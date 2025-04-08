@@ -14,7 +14,7 @@ from scipy import interpolate
 from scipy.interpolate import RegularGridInterpolator
 from tqdm import tqdm
 import matplotlib as mpl
-# mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import FixedLocator
@@ -42,8 +42,9 @@ def save_h5(date,
         wavelength=532.0,
         vnames=['jday', 'lon', 'lat', 'sza', \
             'tmhr', 'alt',\
-            'f-up_ssfr', 'f-down_ssfr',\
-            'f-down-diffuse_spns', 'f-down_spns', \
+            'ang_pit', 'ang_rol',\
+            # 'f-up_ssfr', 'f-down_ssfr',\
+            'f-down-diffuse_hsr1', 'f-down_hsr1', \
             'cot', 'cer', 'cth', \
             'f-down_mca-3d', 'f-down-diffuse_mca-3d', 'f-down-direct_mca-3d', 'f-up_mca-3d',\
             'f-down_mca-3d-alt-all', 'f-down-diffuse_mca-3d-alt-all', 'f-down-direct_mca-3d-alt-all', 'f-up_mca-3d-alt-all',\
@@ -188,59 +189,63 @@ def run_mcarats_one(
     """
 
     # define an atmosphere object
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #╭────────────────────────────────────────────────────────────────────────────╮#
     levels    = np.linspace(0.0, 20.0, 21)
     fname_atm = '%s/atm_%3.3d.pk' % (fdir, index)
     atm0      = atm_atmmod(levels=levels, fname=fname_atm, overwrite=overwrite)
-    # ------------------------------------------------------------------------------------------------------
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
     # define an absorption object
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #╭────────────────────────────────────────────────────────────────────────────╮#
     fname_abs = '%s/abs_%3.3d.pk' % (fdir, index)
     abs0      = abs_16g(wavelength=wavelength, fname=fname_abs, atm_obj=atm0, overwrite=overwrite)
-    # ------------------------------------------------------------------------------------------------------
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
     # define an cloud object
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    fname_cld = '%s/cld_him_%3.3d.pk' % (fdir, index)
+    #╭────────────────────────────────────────────────────────────────────────────╮#
+    fname_cld = '%s/cld_sat_%3.3d.pk' % (fdir, index)
 
     if overwrite:
-        him0      = himawari_l2(fnames=[fname_sat], extent=extent, vnames=['cld_height_acha'])
-        lon_2d, lat_2d, cot_2d = grid_modis_by_extent(him0.data['lon']['data'], him0.data['lat']['data'], him0.data['cot']['data'], extent=extent)
-        lon_2d, lat_2d, cer_2d = grid_modis_by_extent(him0.data['lon']['data'], him0.data['lat']['data'], him0.data['cermg']['data'], extent=extent)
+        sat0 = er3t.util.abi_l2(fnames=[fname_sat], extent=extent, vnames=['cld_height_acha'])
+        lon_2d, lat_2d, cot_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cot']['data'], extent=extent)
+        lon_2d, lat_2d, cer_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cer']['data'], extent=extent)
         cot_2d[cot_2d>100.0] = 100.0
         cer_2d[cer_2d==0.0] = 1.0
-        him0.data['lon_2d'] = dict(name='Gridded longitude'               , units='degrees'    , data=lon_2d)
-        him0.data['lat_2d'] = dict(name='Gridded latitude'                , units='degrees'    , data=lat_2d)
-        him0.data['cot_2d'] = dict(name='Gridded cloud optical thickness' , units='N/A'        , data=cot_2d)
-        him0.data['cer_2d'] = dict(name='Gridded cloud effective radius'  , units='micro'      , data=cer_2d)
+        sat0.data['lon_2d'] = dict(name='Gridded longitude'               , units='degrees'    , data=lon_2d)
+        sat0.data['lat_2d'] = dict(name='Gridded latitude'                , units='degrees'    , data=lat_2d)
+        sat0.data['cot_2d'] = dict(name='Gridded cloud optical thickness' , units='N/A'        , data=cot_2d)
+        sat0.data['cer_2d'] = dict(name='Gridded cloud effective radius'  , units='micro'      , data=cer_2d)
 
         if cloud_top_height is None:
-            lon_2d, lat_2d, cth_2d = grid_modis_by_extent(him0.data['lon']['data'], him0.data['lat']['data'], him0.data['cld_height_acha']['data'], extent=extent)
+            lon_2d, lat_2d, cth_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cld_height_acha']['data'], extent=extent)
             cth_2d[cth_2d<0.0]  = 0.0; cth_2d /= 1000.0
-            him0.data['cth_2d'] = dict(name='Gridded cloud top height', units='km', data=cth_2d)
-            cloud_top_height = him0.data['cth_2d']['data']
-        cld0 = cld_sat(sat_obj=him0, fname=fname_cld, cth=cloud_top_height, cgt=1.0, dz=(levels[1]-levels[0]), overwrite=overwrite)
+            sat0.data['cth_2d'] = dict(name='Gridded cloud top height', units='km', data=cth_2d)
+            cloud_top_height = sat0.data['cth_2d']['data']
+        cld0 = cld_sat(sat_obj=sat0, fname=fname_cld, cth=cloud_top_height, cgt=1.0, dz=(levels[1]-levels[0]), overwrite=overwrite)
     else:
         cld0 = cld_sat(fname=fname_cld, overwrite=overwrite)
-    # ----------------------------------------------------------------------------------------------------
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
-    pha0 = pha_mie(wvl0=wavelength)
+
+    # define phase object
+    #╭────────────────────────────────────────────────────────────────────────────╮#
+    pha0 = pha_mie(wavelength=wavelength)
     sca  = mca_sca(pha_obj=pha0, fname='%s/mca_sca.bin' % fdir, overwrite=overwrite)
-
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
     # define mcarats 1d and 3d "atmosphere", can represent aersol, cloud, atmosphere
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #╭────────────────────────────────────────────────────────────────────────────╮#
     atm1d0  = mca_atm_1d(atm_obj=atm0, abs_obj=abs0)
     atm_1ds = [atm1d0]
 
     atm3d0  = mca_atm_3d(cld_obj=cld0, atm_obj=atm0, pha_obj=pha0, fname='%s/mca_atm_3d.bin' % fdir, quiet=quiet, overwrite=overwrite)
+    # atm3d0  = mca_atm_3d(cld_obj=cld0, atm_obj=atm0, pha_obj=pha0, fname='%s/mca_atm_3d.bin' % fdir, quiet=quiet, overwrite=False)
     atm_3ds = [atm3d0]
-    # ------------------------------------------------------------------------------------------------------
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
 
     # define mcarats object
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #╭────────────────────────────────────────────────────────────────────────────╮#
     mca0 = mcarats_ng(
             atm_1ds=atm_1ds,
             atm_3ds=atm_3ds,
@@ -248,7 +253,7 @@ def run_mcarats_one(
             date=date,
             weights=abs0.coef['weight']['data'],
             solar_zenith_angle=solar_zenith_angle,
-            fdir='%s/%.2fnm/himawari/%s/%3.3d' % (fdir, wavelength, solver.lower(), index),
+            fdir='%s/%.2fnm/sat/%s/%3.3d' % (fdir, wavelength, solver.lower(), index),
             Nrun=3,
             photons=photons,
             solver=solver,
@@ -257,14 +262,16 @@ def run_mcarats_one(
             mp_mode='py',
             quiet=quiet,
             overwrite=overwrite
+            # overwrite=False
             )
-    # ------------------------------------------------------------------------------------------------------
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
 
     # define mcarats output object
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    out0 = mca_out_ng(fname='%s/mca-out-%s-%s_himawari_%3.3d.h5' % (fdir, target.lower(), solver.lower(), index), mca_obj=mca0, abs_obj=abs0, mode='mean', squeeze=True, quiet=quiet, overwrite=overwrite)
-    # ------------------------------------------------------------------------------------------------------
+    #╭────────────────────────────────────────────────────────────────────────────╮#
+    out0 = mca_out_ng(fname='%s/mca-out-%s-%s_sat_%3.3d.h5' % (fdir, target.lower(), solver.lower(), index), mca_obj=mca0, abs_obj=abs0, mode='mean', squeeze=True, quiet=quiet, overwrite=overwrite)
+    # out0 = mca_out_ng(fname='%s/mca-out-%s-%s_sat_%3.3d.h5' % (fdir, target.lower(), solver.lower(), index), mca_obj=mca0, abs_obj=abs0, mode='mean', squeeze=True, quiet=quiet, overwrite=False)
+    #╰────────────────────────────────────────────────────────────────────────────╯#
 
     return atm0, cld0, out0
 
@@ -340,7 +347,7 @@ def get_jday_geos_east(fnames):
 def first_run(
         date,
         wavelength=532.0,
-        spns=True,
+        hsr1=True,
         ssfr=False,
         run_rtm=True,
         run_plt=True,
@@ -403,9 +410,11 @@ def first_run(
     flt_trk['jday'] = jday[logic]
     flt_trk['lon']  = lon[logic]
     flt_trk['lat']  = lat[logic]
+    flt_trk['ang_pit']  = pit[logic]
+    flt_trk['ang_rol']  = rol[logic]
     flt_trk['sza']  = sza[logic]
     flt_trk['tmhr'] = tmhr[logic]
-    flt_trk['alt']  = alt/1000.0
+    flt_trk['alt']  = alt[logic]/1000.0
     #╰────────────────────────────────────────────────────────────────────────────╯#
 
 
@@ -429,7 +438,7 @@ def first_run(
 
     # HSR1 (used to be called SPNS) data
     #╭────────────────────────────────────────────────────────────────────────────╮#
-    if spns:
+    if hsr1:
 
         fname_hsr1 = '%s/MAGPIE_SPN-S_%s_v2.h5' % (fdir_data, date_s_)
         f_hsr1 = h5py.File(fname_hsr1, 'r')
@@ -529,7 +538,7 @@ class flt_sim:
                 self.flt_trks = obj.flt_trks
                 self.sat_imgs = obj.sat_imgs
             else:
-                sys.exit('Error   [flt_sim]: File \'%s\' is not the correct pickle file to load.' % fname)
+                sys.exit('Error [flt_sim]: File \'%s\' is not the correct pickle file to load.' % fname)
 
     def run(self, overwrite=True):
 
@@ -560,11 +569,13 @@ class flt_sim:
                 indices_lon = np.int_(np.round((lon_trk-lon_sat[0])/dlon, decimals=0))
                 indices_lat = np.int_(np.round((lat_trk-lat_sat[0])/dlat, decimals=0))
                 self.flt_trks[i]['cot'] = self.sat_imgs[i]['cot'][indices_lon, indices_lat]
-                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat]
+                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat, -1]
 
                 if 'cth' in cld_sat0.lay.keys():
                     self.sat_imgs[i]['cth'] = cld_sat0.lay['cth']['data']
                     self.flt_trks[i]['cth'] = self.sat_imgs[i]['cth'][indices_lon, indices_lat]
+                    print(np.nanmin(self.sat_imgs[i]['cth']))
+                    print(np.nanmax(self.sat_imgs[i]['cth']))
 
                 data_3d_mca = {
                     'lon'         : cld_sat0.lay['lon']['data'][:, 0],
@@ -609,32 +620,30 @@ class flt_sim:
 
 if __name__ == '__main__':
 
-    run_rtm=False
+    run_rtm=True
     run_plt=False
 
     dates = [
-        datetime.datetime(2023, 8, 5),
-        # datetime.datetime(2019, 9, 19),
-        # datetime.datetime(2019, 8, 29),
-        # datetime.datetime(2019, 8, 30),
-        # datetime.datetime(2019, 9, 4) ,
-        # datetime.datetime(2019, 9, 6) ,
-        # datetime.datetime(2019, 9, 8) ,
-        # datetime.datetime(2019, 9, 13),
-        # datetime.datetime(2019, 9, 15),
-        # datetime.datetime(2019, 9, 16),
-        # datetime.datetime(2019, 9, 21),
-        # datetime.datetime(2019, 9, 23),
-        # datetime.datetime(2019, 9, 25),
-        # datetime.datetime(2019, 9, 27),
-        # datetime.datetime(2019, 9, 29),
-        # datetime.datetime(2019, 10, 1),
-        # datetime.datetime(2019, 10, 3),
-        # datetime.datetime(2019, 10, 5)
+            datetime.datetime(2023, 8, 2),
+            datetime.datetime(2023, 8, 3),
+            # datetime.datetime(2023, 8, 5),
+            datetime.datetime(2023, 8, 13),
+            datetime.datetime(2023, 8, 14), # heavy aerosol condition
+            datetime.datetime(2023, 8, 15), # heaviest aerosol condition
+            datetime.datetime(2023, 8, 16),
+            datetime.datetime(2023, 8, 18),
+            datetime.datetime(2023, 8, 20),
+            datetime.datetime(2023, 8, 21),
+            datetime.datetime(2023, 8, 22),
+            datetime.datetime(2023, 8, 23),
+            datetime.datetime(2023, 8, 25),
+            datetime.datetime(2023, 8, 26),
+            datetime.datetime(2023, 8, 27),
+            datetime.datetime(2023, 8, 28), # bad dewpoint temperature (thus RH) data at the end of the flight
         ]
 
     wavelength = 745.0
 
     for date in dates:
-        first_run(date, run_rtm=run_rtm, run_plt=run_plt, wavelength=wavelength, spns=True)
+        first_run(date, run_rtm=run_rtm, run_plt=run_plt, wavelength=wavelength, hsr1=True)
         save_h5(date, wavelength=wavelength)
