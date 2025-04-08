@@ -624,12 +624,12 @@ if __name__ == '__main__':
     run_plt=False
 
     dates = [
+            datetime.datetime(2023, 8, 14), # heavy aerosol condition
+            datetime.datetime(2023, 8, 15), # heaviest aerosol condition
             datetime.datetime(2023, 8, 2),
             datetime.datetime(2023, 8, 3),
             # datetime.datetime(2023, 8, 5),
             datetime.datetime(2023, 8, 13),
-            datetime.datetime(2023, 8, 14), # heavy aerosol condition
-            datetime.datetime(2023, 8, 15), # heaviest aerosol condition
             datetime.datetime(2023, 8, 16),
             datetime.datetime(2023, 8, 18),
             datetime.datetime(2023, 8, 20),
