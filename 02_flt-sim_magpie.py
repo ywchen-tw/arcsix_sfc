@@ -24,9 +24,6 @@ import matplotlib.patches as mpatches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.image as mpimg
 
-import cartopy.crs as ccrs
-from owslib.wmts import WebMapTileService
-
 import er3t
 from er3t.pre.atm import atm_atmmod
 from er3t.pre.abs import abs_16g
@@ -41,19 +38,12 @@ from er3t.rtm.mca import mca_sca
 
 
 
-
-
-def check_continuity(data, threshold=0.1):
-
-    data = np.append(data[0], data)
-
-    return (np.abs(data[1:]-data[:-1]) < threshold)
-
-
 def save_h5(date,
         wavelength=532.0,
         vnames=['jday', 'lon', 'lat', 'sza', \
-            'tmhr', 'alt', 'f-up_ssfr', 'f-down_ssfr', 'f-down-diffuse_spns', 'f-down_spns', \
+            'tmhr', 'alt',\
+            'f-up_ssfr', 'f-down_ssfr',\
+            'f-down-diffuse_spns', 'f-down_spns', \
             'cot', 'cer', 'cth', \
             'f-down_mca-3d', 'f-down-diffuse_mca-3d', 'f-down-direct_mca-3d', 'f-up_mca-3d',\
             'f-down_mca-3d-alt-all', 'f-down-diffuse_mca-3d-alt-all', 'f-down-direct_mca-3d-alt-all', 'f-up_mca-3d-alt-all',\
@@ -103,9 +93,11 @@ def save_h5(date,
     # os.system('cp %s %s' % (fname_h5, fname_des))
     # os.system('chmod 777 %s' % fname_des)
 
+def check_continuity(data, threshold=0.1):
 
+    data = np.append(data[0], data)
 
-
+    return (np.abs(data[1:]-data[:-1]) < threshold)
 
 def partition_flight_track(flt_trk, tmhr_interval=0.1, margin_x=1.0, margin_y=1.0):
 
@@ -478,6 +470,8 @@ def first_run(
 
     # os.system('rm -rf %s' % fdir)
 
+
+
 class flt_sim:
 
     def __init__(
@@ -613,7 +607,6 @@ class flt_sim:
 
 
 
-
 if __name__ == '__main__':
 
     run_rtm=False
@@ -644,5 +637,4 @@ if __name__ == '__main__':
 
     for date in dates:
         first_run(date, run_rtm=run_rtm, run_plt=run_plt, wavelength=wavelength, spns=True)
-        # create_video(date)
         save_h5(date, wavelength=wavelength)
