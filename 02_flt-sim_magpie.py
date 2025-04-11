@@ -351,8 +351,8 @@ def first_run(
         ssfr=False,
         run_rtm=True,
         run_plt=True,
-        fdir_sat='/argus/field/magpie/2023/sat',
-        fdir_data='/argus/field/magpie/processed'
+        fdir_sat='data/magpie/2023/sat',
+        fdir_data='data/magpie/processed'
         ):
 
     date_s = date.strftime('%Y%m%d')
@@ -628,7 +628,7 @@ if __name__ == '__main__':
             datetime.datetime(2023, 8, 15), # heaviest aerosol condition
             datetime.datetime(2023, 8, 2),
             datetime.datetime(2023, 8, 3),
-            # datetime.datetime(2023, 8, 5),
+            datetime.datetime(2023, 8, 5),
             datetime.datetime(2023, 8, 13),
             datetime.datetime(2023, 8, 16),
             datetime.datetime(2023, 8, 18),
