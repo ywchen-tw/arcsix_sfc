@@ -399,8 +399,7 @@ def first_run(
     f_hsk.close()
 
     logic = (jday>=jday_sat_all[0]) & (jday<=jday_sat_all[-1]) & \
-            (np.logical_not(np.isnan(jday))) & (np.logical_not(np.isnan(sza))) & \
-            check_continuity(lon) & check_continuity(lat)
+            (np.logical_not(np.isnan(jday))) & (np.logical_not(np.isnan(sza)))
     #╰────────────────────────────────────────────────────────────────────────────╯#
 
 
@@ -474,8 +473,10 @@ def first_run(
 
         sat_imgs.append(sat_img)
     #╰────────────────────────────────────────────────────────────────────────────╯#
+    print(flt_trks)
+    print(sat_imgs)
 
-    sim0 = flt_sim(date=date, wavelength=wavelength, flt_trks=flt_trks, sat_imgs=sat_imgs, fname='data/flt_sim_%09.4fnm_%s.pk' % (wavelength, date_s), overwrite=True, overwrite_rtm=run_rtm)
+    # sim0 = flt_sim(date=date, wavelength=wavelength, flt_trks=flt_trks, sat_imgs=sat_imgs, fname='data/flt_sim_%09.4fnm_%s.pk' % (wavelength, date_s), overwrite=True, overwrite_rtm=run_rtm)
 
     # os.system('rm -rf %s' % fdir)
 
