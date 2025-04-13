@@ -480,7 +480,7 @@ class flt_sim:
 
                 # figure
                 #╭────────────────────────────────────────────────────────────────────────────╮#
-                plot = False
+                plot = True
                 if plot:
                     rcParams['font.size'] = 12
                     plt.close('all')
