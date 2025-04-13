@@ -686,7 +686,7 @@ class flt_sim:
 
 if __name__ == '__main__':
 
-    run_rtm=False
+    run_rtm=True
     run_plt=False
 
     dates = [
