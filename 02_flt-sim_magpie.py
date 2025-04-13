@@ -14,7 +14,7 @@ from scipy import interpolate
 from scipy.interpolate import RegularGridInterpolator
 from tqdm import tqdm
 import matplotlib as mpl
-# mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import FixedLocator
@@ -100,7 +100,7 @@ def check_continuity(data, threshold=0.1):
 
     return (np.abs(data[1:]-data[:-1]) < threshold)
 
-def partition_flight_track(flt_trk, tmhr_interval=0.1, margin_x=1.0, margin_y=1.0):
+def partition_flight_track(flt_trk, tmhr_interval=0.1, margin_px=25.0, margin_py=25.0):
 
     """
     Input:
@@ -157,6 +157,9 @@ def partition_flight_track(flt_trk, tmhr_interval=0.1, margin_x=1.0, margin_y=1.
                 flt_trk_segment[key]     = flt_trk[key][logic]
                 if key in ['jday', 'tmhr', 'lon', 'lat', 'alt', 'sza']:
                     flt_trk_segment[key+'0'] = np.nanmean(flt_trk_segment[key])
+
+            margin_x = (np.nanmax(flt_trk_segment['lon'])-np.nanmin(flt_trk_segment['lon'])) * margin_px/100.0
+            margin_y = (np.nanmax(flt_trk_segment['lat'])-np.nanmin(flt_trk_segment['lat'])) * margin_py/100.0
 
             flt_trk_segment['extent'] = np.array([np.nanmin(flt_trk_segment['lon'])-margin_x, \
                                                   np.nanmax(flt_trk_segment['lon'])+margin_x, \
@@ -483,7 +486,7 @@ class flt_sim:
     def __init__(
             self,
             date=datetime.datetime.now(),
-            photons=2e7,
+            photons=2e8,
             Ncpu=16,
             wavelength=None,
             flt_trks=None,
@@ -605,7 +608,7 @@ class flt_sim:
 
                 # figure
                 #╭────────────────────────────────────────────────────────────────────────────╮#
-                plot = False
+                plot = True
                 if plot:
                     rcParams['font.size'] = 12
                     plt.close('all')
