@@ -14,7 +14,7 @@ from scipy import interpolate
 from scipy.interpolate import RegularGridInterpolator
 from tqdm import tqdm
 import matplotlib as mpl
-mpl.use('Agg')
+# mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import FixedLocator
@@ -309,8 +309,6 @@ def interpolate_3d_to_flight_track(flt_trk, data_3d):
     indices_lon = np.int_(np.round((lon_trk-lon_field[0])/dlon, decimals=0))
     indices_lat = np.int_(np.round((lat_trk-lat_field[0])/dlat, decimals=0))
 
-    indices_lon = np.int_(flt_trk['lon']-data_3d['lon'][0])
-
     for key in data_3d.keys():
         if key not in ['tmhr', 'lon', 'lat', 'alt']:
             f_interp     = RegularGridInterpolator((data_3d['lon'], data_3d['lat'], data_3d['alt']), data_3d[key])
@@ -473,10 +471,8 @@ def first_run(
 
         sat_imgs.append(sat_img)
     #╰────────────────────────────────────────────────────────────────────────────╯#
-    print(flt_trks)
-    print(sat_imgs)
 
-    # sim0 = flt_sim(date=date, wavelength=wavelength, flt_trks=flt_trks, sat_imgs=sat_imgs, fname='data/flt_sim_%09.4fnm_%s.pk' % (wavelength, date_s), overwrite=True, overwrite_rtm=run_rtm)
+    sim0 = flt_sim(date=date, wavelength=wavelength, flt_trks=flt_trks, sat_imgs=sat_imgs, fname='data/flt_sim_%09.4fnm_%s.pk' % (wavelength, date_s), overwrite=True, overwrite_rtm=run_rtm)
 
     # os.system('rm -rf %s' % fdir)
 
@@ -559,7 +555,7 @@ class flt_sim:
                 self.sat_imgs[i]['lon'] = cld_sat0.lay['lon']['data']
                 self.sat_imgs[i]['lat'] = cld_sat0.lay['lat']['data']
                 self.sat_imgs[i]['cot'] = cld_sat0.lay['cot']['data']
-                self.sat_imgs[i]['cer'] = cld_sat0.lay['cer']['data']
+                self.sat_imgs[i]['cer'] = cld_sat0.lay['cer']['data'][:, :, -1]
 
                 lon_sat = self.sat_imgs[i]['lon'][:, 0]
                 lat_sat = self.sat_imgs[i]['lat'][0, :]
@@ -570,7 +566,7 @@ class flt_sim:
                 indices_lon = np.int_(np.round((lon_trk-lon_sat[0])/dlon, decimals=0))
                 indices_lat = np.int_(np.round((lat_trk-lat_sat[0])/dlat, decimals=0))
                 self.flt_trks[i]['cot'] = self.sat_imgs[i]['cot'][indices_lon, indices_lat]
-                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat, -1]
+                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat]
 
                 if 'cth' in cld_sat0.lay.keys():
                     self.sat_imgs[i]['cth'] = cld_sat0.lay['cth']['data']
@@ -585,6 +581,7 @@ class flt_sim:
                     }
 
                 index_h = np.argmin(np.abs(atm0.lev['altitude']['data']-flt_trk['alt0']))
+
                 if atm0.lev['altitude']['data'][index_h] > flt_trk['alt0']:
                     index_h -= 1
                 if index_h < 0:
@@ -596,6 +593,7 @@ class flt_sim:
                             vname = key.replace('_', '-') + '_mca-3d'
                             self.sat_imgs[i][vname] = mca_out_3d0.data[key]['data'][..., index_h]
                             data_3d_mca[vname] = mca_out_3d0.data[key]['data']
+
                 for key in mca_out_ipa0.data.keys():
                     if key in ['f_down', 'f_down_diffuse', 'f_down_direct', 'f_up', 'toa']:
                         if 'toa' not in key:
@@ -605,9 +603,76 @@ class flt_sim:
 
                 self.flt_trks[i] = interpolate_3d_to_flight_track(flt_trk, data_3d_mca)
 
+                # figure
+                #╭────────────────────────────────────────────────────────────────────────────╮#
+                plot = False
+                if plot:
+                    rcParams['font.size'] = 12
+                    plt.close('all')
+                    fig = plt.figure(figsize=(12, 4))
+                    fig.suptitle('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+
+                    # plot1
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax1 = fig.add_subplot(131)
+                    cot = self.sat_imgs[i]['cot'].copy()
+                    cot[cot==0.0] = np.nan
+                    cs = ax1.imshow(cot.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
+                    ax1.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax1.set_xlabel('Longitude')
+                    ax1.set_ylabel('Latitude')
+                    divider = make_axes_locatable(ax1)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+                    # plot2
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax2 = fig.add_subplot(132)
+                    cer = self.sat_imgs[i]['cer'].copy()
+                    cer[np.isnan(cot)] = np.nan
+                    cs = ax2.imshow(cer.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
+                    ax2.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax2.set_xlabel('Longitude')
+                    ax2.set_ylabel('Latitude')
+                    # ax2.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+                    divider = make_axes_locatable(ax2)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+                    # plot3
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax3 = fig.add_subplot(133)
+                    cth = self.sat_imgs[i]['cth'].copy()
+                    cth[np.isnan(cot)] = np.nan
+                    cs = ax3.imshow(cth.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=10.0)
+                    ax3.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax3.set_xlabel('Longitude')
+                    ax3.set_ylabel('Latitude')
+                    # ax3.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+                    divider = make_axes_locatable(ax3)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+
+                    # save figure
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    fig.subplots_adjust(hspace=0.35, wspace=0.35)
+                    _metadata_ = {'Computer': os.uname()[1], 'Script': os.path.abspath(__file__), 'Function':sys._getframe().f_code.co_name, 'Date':datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}
+                    fname_fig = '%4.4d_%s.png' % (i, _metadata_['Function'],)
+                    plt.savefig(fname_fig, bbox_inches='tight', metadata=_metadata_, transparent=False)
+                    #╰──────────────────────────────────────────────────────────────╯#
+                    # plt.show()
+                    # sys.exit()
+                    plt.close(fig)
+                    plt.clf()
+                #╰────────────────────────────────────────────────────────────────────────────╯#
+
             except Exception as error:
-                print(error)
-                pass
+                msg = 'Error [flt_sim]: Error <%s> encountered.' % error
+                warnings.warn(msg)
 
     def dump(self, fname):
 
@@ -621,7 +686,7 @@ class flt_sim:
 
 if __name__ == '__main__':
 
-    run_rtm=True
+    run_rtm=False
     run_plt=False
 
     dates = [
