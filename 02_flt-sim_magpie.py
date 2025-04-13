@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import copy
+import warnings
 from collections import OrderedDict
 import h5py
 import numpy as np
@@ -160,6 +161,8 @@ def partition_flight_track(flt_trk, tmhr_interval=0.1, margin_px=25.0, margin_py
 
             margin_x = (np.nanmax(flt_trk_segment['lon'])-np.nanmin(flt_trk_segment['lon'])) * margin_px/100.0
             margin_y = (np.nanmax(flt_trk_segment['lat'])-np.nanmin(flt_trk_segment['lat'])) * margin_py/100.0
+            margin_x = max(0.2, margin_x)
+            margin_y = max(0.2, margin_y)
 
             flt_trk_segment['extent'] = np.array([np.nanmin(flt_trk_segment['lon'])-margin_x, \
                                                   np.nanmax(flt_trk_segment['lon'])+margin_x, \
@@ -193,7 +196,7 @@ def run_mcarats_one(
 
     # define an atmosphere object
     #╭────────────────────────────────────────────────────────────────────────────╮#
-    levels    = np.linspace(0.0, 20.0, 21)
+    levels    = np.append(np.arange(0.0, 2.0, 0.2), np.arange(2.0, 20.1, 2.0))
     fname_atm = '%s/atm_%3.3d.pk' % (fdir, index)
     atm0      = atm_atmmod(levels=levels, fname=fname_atm, overwrite=overwrite)
     #╰────────────────────────────────────────────────────────────────────────────╯#
@@ -210,8 +213,8 @@ def run_mcarats_one(
 
     if overwrite:
         sat0 = er3t.util.abi_l2(fnames=[fname_sat], extent=extent, vnames=['cld_height_acha'])
-        lon_2d, lat_2d, cot_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cot']['data'], extent=extent)
-        lon_2d, lat_2d, cer_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cer']['data'], extent=extent)
+        lon_2d, lat_2d, cot_2d = er3t.util.grid_by_dxdy(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cot']['data'], extent=extent, dx=3000.0, dy=3000.0)
+        lon_2d, lat_2d, cer_2d = er3t.util.grid_by_dxdy(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cer']['data'], extent=extent, dx=3000.0, dy=3000.0)
         cot_2d[cot_2d>100.0] = 100.0
         cer_2d[cer_2d==0.0] = 1.0
         sat0.data['lon_2d'] = dict(name='Gridded longitude'               , units='degrees'    , data=lon_2d)
@@ -220,11 +223,15 @@ def run_mcarats_one(
         sat0.data['cer_2d'] = dict(name='Gridded cloud effective radius'  , units='micro'      , data=cer_2d)
 
         if cloud_top_height is None:
-            lon_2d, lat_2d, cth_2d = er3t.util.grid_by_extent(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cld_height_acha']['data'], extent=extent)
-            cth_2d[cth_2d<0.0]  = 0.0; cth_2d /= 1000.0
-            sat0.data['cth_2d'] = dict(name='Gridded cloud top height', units='km', data=cth_2d)
-            cloud_top_height = sat0.data['cth_2d']['data']
-        cld0 = cld_sat(sat_obj=sat0, fname=fname_cld, cth=cloud_top_height, cgt=1.0, dz=(levels[1]-levels[0]), overwrite=overwrite)
+            try:
+                lon_2d, lat_2d, cth_2d = er3t.util.grid_by_dxdy(sat0.data['lon']['data'], sat0.data['lat']['data'], sat0.data['cld_height_acha']['data'], extent=extent, dx=3000.0, dy=3000.0)
+                cth_2d[cth_2d<0.0]  = 0.0; cth_2d /= 1000.0
+                sat0.data['cth_2d'] = dict(name='Gridded cloud top height', units='km', data=cth_2d)
+                cloud_top_height = sat0.data['cth_2d']['data']
+            except Exception as err:
+                print('Warning [run_mcarats_one]: Cannot generate 2D CTH field, falling back to 1km for CTH <%s>...' % err)
+                cld_top_height = np.ones_like(cot_2d)
+        cld0 = cld_sat(sat_obj=sat0, fname=fname_cld, cth=cloud_top_height, cgt=0.4, dz=(levels[1]-levels[0]), overwrite=overwrite)
     else:
         cld0 = cld_sat(fname=fname_cld, overwrite=overwrite)
     #╰────────────────────────────────────────────────────────────────────────────╯#
@@ -345,6 +352,211 @@ def get_jday_geos_east(fnames):
 
     return np.array(jday)
 
+
+
+
+class flt_sim:
+
+    def __init__(
+            self,
+            date=datetime.datetime.now(),
+            photons=2e8,
+            Ncpu=16,
+            wavelength=None,
+            flt_trks=None,
+            sat_imgs=None,
+            fname=None,
+            overwrite=False,
+            overwrite_rtm=False,
+            quiet=False,
+            verbose=False
+            ):
+
+        self.date      = date
+        self.photons   = photons
+        self.Ncpu      = Ncpu
+        self.wvl       = wavelength
+        self.flt_trks  = flt_trks
+        self.sat_imgs  = sat_imgs
+        self.overwrite = overwrite
+        self.quiet     = quiet
+        self.verbose   = verbose
+
+        if ((fname is not None) and (os.path.exists(fname)) and (not overwrite)):
+
+            self.load(fname)
+
+        elif (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is not None) and (os.path.exists(fname)) and (overwrite)) or \
+             (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is not None) and (not os.path.exists(fname))):
+
+            self.run(overwrite=overwrite_rtm)
+            self.dump(fname)
+
+        elif (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is None)):
+
+            self.run()
+
+        else:
+
+            sys.exit('Error [flt_sim]: Please check if \'%s\' exists or provide \'wavelength\', \'flt_trks\', and \'sat_imgs\' to proceed.' % fname)
+
+    def load(self, fname):
+
+        with open(fname, 'rb') as f:
+            obj = pickle.load(f)
+            if hasattr(obj, 'flt_trks') and hasattr(obj, 'sat_imgs'):
+                if self.verbose:
+                    print('Message [flt_sim]: Loading %s ...' % fname)
+                self.wvl      = obj.wvl
+                self.fname    = obj.fname
+                self.flt_trks = obj.flt_trks
+                self.sat_imgs = obj.sat_imgs
+            else:
+                sys.exit('Error [flt_sim]: File \'%s\' is not the correct pickle file to load.' % fname)
+
+    def run(self, overwrite=True):
+
+        N = len(self.flt_trks)
+
+        for i in range(N):
+
+            print('%3.3d/%3.3d' % (i, N))
+
+            flt_trk = self.flt_trks[i]
+            sat_img = self.sat_imgs[i]
+
+            try:
+                atm0, cld_sat0, mca_out_ipa0 = run_mcarats_one(i, sat_img['fname'], sat_img['extent'], flt_trk['sza0'], date=self.date, wavelength=self.wvl, solver='IPA', fdir='tmp-data/%s/%09.4fnm' % (self.date.strftime('%Y%m%d'), self.wvl), photons=self.photons, Ncpu=self.Ncpu, overwrite=overwrite, quiet=self.quiet)
+                atm0, cld_sat0, mca_out_3d0  = run_mcarats_one(i, sat_img['fname'], sat_img['extent'], flt_trk['sza0'], date=self.date, wavelength=self.wvl, solver='3D' , fdir='tmp-data/%s/%09.4fnm' % (self.date.strftime('%Y%m%d'), self.wvl), photons=self.photons, Ncpu=self.Ncpu, overwrite=overwrite, quiet=self.quiet)
+
+                self.sat_imgs[i]['lon'] = cld_sat0.lay['lon']['data']
+                self.sat_imgs[i]['lat'] = cld_sat0.lay['lat']['data']
+                self.sat_imgs[i]['cot'] = cld_sat0.lay['cot']['data']
+                self.sat_imgs[i]['cer'] = cld_sat0.lay['cer']['data'][:, :, -1]
+
+                lon_sat = self.sat_imgs[i]['lon'][:, 0]
+                lat_sat = self.sat_imgs[i]['lat'][0, :]
+                dlon    = lon_sat[1]-lon_sat[0]
+                dlat    = lat_sat[1]-lat_sat[0]
+                lon_trk = self.flt_trks[i]['lon']
+                lat_trk = self.flt_trks[i]['lat']
+                indices_lon = np.int_(np.round((lon_trk-lon_sat[0])/dlon, decimals=0))
+                indices_lat = np.int_(np.round((lat_trk-lat_sat[0])/dlat, decimals=0))
+                self.flt_trks[i]['cot'] = self.sat_imgs[i]['cot'][indices_lon, indices_lat]
+                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat]
+
+                if 'cth' in cld_sat0.lay.keys():
+                    self.sat_imgs[i]['cth'] = cld_sat0.lay['cth']['data']
+                    self.flt_trks[i]['cth'] = self.sat_imgs[i]['cth'][indices_lon, indices_lat]
+
+                data_3d_mca = {
+                    'lon'         : cld_sat0.lay['lon']['data'][:, 0],
+                    'lat'         : cld_sat0.lay['lat']['data'][0, :],
+                    'alt'         : atm0.lev['altitude']['data'],
+                    }
+
+                index_h = np.argmin(np.abs(atm0.lev['altitude']['data']-flt_trk['alt0']))
+
+                if atm0.lev['altitude']['data'][index_h] > flt_trk['alt0']:
+                    index_h -= 1
+                if index_h < 0:
+                    index_h = 0
+
+                for key in mca_out_3d0.data.keys():
+                    if key in ['f_down', 'f_down_diffuse', 'f_down_direct', 'f_up', 'toa']:
+                        if 'toa' not in key:
+                            vname = key.replace('_', '-') + '_mca-3d'
+                            self.sat_imgs[i][vname] = mca_out_3d0.data[key]['data'][..., index_h]
+                            data_3d_mca[vname] = mca_out_3d0.data[key]['data']
+
+                for key in mca_out_ipa0.data.keys():
+                    if key in ['f_down', 'f_down_diffuse', 'f_down_direct', 'f_up', 'toa']:
+                        if 'toa' not in key:
+                            vname = key.replace('_', '-') + '_mca-ipa'
+                            self.sat_imgs[i][vname] = mca_out_ipa0.data[key]['data'][..., index_h]
+                            data_3d_mca[vname] = mca_out_ipa0.data[key]['data']
+
+                self.flt_trks[i] = interpolate_3d_to_flight_track(flt_trk, data_3d_mca)
+
+                # figure
+                #╭────────────────────────────────────────────────────────────────────────────╮#
+                plot = False
+                if plot:
+                    rcParams['font.size'] = 12
+                    plt.close('all')
+                    fig = plt.figure(figsize=(12, 4))
+                    fig.suptitle('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+
+                    # plot1
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax1 = fig.add_subplot(131)
+                    cot = self.sat_imgs[i]['cot'].copy()
+                    cot[cot==0.0] = np.nan
+                    cs = ax1.imshow(cot.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
+                    ax1.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax1.set_xlabel('Longitude')
+                    ax1.set_ylabel('Latitude')
+                    divider = make_axes_locatable(ax1)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+                    # plot2
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax2 = fig.add_subplot(132)
+                    cer = self.sat_imgs[i]['cer'].copy()
+                    cer[np.isnan(cot)] = np.nan
+                    cs = ax2.imshow(cer.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
+                    ax2.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax2.set_xlabel('Longitude')
+                    ax2.set_ylabel('Latitude')
+                    # ax2.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+                    divider = make_axes_locatable(ax2)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+                    # plot3
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    ax3 = fig.add_subplot(133)
+                    cth = self.sat_imgs[i]['cth'].copy()
+                    cth[np.isnan(cot)] = np.nan
+                    cs = ax3.imshow(cth.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=10.0)
+                    ax3.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
+                    ax3.set_xlabel('Longitude')
+                    ax3.set_ylabel('Latitude')
+                    # ax3.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
+                    divider = make_axes_locatable(ax3)
+                    cax = divider.append_axes('right', '5%', pad='3%')
+                    cbar = fig.colorbar(cs, cax=cax)
+                    #╰──────────────────────────────────────────────────────────────╯#
+
+
+                    # save figure
+                    #╭──────────────────────────────────────────────────────────────╮#
+                    fig.subplots_adjust(hspace=0.35, wspace=0.35)
+                    _metadata_ = {'Computer': os.uname()[1], 'Script': os.path.abspath(__file__), 'Function':sys._getframe().f_code.co_name, 'Date':datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}
+                    fname_fig = '%4.4d_%s.png' % (i, _metadata_['Function'],)
+                    plt.savefig(fname_fig, bbox_inches='tight', metadata=_metadata_, transparent=False)
+                    #╰──────────────────────────────────────────────────────────────╯#
+                    # plt.show()
+                    # sys.exit()
+                    plt.close(fig)
+                    plt.clf()
+                #╰────────────────────────────────────────────────────────────────────────────╯#
+
+            except Exception as error:
+                msg = 'Error [flt_sim]: Error <%s> encountered.' % error
+                warnings.warn(msg)
+
+    def dump(self, fname):
+
+        self.fname = fname
+        with open(fname, 'wb') as f:
+            if self.verbose:
+                print('Message [flt_sim]: Saving object into %s ...' % fname)
+            pickle.dump(self, f)
+
 def first_run(
         date,
         wavelength=532.0,
@@ -458,7 +670,7 @@ def first_run(
 
     # partition flight track
     #╭────────────────────────────────────────────────────────────────────────────╮#
-    flt_trks = partition_flight_track(flt_trk, tmhr_interval=0.05, margin_x=1.0, margin_y=1.0)
+    flt_trks = partition_flight_track(flt_trk, tmhr_interval=0.05, margin_px=25.0, margin_py=25.0)
     #╰────────────────────────────────────────────────────────────────────────────╯#
 
 
@@ -478,212 +690,6 @@ def first_run(
     sim0 = flt_sim(date=date, wavelength=wavelength, flt_trks=flt_trks, sat_imgs=sat_imgs, fname='data/flt_sim_%09.4fnm_%s.pk' % (wavelength, date_s), overwrite=True, overwrite_rtm=run_rtm)
 
     # os.system('rm -rf %s' % fdir)
-
-
-
-class flt_sim:
-
-    def __init__(
-            self,
-            date=datetime.datetime.now(),
-            photons=2e8,
-            Ncpu=16,
-            wavelength=None,
-            flt_trks=None,
-            sat_imgs=None,
-            fname=None,
-            overwrite=False,
-            overwrite_rtm=False,
-            quiet=False,
-            verbose=False
-            ):
-
-        self.date      = date
-        self.photons   = photons
-        self.Ncpu      = Ncpu
-        self.wvl       = wavelength
-        self.flt_trks  = flt_trks
-        self.sat_imgs  = sat_imgs
-        self.overwrite = overwrite
-        self.quiet     = quiet
-        self.verbose   = verbose
-
-        if ((fname is not None) and (os.path.exists(fname)) and (not overwrite)):
-
-            self.load(fname)
-
-        elif (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is not None) and (os.path.exists(fname)) and (overwrite)) or \
-             (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is not None) and (not os.path.exists(fname))):
-
-            self.run(overwrite=overwrite_rtm)
-            self.dump(fname)
-
-        elif (((flt_trks is not None) and (sat_imgs is not None) and (wavelength is not None)) and (fname is None)):
-
-            self.run()
-
-        else:
-
-            sys.exit('Error [flt_sim]: Please check if \'%s\' exists or provide \'wavelength\', \'flt_trks\', and \'sat_imgs\' to proceed.' % fname)
-
-    def load(self, fname):
-
-        with open(fname, 'rb') as f:
-            obj = pickle.load(f)
-            if hasattr(obj, 'flt_trks') and hasattr(obj, 'sat_imgs'):
-                if self.verbose:
-                    print('Message [flt_sim]: Loading %s ...' % fname)
-                self.wvl      = obj.wvl
-                self.fname    = obj.fname
-                self.flt_trks = obj.flt_trks
-                self.sat_imgs = obj.sat_imgs
-            else:
-                sys.exit('Error [flt_sim]: File \'%s\' is not the correct pickle file to load.' % fname)
-
-    def run(self, overwrite=True):
-
-        N = len(self.flt_trks)
-
-        for i in range(N):
-
-            print('%3.3d/%3.3d' % (i, N))
-
-            flt_trk = self.flt_trks[i]
-            sat_img = self.sat_imgs[i]
-
-            try:
-                atm0, cld_sat0, mca_out_ipa0 = run_mcarats_one(i, sat_img['fname'], sat_img['extent'], flt_trk['sza0'], date=self.date, wavelength=self.wvl, solver='IPA', fdir='tmp-data/%s/%09.4fnm' % (self.date.strftime('%Y%m%d'), self.wvl), photons=self.photons, Ncpu=self.Ncpu, overwrite=overwrite, quiet=self.quiet)
-                atm0, cld_sat0, mca_out_3d0  = run_mcarats_one(i, sat_img['fname'], sat_img['extent'], flt_trk['sza0'], date=self.date, wavelength=self.wvl, solver='3D' , fdir='tmp-data/%s/%09.4fnm' % (self.date.strftime('%Y%m%d'), self.wvl), photons=self.photons, Ncpu=self.Ncpu, overwrite=overwrite, quiet=self.quiet)
-
-                self.sat_imgs[i]['lon'] = cld_sat0.lay['lon']['data']
-                self.sat_imgs[i]['lat'] = cld_sat0.lay['lat']['data']
-                self.sat_imgs[i]['cot'] = cld_sat0.lay['cot']['data']
-                self.sat_imgs[i]['cer'] = cld_sat0.lay['cer']['data'][:, :, -1]
-
-                lon_sat = self.sat_imgs[i]['lon'][:, 0]
-                lat_sat = self.sat_imgs[i]['lat'][0, :]
-                dlon    = lon_sat[1]-lon_sat[0]
-                dlat    = lat_sat[1]-lat_sat[0]
-                lon_trk = self.flt_trks[i]['lon']
-                lat_trk = self.flt_trks[i]['lat']
-                indices_lon = np.int_(np.round((lon_trk-lon_sat[0])/dlon, decimals=0))
-                indices_lat = np.int_(np.round((lat_trk-lat_sat[0])/dlat, decimals=0))
-                self.flt_trks[i]['cot'] = self.sat_imgs[i]['cot'][indices_lon, indices_lat]
-                self.flt_trks[i]['cer'] = self.sat_imgs[i]['cer'][indices_lon, indices_lat]
-
-                if 'cth' in cld_sat0.lay.keys():
-                    self.sat_imgs[i]['cth'] = cld_sat0.lay['cth']['data']
-                    self.flt_trks[i]['cth'] = self.sat_imgs[i]['cth'][indices_lon, indices_lat]
-                    print(np.nanmin(self.sat_imgs[i]['cth']))
-                    print(np.nanmax(self.sat_imgs[i]['cth']))
-
-                data_3d_mca = {
-                    'lon'         : cld_sat0.lay['lon']['data'][:, 0],
-                    'lat'         : cld_sat0.lay['lat']['data'][0, :],
-                    'alt'         : atm0.lev['altitude']['data'],
-                    }
-
-                index_h = np.argmin(np.abs(atm0.lev['altitude']['data']-flt_trk['alt0']))
-
-                if atm0.lev['altitude']['data'][index_h] > flt_trk['alt0']:
-                    index_h -= 1
-                if index_h < 0:
-                    index_h = 0
-
-                for key in mca_out_3d0.data.keys():
-                    if key in ['f_down', 'f_down_diffuse', 'f_down_direct', 'f_up', 'toa']:
-                        if 'toa' not in key:
-                            vname = key.replace('_', '-') + '_mca-3d'
-                            self.sat_imgs[i][vname] = mca_out_3d0.data[key]['data'][..., index_h]
-                            data_3d_mca[vname] = mca_out_3d0.data[key]['data']
-
-                for key in mca_out_ipa0.data.keys():
-                    if key in ['f_down', 'f_down_diffuse', 'f_down_direct', 'f_up', 'toa']:
-                        if 'toa' not in key:
-                            vname = key.replace('_', '-') + '_mca-ipa'
-                            self.sat_imgs[i][vname] = mca_out_ipa0.data[key]['data'][..., index_h]
-                            data_3d_mca[vname] = mca_out_ipa0.data[key]['data']
-
-                self.flt_trks[i] = interpolate_3d_to_flight_track(flt_trk, data_3d_mca)
-
-                # figure
-                #╭────────────────────────────────────────────────────────────────────────────╮#
-                plot = True
-                if plot:
-                    rcParams['font.size'] = 12
-                    plt.close('all')
-                    fig = plt.figure(figsize=(12, 4))
-                    fig.suptitle('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
-
-                    # plot1
-                    #╭──────────────────────────────────────────────────────────────╮#
-                    ax1 = fig.add_subplot(131)
-                    cot = self.sat_imgs[i]['cot'].copy()
-                    cot[cot==0.0] = np.nan
-                    cs = ax1.imshow(cot.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
-                    ax1.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
-                    ax1.set_xlabel('Longitude')
-                    ax1.set_ylabel('Latitude')
-                    divider = make_axes_locatable(ax1)
-                    cax = divider.append_axes('right', '5%', pad='3%')
-                    cbar = fig.colorbar(cs, cax=cax)
-                    #╰──────────────────────────────────────────────────────────────╯#
-
-                    # plot2
-                    #╭──────────────────────────────────────────────────────────────╮#
-                    ax2 = fig.add_subplot(132)
-                    cer = self.sat_imgs[i]['cer'].copy()
-                    cer[np.isnan(cot)] = np.nan
-                    cs = ax2.imshow(cer.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=20.0)
-                    ax2.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
-                    ax2.set_xlabel('Longitude')
-                    ax2.set_ylabel('Latitude')
-                    # ax2.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
-                    divider = make_axes_locatable(ax2)
-                    cax = divider.append_axes('right', '5%', pad='3%')
-                    cbar = fig.colorbar(cs, cax=cax)
-                    #╰──────────────────────────────────────────────────────────────╯#
-
-                    # plot3
-                    #╭──────────────────────────────────────────────────────────────╮#
-                    ax3 = fig.add_subplot(133)
-                    cth = self.sat_imgs[i]['cth'].copy()
-                    cth[np.isnan(cot)] = np.nan
-                    cs = ax3.imshow(cth.T, origin='lower', cmap='jet', zorder=0, extent=self.sat_imgs[i]['extent'], vmin=0.0, vmax=10.0)
-                    ax3.scatter(self.flt_trks[i]['lon'], self.flt_trks[i]['lat'], s=2, c='k', lw=0.0)
-                    ax3.set_xlabel('Longitude')
-                    ax3.set_ylabel('Latitude')
-                    # ax3.set_title('%4.4d %s\n(%s)' % (i, str(er3t.util.jday_to_dtime(self.flt_trks[i]['jday0'])), os.path.basename(self.sat_imgs[i]['fname'])), y=1.03)
-                    divider = make_axes_locatable(ax3)
-                    cax = divider.append_axes('right', '5%', pad='3%')
-                    cbar = fig.colorbar(cs, cax=cax)
-                    #╰──────────────────────────────────────────────────────────────╯#
-
-
-                    # save figure
-                    #╭──────────────────────────────────────────────────────────────╮#
-                    fig.subplots_adjust(hspace=0.35, wspace=0.35)
-                    _metadata_ = {'Computer': os.uname()[1], 'Script': os.path.abspath(__file__), 'Function':sys._getframe().f_code.co_name, 'Date':datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}
-                    fname_fig = '%4.4d_%s.png' % (i, _metadata_['Function'],)
-                    plt.savefig(fname_fig, bbox_inches='tight', metadata=_metadata_, transparent=False)
-                    #╰──────────────────────────────────────────────────────────────╯#
-                    # plt.show()
-                    # sys.exit()
-                    plt.close(fig)
-                    plt.clf()
-                #╰────────────────────────────────────────────────────────────────────────────╯#
-
-            except Exception as error:
-                msg = 'Error [flt_sim]: Error <%s> encountered.' % error
-                warnings.warn(msg)
-
-    def dump(self, fname):
-
-        self.fname = fname
-        with open(fname, 'wb') as f:
-            if self.verbose:
-                print('Message [flt_sim]: Saving object into %s ...' % fname)
-            pickle.dump(self, f)
 
 
 
