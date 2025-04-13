@@ -196,7 +196,8 @@ def run_mcarats_one(
 
     # define an atmosphere object
     #╭────────────────────────────────────────────────────────────────────────────╮#
-    levels    = np.append(np.arange(0.0, 2.0, 0.2), np.arange(2.0, 20.1, 2.0))
+    # levels    = np.append(np.arange(0.0, 2.0, 0.2), np.arange(2.0, 20.1, 2.0))
+    levels    = np.arange(0.0, 20.1, 0.5)
     fname_atm = '%s/atm_%3.3d.pk' % (fdir, index)
     atm0      = atm_atmmod(levels=levels, fname=fname_atm, overwrite=overwrite)
     #╰────────────────────────────────────────────────────────────────────────────╯#
@@ -231,7 +232,7 @@ def run_mcarats_one(
             except Exception as err:
                 print('Warning [run_mcarats_one]: Cannot generate 2D CTH field, falling back to 1km for CTH <%s>...' % err)
                 cld_top_height = np.ones_like(cot_2d)
-        cld0 = cld_sat(sat_obj=sat0, fname=fname_cld, cth=cloud_top_height, cgt=0.4, dz=(levels[1]-levels[0]), overwrite=overwrite)
+        cld0 = cld_sat(sat_obj=sat0, fname=fname_cld, cth=cloud_top_height, cgt=0.5, dz=(levels[1]-levels[0]), overwrite=overwrite)
     else:
         cld0 = cld_sat(fname=fname_cld, overwrite=overwrite)
     #╰────────────────────────────────────────────────────────────────────────────╯#
