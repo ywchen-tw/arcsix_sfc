@@ -866,7 +866,8 @@ def read_ict_o3(filepath, encoding='utf-8', na_values=None):
 
 
 def ssfr_slit_convolve(wvl, flux_orig, wvl_joint):
-    xx = np.linspace(-12, 12, 241)
+    dwvl = wvl[1] - wvl[0]
+    xx = np.linspace(-12, 12, int(24/dwvl+1))
     yy_gaussian_vis = gaussian(xx, 0, 3.8251)
     yy_gaussian_nir = gaussian(xx, 0, 4.5046)
     
@@ -877,6 +878,18 @@ def ssfr_slit_convolve(wvl, flux_orig, wvl_joint):
     flux_conv[wvl<=wvl_joint] = flux_convolved_vis[wvl<=950]
     flux_conv[wvl>wvl_joint] = flux_convolved_nir[wvl>950]
     
+    # plt.close('all')
+    # plt.figure(figsize=(10,6))
+    # plt.plot(wvl, flux_orig, label='Original', color='black')
+    # plt.plot(wvl, flux_conv, label='Convolved', color='red')
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Flux')
+    # plt.title('SSFR Slit Function Convolution')
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+    # sys.exit()
+    
     return flux_conv
 
 # --- Configuration ----------------------------------------------------------
@@ -886,19 +899,22 @@ class FlightConfig:
     mission: str
     platform: str
     data_root: Path
-    sat_root_mac: Path
-    sat_root_linux: Path
-
+    root_mac: Path
+    root_linux: Path
+    
     def hsk(self, date_s):    return f"{self.data_root}/{self.mission}-HSK_{self.platform}_{date_s}_v0.h5"
-    def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R0.h5"
+    def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R1.h5"
+    # def ssrr(self, date_s):   return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_R0.h5"
     def hsr1(self, date_s):   return f"{self.data_root}/{self.mission}-HSR1_{self.platform}_{date_s}_R0.h5"
     def logic(self, date_s):  return f"{self.data_root}/{self.mission}-LOGIC_{self.platform}_{date_s}_RA.h5"
     def sat_coll(self, date_s): return f"{self.data_root}/{self.mission}-SAT-CLD_{self.platform}_{date_s}_v0.h5"
-    def marli(self, fname):   return Path(fname)
+    def marli(self, date_s):   
+        root = self.root_mac if sys.platform=="darwin" else self.root_linux
+        return f"{root}/marli/ARCSIX-MARLi_P3B_{date_s}_R0.cdf"
     def kt19(self, fname):    return Path(fname)
     def sat_nc(self, date_s, raw):  # choose root by platform
-        root = self.sat_root_mac if sys.platform=="darwin" else self.sat_root_linux
-        return f"{root}/{date_s}/{raw}"
+        root = self.root_mac if sys.platform=="darwin" else self.root_linux
+        return f"{root}/sat-data/{date_s}/{raw}"
     
     
 # --- Helpers ----------------------------------------------------------------
