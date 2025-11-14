@@ -158,11 +158,13 @@ h2o_4_start, h2o_4_end = 1084, 1175
 h2o_5_start, h2o_5_end = 1230, 1286
 h2o_6_start, h2o_6_end = 1290, 1509
 h2o_7_start, h2o_7_end = 1748, 2050
+h2o_8_start, h2o_8_end = 803, 842
 final_start, final_end = 2110, 2200
 
 gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h2o_2_end),
                 (h2o_3_start, h2o_3_end), (h2o_4_start, h2o_4_end), (h2o_5_start, h2o_5_end),
-                (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (final_start, final_end)]
+                (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (h2o_8_start, h2o_8_end),
+                (final_start, final_end)]
 
  
 def ssfr_alb_plot(date_s, tmhr_ranges_select, wvl, alb, color_series, 
@@ -235,7 +237,6 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
                      case_tag='default',
                      config: Optional[FlightConfig] = None,
                      simulation_interval: Optional[float] = None,  # in minutes, e.g., 10 for 10 minutes
-                     rsp_plot=False,
                             ):
     log = logging.getLogger("atm corr spiral plot")
     log.info("Starting processing for %s", date.strftime("%Y%m%d"))
@@ -366,19 +367,6 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
             simu_fup_toa_mean_all_iter1 = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             simu_fup_toa_mean_all_iter2 = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             toa_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_up_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_dn_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_up_std_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_dn_std_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            
-            rsp_rad_mean_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_rad_std_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_ref_mean_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_ref_std_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_mu0_mean_all = np.zeros(len(tmhr_ranges_select))
-            rsp_sd_mean_all = np.zeros(len(tmhr_ranges_select))
-
-            
 
         time_all.append(time)
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
@@ -418,30 +406,8 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
         simu_fup_toa_mean_all_iter1[i, :] = df_upd1['simu_fup_toa_mean'].values
         simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
         toa_mean_all[i, :] = df_ori['toa_mean'].values
+    
         
-        ssrr_rad_up_mean_all[i, :] = df_ori['ssrr_rad_up_mean'].values
-        ssrr_rad_dn_mean_all[i, :] = df_ori['ssrr_rad_dn_mean'].values
-        ssrr_rad_up_std_all[i, :] = df_ori['ssrr_rad_up_std'].values
-        ssrr_rad_dn_std_all[i, :] = df_ori['ssrr_rad_dn_std'].values
-        ssrr_rad_up_wvl = df_ori['ssrr_nad_wvl'].values
-        ssrr_rad_dn_wvl = df_ori['ssrr_zen_wvl'].values
-        
-        rsp_wvl = cld_leg['rsp_wvl']
-        rsp_mu0 = cld_leg['rsp_mu0']
-        rsp_sd = cld_leg['rsp_sd']
-        if cld_leg['rsp_rad'] is not None:
-            print("cld_leg['rsp_rad'] shape:", cld_leg['rsp_rad'].shape)
-            
-            rsp_rad_mean_all[i, :] = np.nanmean(cld_leg['rsp_rad'], axis=0)/1000  # in W m-2 sr-1 nm-1
-            rsp_rad_std_all[i, :] = np.nanstd(cld_leg['rsp_rad'], axis=0)/1000  # in W m-2 sr-1 nm-1
-            
-            rsp_ref_mean_all[i, :] = np.nanmean(cld_leg['rsp_ref'], axis=0)
-            rsp_ref_std_all[i, :] = np.nanstd(cld_leg['rsp_ref'], axis=0)
-            
-            rsp_mu0_mean_all[i] = np.nanmean(cld_leg['rsp_mu0'])
-            rsp_sd_mean_all[i] = np.nanmean(cld_leg['rsp_sd'])
-        
-        print(f"date_s: {date_s}, time: {time_start:.2f}-{time_end:.2f}, alt_avg: {alt_avg:.2f} km")
     
         # find the modis location closest to the flight leg center
         if modis_alb_file is not None:
@@ -475,10 +441,7 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
         pickle.dump(alb_update_dict, f)
     log.info(f"Saved surface albedo updates to {_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}.pkl")
 
-    ssrr_ref = ssrr_rad_up_mean_all * np.pi / toa_mean_all / rsp_mu0_mean_all[:, np.newaxis] * (rsp_sd_mean_all[:, np.newaxis]**2)
-    ssfr_fup_ref = ssfr_fup_mean_all / toa_mean_all /  rsp_mu0_mean_all[:, np.newaxis] * (rsp_sd_mean_all[:, np.newaxis]**2)
-       
-    print("rsp_wvl:", rsp_wvl)
+
     
         
     print("lon avg all mean:", lon_avg_all.mean())
@@ -744,102 +707,6 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_flux_dn_diff_perc_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
     
-    if rsp_plot:
-        fig, ax = plt.subplots(figsize=(8, 4.5))
-        ax2 = ax.twinx()
-        for alt_ind in range(len(tmhr_ranges_select)):
-            ax.plot(flux_wvl, ssrr_ref[alt_ind, :], '-', color=color_series[alt_ind], 
-                    label='Z=%.2fkm, lon:%.2f to %.2f' % (alt_avg_all[alt_ind], lon_min_all[alt_ind], lon_max_all[alt_ind]))
-            ax.scatter(rsp_wvl, rsp_ref_mean_all[alt_ind, :], marker='o', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7)
-                
-            ax2.plot(flux_wvl, ssfr_fup_ref[alt_ind, :], '--', color=color_series[alt_ind], alpha=0.7)
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('SSRR radiance x $\pi$ / TOA', fontsize=14)
-        ax2.set_ylabel('SSFR Upward flux / TOA', fontsize=14)
-        ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.16, 0.5))
-        # plt.grid(True)
-        ax.set_ylim(-0.05, 1.2)
-        ax2.set_ylim(-0.05, 1.2)
-        ax.tick_params(labelsize=12)
-        # ax.set_title(f'Simulated - Observed Downward Flux Difference Percentage\nalb=SSFR up/down flux ratio', fontsize=13)
-        fig.suptitle(f'Upward Radiance and Flux Ref Comparison {date_s}', fontsize=16, y=0.98)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_ssfr_ssrr_ref_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-        
-        for alt_ind in range(len(tmhr_ranges_select)):
-            fig, ax = plt.subplots(figsize=(7, 4.5))
-            ax2 = ax.twinx()
-            l1 = ax.plot(flux_wvl, ssrr_ref[alt_ind, :], '-', color=color_series[alt_ind], label='SSRR')
-            
-            l2 = ax.scatter(rsp_wvl, rsp_ref_mean_all[alt_ind, :], marker='o', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7, label='RSP')
-            l5 = ax2.plot(flux_wvl, ssfr_fup_ref[alt_ind, :], '--', color=color_series[alt_ind], alpha=0.7, label='SSFR')
-            
-            ll = l1 + [l2] + l5
-            labs = [l.get_label() for l in ll]
-            ax.legend(ll, labs, fontsize=10, loc='upper right', ) 
-            ax.set_xlabel('Wavelength (nm)', fontsize=14)
-            ax.set_ylabel('SSRR radiance x $\pi$ / TOA', fontsize=14)
-            ax2.set_ylabel('SSFR Upward flux / TOA', fontsize=14)
-            ax.set_ylim(-0.05, 1.2)
-            ax2.set_ylim(-0.05, 1.2)
-            ax.tick_params(labelsize=12)
-            fig.suptitle(f'Upward Radiance and Flux Ref Comparison {date_s}\nZ={alt_avg_all[alt_ind]:.2f}km, lon: {lon_min_all[alt_ind]:.3f}-{lon_max_all[alt_ind]:.3f}', 
-                        fontsize=16, y=0.98)
-            fig.tight_layout()
-            fig.savefig('fig/%s/%s_%s_ssfr_ssrr_ref_comparison_Z%.2fkm.png' % (date_s, date_s, case_tag, alt_avg_all[alt_ind]), bbox_inches='tight', dpi=150)
-            plt.close('all')
-    
-   
-    
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        for alt_ind in range(len(tmhr_ranges_select)):
-            # plot ssrr
-            ax.tick_params(labelsize=12)
-            # ax.errorbar(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-            #             yerr=ssrr_rad_up_std_all[alt_ind, :], color=color_series[alt_ind], markersize=4, label='SSRR Z=%.2fkm' % (alt_avg_all[alt_ind]))
-            ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-                    color=color_series[alt_ind], label='Z=%.2fkm' % (alt_avg_all[alt_ind]))
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)', fontsize=14)
-        ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-        # plt.grid(True)
-        ax.tick_params(labelsize=12)
-        # ax.set_ylim(-0.05, 1.05)
-        fig.suptitle(f'SSRR Upward Radiance Comparison {date_s}', fontsize=13)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_ssrr_rad_up_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-        plt.close('all')
-        
-        
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        ax2 = ax.twinx()
-        for alt_ind in range(len(tmhr_ranges_select)):
-            # plot ssrr
-            ax.tick_params(labelsize=12)
-            ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-                    color=color_series[alt_ind], label='SSRR Z=%.2fkm' % (alt_avg_all[alt_ind]))
-
-            ax2.plot(flux_wvl, ssfr_fup_mean_all[alt_ind, :],
-                    linestyle='--', label='SSRR Ref Z=%.2fkm' % (alt_avg_all[alt_ind]))
-            
-            for rsp_wvl_ind in range(len(rsp_wvl)):
-                rsp_wvl_val = rsp_wvl[rsp_wvl_ind]
-                # find the closest wavelength in flux_wvl
-                rsp_rad_mean = rsp_rad_mean_all[alt_ind, rsp_wvl_ind]
-                rsp_rad_std = rsp_rad_std_all[alt_ind, rsp_wvl_ind]
-                ax.errorbar(rsp_wvl_val, rsp_rad_mean, yerr=rsp_rad_std, fmt='s', color=color_series[alt_ind], markersize=6,)# label='SSRR RSP Z=%.2fkm' % (alt_avg_all[alt_ind]))
- 
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)', fontsize=14)
-        ax2.set_ylabel('SSFR Ref Upward Flux (W/m$^2$/nm)', fontsize=14)
-        ax.legend(fontsize=10, loc='upper right')
-        # plt.grid(True)
-        ax.tick_params(labelsize=12)
-        # ax.set_ylim(-0.05, 1.05)
-        fig.suptitle(f'SSRR Upward Radiance Comparison {date_s}', fontsize=13)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_ssrr_ssfr_rad_up_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-        plt.close('all')
     
     
     
@@ -975,19 +842,7 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
             simu_fup_toa_mean_all_iter1 = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             simu_fup_toa_mean_all_iter2 = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             toa_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_up_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_dn_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_up_std_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            ssrr_rad_dn_std_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
-            
-            rsp_rad_mean_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_rad_std_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_ref_mean_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_ref_std_all = np.zeros((len(tmhr_ranges_select), 9))
-            rsp_mu0_mean_all = np.zeros(len(tmhr_ranges_select))
-            rsp_sd_mean_all = np.zeros(len(tmhr_ranges_select))
 
-            
 
         time_all.append(time)
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
@@ -1028,51 +883,10 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
         toa_mean_all[i, :] = df_ori['toa_mean'].values
         
-        ssrr_rad_up_mean_all[i, :] = df_ori['ssrr_rad_up_mean'].values
-        ssrr_rad_dn_mean_all[i, :] = df_ori['ssrr_rad_dn_mean'].values
-        ssrr_rad_up_std_all[i, :] = df_ori['ssrr_rad_up_std'].values
-        ssrr_rad_dn_std_all[i, :] = df_ori['ssrr_rad_dn_std'].values
-        ssrr_rad_up_wvl = df_ori['ssrr_nad_wvl'].values
-        ssrr_rad_dn_wvl = df_ori['ssrr_zen_wvl'].values
-        
-        rsp_wvl = cld_leg['rsp_wvl']
-        rsp_mu0 = cld_leg['rsp_mu0']
-        rsp_sd = cld_leg['rsp_sd']
-        print("cld_leg['rsp_rad'] shape:", cld_leg['rsp_rad'].shape)
-        
-        rsp_rad_mean_all[i, :] = np.nanmean(cld_leg['rsp_rad'], axis=0)/1000  # in W m-2 sr-1 nm-1
-        rsp_rad_std_all[i, :] = np.nanstd(cld_leg['rsp_rad'], axis=0)/1000  # in W m-2 sr-1 nm-1
-        
-        rsp_ref_mean_all[i, :] = np.nanmean(cld_leg['rsp_ref'], axis=0)
-        rsp_ref_std_all[i, :] = np.nanstd(cld_leg['rsp_ref'], axis=0)
-        
-        rsp_mu0_mean_all[i] = np.nanmean(cld_leg['rsp_mu0'])
-        rsp_sd_mean_all[i] = np.nanmean(cld_leg['rsp_sd'])
-        
-        # plt.close('all')
-        # plt.plot(rsp_wvl, rsp_rad_mean_all[i, :], '.-', label=f'Leg {i} mean')
-        # plt.plot(cld_leg['ssrr_nad_wvl'], np.nanmean(cld_leg['ssrr_nad_rad'], axis=0), 'x--', label=f'Leg {i} SSFR nadir')
-        # plt.xlabel('Wavelength (nm)', fontsize=14)
-        # plt.ylabel('Radiance (mW cm$^{-2}$ sr$^{-1}$ nm$^{-1}$)', fontsize=14)
-        # plt.show()
-        
-        # plt.close('all')
-        # plt.scatter(cld_leg['rsp_lon'], cld_leg['rsp_lat'], c='b', s=20, marker='o')
-        # plt.scatter(cld_leg['lon'], cld_leg['lat'], c='r', s=20, marker='x')
-        # plt.show()
-        # sys.exit()
-        
         
         print(f"date_s: {date_s}, time: {time_start:.2f}-{time_end:.2f}, alt_avg: {alt_avg:.2f} km")
     
 
-    ssrr_ref = ssrr_rad_up_mean_all * np.pi / toa_mean_all / rsp_mu0_mean_all[:, np.newaxis] * (rsp_sd_mean_all[:, np.newaxis]**2)
-    ssfr_fup_ref = ssfr_fup_mean_all / toa_mean_all /  rsp_mu0_mean_all[:, np.newaxis] * (rsp_sd_mean_all[:, np.newaxis]**2)
-       
-    print("rsp_wvl:", rsp_wvl)
-    
-    # print("ssfr_fup_ref shape:", ssfr_fup_ref.shape)
-    # sys.exit()
         
     print("lon avg all mean:", lon_avg_all.mean())
     print("lat avg all mean:", lat_avg_all.mean())
@@ -1542,67 +1356,9 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_flux_dn_diff_perc_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
     
-    if aviris_file is not None:
-        ssfr_toa_data = pd.read_csv('arcsix_ssfr_solar_flux.dat', delim_whitespace=True, header=2,
-                                    names=['wvl', 'flux'])
-        ssfr_toa_wvl = ssfr_toa_data['wvl'].values
-        ssfr_toa_flux = ssfr_toa_data['flux'].values
-        # print("ssfr_toa_flux:", ssfr_toa_flux)
-        ssfr_toa_flux /= 1000  # convert to W/m2/nm
-        toa_interp = interp1d(ssfr_toa_wvl, ssfr_toa_flux, kind='linear', bounds_error=False, fill_value='extrapolate')
-        rsp_sd_mean = np.nanmean(rsp_sd_mean_all, axis=0)
-        rsp_mu0_mean = np.nanmean(rsp_mu0_mean_all, axis=0)
-        print("aviris_rad_wvl:", aviris_rad_wvl)
-        toa_at_aviris_wvl = toa_interp(aviris_rad_wvl)
-        aviris_rad_to_ref = aviris_rad_spectrum * np.pi / toa_at_aviris_wvl / np.cos(rsp_mu0_mean) * rsp_sd_mean**2
+
     
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax2 = ax.twinx()
-    for alt_ind in range(len(tmhr_ranges_select)):
-        ax.plot(flux_wvl, ssrr_ref[alt_ind, :], '-', color=color_series[alt_ind], label='Z=%.2fkm' % (alt_avg_all[alt_ind]))
-        ax.scatter(rsp_wvl, rsp_ref_mean_all[alt_ind, :], marker='o', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7)
-            
-        ax2.plot(flux_wvl, ssfr_fup_ref[alt_ind, :], '--', color=color_series[alt_ind], alpha=0.7)
-    if aviris_file is not None:
-        ax.plot(aviris_reflectance_wvl, aviris_rad_to_ref, c='m', label='AVIRIS Rad x $\pi$ / TOA', alpha=0.7)
-        ax.plot(aviris_reflectance_wvl, aviris_reflectance_spectrum, c='darkviolet', label='AVIRIS L2 Ref', alpha=0.7)
-    ax.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax.set_ylabel('SSRR radiance x $\pi$ / TOA', fontsize=14)
-    ax2.set_ylabel('SSFR Upward flux / TOA', fontsize=14)
-    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.16, 0.5))
-    # plt.grid(True)
-    ax.set_ylim(-0.05, 1.2)
-    ax2.set_ylim(-0.05, 1.2)
-    ax.tick_params(labelsize=12)
-    # ax.set_title(f'Simulated - Observed Downward Flux Difference Percentage\nalb=SSFR up/down flux ratio', fontsize=13)
-    fig.suptitle(f'Upward Radiance and Flux Ref Comparison {date_s}', fontsize=16, y=0.98)
-    fig.tight_layout()
-    fig.savefig('fig/%s/%s_%s_ssfr_ssrr_ref_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-    
-    for alt_ind in range(len(tmhr_ranges_select)):
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        ax2 = ax.twinx()
-        l1 = ax.plot(flux_wvl, ssrr_ref[alt_ind, :], '-', color=color_series[alt_ind], label='SSRR')
         
-        l2 = ax.scatter(rsp_wvl, rsp_ref_mean_all[alt_ind, :], marker='o', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7, label='RSP')
-        if aviris_file is not None:
-            l3 = ax.plot(aviris_reflectance_wvl, aviris_rad_to_ref, c='m', label='AVIRIS Rad x $\pi$ / TOA', alpha=0.7)
-            l4 = ax.plot(aviris_reflectance_wvl, aviris_reflectance_spectrum, c='darkviolet', label='AVIRIS L2 Ref', alpha=0.7)
-        l5 = ax2.plot(flux_wvl, ssfr_fup_ref[alt_ind, :], '--', color=color_series[alt_ind], alpha=0.7, label='SSFR')
-        
-        ll = l1 + [l2] + l5 + l3 + l4 if aviris_file is not None else l1 + [l2] + l5
-        labs = [l.get_label() for l in ll]
-        ax.legend(ll, labs, fontsize=10, loc='upper right', ) 
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('SSRR radiance x $\pi$ / TOA', fontsize=14)
-        ax2.set_ylabel('SSFR Upward flux / TOA', fontsize=14)
-        ax.set_ylim(-0.05, 1.2)
-        ax2.set_ylim(-0.05, 1.2)
-        ax.tick_params(labelsize=12)
-        fig.suptitle(f'Upward Radiance and Flux Ref Comparison {date_s}\nZ={alt_avg_all[alt_ind]:.2f}km', fontsize=16, y=0.98)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_ssfr_ssrr_ref_comparison_Z%.2fkm.png' % (date_s, date_s, case_tag, alt_avg_all[alt_ind]), bbox_inches='tight', dpi=150)
-    
     
     fig, ((ax1, ax2, ax3),
           (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 12), sharex=True, sharey='row')
@@ -1651,123 +1407,6 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_flux_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
             
-    
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    if aviris_rad_file is not None:
-        # ax.errorbar(aviris_rad_wvl, aviris_rad_spectrum, yerr=aviris_rad_spectrum_unc, 
-        #             fmt='o', color='m', markersize=2, label='AVIRIS', alpha=0.7)
-        ax.plot(aviris_rad_wvl, aviris_rad_spectrum, '-', color='m', alpha=0.7)
-    for alt_ind in range(len(tmhr_ranges_select)):
-        # plot ssrr
-        ax.tick_params(labelsize=12)
-        # ax.errorbar(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-        #             yerr=ssrr_rad_up_std_all[alt_ind, :], color=color_series[alt_ind], markersize=4, label='SSRR Z=%.2fkm' % (alt_avg_all[alt_ind]))
-        ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-                 color=color_series[alt_ind], label='Z=%.2fkm' % (alt_avg_all[alt_ind]))
-    ax.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)', fontsize=14)
-    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-    # plt.grid(True)
-    ax.tick_params(labelsize=12)
-    # ax.set_ylim(-0.05, 1.05)
-    fig.suptitle(f'SSRR Upward Radiance Comparison {date_s}', fontsize=13)
-    fig.tight_layout()
-    fig.savefig('fig/%s/%s_%s_ssrr_rad_up_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-    
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    if aviris_rad_file is not None:
-        # ax.errorbar(aviris_rad_wvl, aviris_rad_spectrum, yerr=aviris_rad_spectrum_unc, 
-        #             fmt='o', color='m', markersize=2, label='AVIRIS', alpha=0.7)
-        ax.plot(aviris_rad_wvl, aviris_rad_spectrum, '-', color='m', alpha=0.7)
-        
-    ax2 = ax.twinx()
-    for alt_ind in range(len(tmhr_ranges_select)):
-        # plot ssrr
-        ax.tick_params(labelsize=12)
-        ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :],
-                 color=color_series[alt_ind], label='SSRR Z=%.2fkm' % (alt_avg_all[alt_ind]))
-
-    
-        ax2.plot(flux_wvl, ssfr_fup_mean_all[alt_ind, :],
-                 linestyle='--', label='SSRR Ref Z=%.2fkm' % (alt_avg_all[alt_ind]))
-        
-        for rsp_wvl_ind in range(len(rsp_wvl)):
-            rsp_wvl_val = rsp_wvl[rsp_wvl_ind]
-            # find the closest wavelength in flux_wvl
-            rsp_rad_mean = rsp_rad_mean_all[alt_ind, rsp_wvl_ind]
-            rsp_rad_std = rsp_rad_std_all[alt_ind, rsp_wvl_ind]
-            ax.errorbar(rsp_wvl_val, rsp_rad_mean, yerr=rsp_rad_std, fmt='s', color=color_series[alt_ind], markersize=6,)# label='SSRR RSP Z=%.2fkm' % (alt_avg_all[alt_ind]))
-    
-    
-    ax.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)', fontsize=14)
-    ax2.set_ylabel('SSFR Ref Upward Flux (W/m$^2$/nm)', fontsize=14)
-    ax.legend(fontsize=10, loc='upper right')
-    # plt.grid(True)
-    ax.tick_params(labelsize=12)
-    # ax.set_ylim(-0.05, 1.05)
-    fig.suptitle(f'SSRR Upward Radiance Comparison {date_s}', fontsize=13)
-    fig.tight_layout()
-    fig.savefig('fig/%s/%s_%s_ssrr_ssfr_rad_up_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-    
-    if aviris_rad_file is not None:
-        aviris_rad_interp = interp1d(aviris_rad_wvl, aviris_rad_spectrum, kind='linear', bounds_error=False, fill_value='extrapolate')
-        aviris_rad_at_rsp_wvl = aviris_rad_interp(rsp_wvl)
-        aviris_rad_at_ssrr_wvl = aviris_rad_interp(ssrr_rad_up_wvl)
-    
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        ax.errorbar(aviris_rad_wvl, aviris_rad_spectrum, yerr=aviris_rad_spectrum_unc, 
-                    fmt='o', color='m', markersize=2, label='AVIRIS Radiance', alpha=0.7)
-        l1 = ax.plot(aviris_rad_wvl, aviris_rad_spectrum, '-', color='m', label='AVIRIS Radiance', alpha=0.7)
-        ax_t = ax.twinx()
-        if aviris_file is not None:
-            l2 = ax_t.plot(aviris_reflectance_wvl, aviris_reflectance_spectrum, c='b', label='AVIRIS Reflectance', alpha=0.7)
-            ax_t.fill_between(aviris_reflectance_wvl, aviris_reflectance_spectrum-aviris_reflectance_spectrum_unc, aviris_reflectance_spectrum+aviris_reflectance_spectrum_unc, color='b', alpha=0.3)
-        ll = l1+l2 if aviris_file is not None else l1
-        labs = [l.get_label() for l in ll]
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ $\mu$m$^{-1}$)', fontsize=14)
-        ax_t.set_ylabel('Reflectance', fontsize=14)
-        ax.legend(ll, labs, fontsize=10,)
-        # plt.grid(True)
-        ax.tick_params(labelsize=12)
-        ax_t.tick_params(labelsize=12)
-        # ax.set_ylim(-0.05, 1.05)
-        fig.suptitle(f'SSRR Upward Radiance & Reflectance Comparison {date_s}', fontsize=13)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_aviris_rad_reflectance_comparison_all.png' % (date_s, date_s, case_tag), bbox_inches='tight', dpi=150)
-        
-        fig, ax = plt.subplots(figsize=(8, 4.5))
-        for alt_ind in range(len(tmhr_ranges_select)):
-            ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :]/aviris_rad_at_ssrr_wvl, '-', color=color_series[alt_ind], label='Z=%.2fkm' % (alt_avg_all[alt_ind]))
-            ax.scatter(rsp_wvl, rsp_rad_mean_all[alt_ind, :]/aviris_rad_at_rsp_wvl, marker='s', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7)
-        ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        ax.set_ylabel('Radiance Ratio', fontsize=14)
-        ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-        # plt.grid(True)
-        ax.tick_params(labelsize=12)
-        ax.set_ylim(0.5, 1.5)
-        ax.set_xlim(350, 2200)
-        ax.hlines(1.0, 350, 2200, color='gray', linestyle='--') 
-        fig.suptitle(f'SSRR & RSP Upward Radiance to AVIRIS Ratio Comparison {date_s}', fontsize=13)
-        fig.tight_layout()
-        fig.savefig('fig/%s/%s_%s_ssrr_rsp_aviris_rad_ratio_comparison_all.png' % (date_s, date_s, case_tag,), bbox_inches='tight', dpi=150)
-        
-        for alt_ind in range(len(tmhr_ranges_select)):
-            fig, ax = plt.subplots(figsize=(7, 4.5))
-            ax.plot(ssrr_rad_up_wvl, ssrr_rad_up_mean_all[alt_ind, :]/aviris_rad_at_ssrr_wvl, '-', color=color_series[alt_ind], label='SSRR/AVIRIS')
-            ax.scatter(rsp_wvl, rsp_rad_mean_all[alt_ind, :]/aviris_rad_at_rsp_wvl, marker='s', color=color_series[alt_ind], edgecolors='k', s=50, alpha=0.7, label='RSP/AVIRIS')
-            ax.set_xlabel('Wavelength (nm)', fontsize=14)
-            ax.set_ylabel('Radiance Ratio', fontsize=14)
-            ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-            # plt.grid(True)
-            ax.tick_params(labelsize=12)
-            ax.set_ylim(0.5, 1.5)
-            ax.set_xlim(350, 2200)
-            ax.hlines(1.0, 350, 2200, color='gray', linestyle='--') 
-            fig.suptitle(f'SSRR & RSP Upward Radiance to AVIRIS Ratio Comparison {date_s}\nZ={alt_avg_all[alt_ind]:.2f}km', fontsize=13)
-            fig.tight_layout()
-            fig.savefig('fig/%s/%s_%s_ssrr_rsp_aviris_rad_ratio_comparison_Z%.2fkm.png' % (date_s, date_s, case_tag, alt_avg_all[alt_ind]), bbox_inches='tight', dpi=150)
 
 
 def fit_1d_poly(x, y, order=1, dx=None, x0=None):
@@ -1915,6 +1554,7 @@ def gas_abs_masking(wvl, alb):
     h2o_5_start, h2o_5_end = 1230, 1286
     h2o_6_start, h2o_6_end = 1290, 1509
     h2o_7_start, h2o_7_end = 1748, 2050
+    h2o_8_start, h2o_8_end = 803, 842
     final_start, final_end = 2110, 2200
     
     alb_mask = alb.copy()
@@ -1926,6 +1566,7 @@ def gas_abs_masking(wvl, alb):
              ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
              ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
              ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
+             ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
              ((wvl>=final_start) & (wvl<=final_end))
             ] = np.nan
     
@@ -2109,14 +1750,14 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
             # best_fit_spectrum = model_run # Store the whole run
             best_fit_spectrum = interpolated_model_albedo # Store the interpolation
         
-    plt.close('all')
-    plt.plot(obs_wvl, best_fit_spectrum, '-', color='r', label='Best Fit Model')
-    plt.plot(obs_wvl, obs_albedo, '-', color='k', label='Observed')
-    plt.xlabel('Wavelength (nm)')
-    plt.ylabel('Albedo')
-    plt.legend()
-    plt.title(f'Best Fit Model: {best_fit_params}, RMSE: {min_rmse:.4f}')
-    plt.show()
+    # plt.close('all')
+    # plt.plot(obs_wvl, best_fit_spectrum, '-', color='r', label='Best Fit Model')
+    # plt.plot(obs_wvl, obs_albedo, '-', color='k', label='Observed')
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Albedo')
+    # plt.legend()
+    # plt.title(f'Best Fit Model: {best_fit_params}, RMSE: {min_rmse:.4f}')
+    # plt.show()
     
         
     return best_fit_params, best_fit_spectrum, min_rmse
@@ -2146,45 +1787,105 @@ def snowice_alb_fitting(alb_wvl, alb_corr, clear_sky=False):
     mask_bands = np.isnan(alb_corr_mask)
     alb_corr_best_fit[mask_bands] = best_fit_spectrum[mask_bands]
     
+
+    
     
     
     alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 795
-    alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 850, 1050
-    alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 1050, 1210
-    alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1185, 1700
-    alb_wvl_sep_5th_s, alb_wvl_sep_5th_e = 1550, 2100
+    alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
+    alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
+    alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
+    alb_wvl_sep_5th_s, alb_wvl_sep_5th_e = 1185, 1700
+    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1550, 2100
     
     band_1_fit = (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e)
     band_2_fit = (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e)
     band_3_fit = (alb_wvl >= alb_wvl_sep_3rd_s) & (alb_wvl < alb_wvl_sep_3rd_e)
     band_4_fit = (alb_wvl >= alb_wvl_sep_4th_s) & (alb_wvl < alb_wvl_sep_4th_e)
     band_5_fit = (alb_wvl >= alb_wvl_sep_5th_s) & (alb_wvl < alb_wvl_sep_5th_e)
+    band_6_fit = (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e)
     
-    alb_corr_fit = np.copy(alb_corr_mask)
-    for bands_fit in [band_1_fit, band_2_fit, band_3_fit, band_4_fit, band_5_fit]:
+    alb_corr_fit = copy.deepcopy(alb_corr_mask)
+    for bands_fit in [band_1_fit, band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
         
-        if np.isnan(alb_corr_mask[bands_fit]).any():
+        # if np.isnan(alb_corr_mask[bands_fit]).any():
             # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
             #     model_library=snicar_data,
             #     obs_wvl=alb_wvl[bands_fit],
             #     obs_albedo=alb_corr_mask[bands_fit]
             #     )
-            bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
-            alb_corr_fit[bands_fit][bandfit_nan] = alb_corr_best_fit[bandfit_nan]
+        bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
+        bandfit_nan_ind = np.where(bandfit_nan)[0]
+        if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
+            bandfit_nan_ind = bandfit_nan_ind[:-1]
+        left_mean_ind_num = 5
+        if bandfit_nan_ind[0] < left_mean_ind_num:
+            left_mean_ind_num = bandfit_nan_ind[0]
+        xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
+        right_mean_ind_num = 5
+        if (len(bandfit_nan) - bandfit_nan_ind[-1] -1) < right_mean_ind_num:
+            right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] -1
+        xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
+        xl_fit, xr_fit = best_fit_spectrum[bands_fit][bandfit_nan_ind[0]-1], best_fit_spectrum[bands_fit][bandfit_nan_ind[-1]+1]
+        xfit_base = np.min([xl_fit, xr_fit])
+        if np.isfinite(xl_origin) and np.isfinite(xr_origin):
+            base = np.min([xl_origin, xr_origin])
+            scale = (xr_origin - xl_origin) / (xr_fit - xl_fit)
+            scale = np.abs(scale)
+            replace_array = base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale
+        elif np.isfinite(xl_origin) and not np.isfinite(xr_origin):
+            # only have value on xl_origin
+            # use valid point to scale
+            xl_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][0:5].mean()
+            xr_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][-6:-1].mean()
+            xl_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][0:6].mean()
+            xr_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][-6:-1].mean()
+            xfit_base_new = xl_fit_new
+            base = np.min([xl_origin_new, xr_origin_new])
+            scale = (xr_origin_new - xl_origin_new) / (xr_fit_new - xl_fit_new)
+            scale = np.abs(scale)
+            replace_array_all = base + (best_fit_spectrum[bands_fit] - xfit_base_new) * scale
+            replace_array = replace_array_all[bandfit_nan]
+            # plt.close('all')
+            # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
+            # plt.plot(alb_wvl[bands_fit], replace_array_all, '--', color='b', label='Replace All')
+            # plt.legend()
+            # plt.show()
+            # sys.exit()
+        elif not np.isfinite(xl_origin) and np.isfinite(xr_origin):
+            # only have value on xr_origin
+            # not supported yet
+            raise NotImplementedError("Only have value on right side is not supported yet.")
+        
+        alb_corr_fit_replace = alb_corr_fit[bands_fit].copy()
+        alb_corr_fit_replace[bandfit_nan] = replace_array.copy()
+        alb_corr_fit[bands_fit] = alb_corr_fit_replace.copy()
+            
+        # print("base, scale:", base, scale)
+        # print("base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale:", replace_array)
+        # print("alb_corr_fit[bands_fit][bandfit_nan] after adjustment:", alb_corr_fit[bands_fit][bandfit_nan])
+        # plt.close('all')
+        # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
+        # plt.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
+        # plt.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
+        # plt.xlabel('Wavelength (nm)')
+        # plt.ylabel('Albedo')
+        # plt.legend()
+        # plt.show()
             
     
     
     alb_corr_fit[alb_corr_fit<0.0] = 0.0
     alb_corr_fit[alb_corr_fit>1.0] = 1.0
     
-    plt.close('all')
-    plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
-    plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo')
-    plt.xlabel('Wavelength (nm)')
-    plt.ylabel('Albedo')
-    plt.legend()
-    plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
-    plt.show()
+    # plt.close('all')
+    # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
+    # plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo')
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Albedo')
+    # plt.legend()
+    # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
+    # plt.show()
     
     # smooth with window size of 3
     alb_corr_fit_smooth = alb_corr_fit.copy()
@@ -2196,11 +1897,11 @@ def snowice_alb_fitting(alb_wvl, alb_corr, clear_sky=False):
     
     alb_corr_fit_smooth[np.isfinite(alb_corr_fit_smooth)] = alb_corr_fit_smooth
     
-    print("alb_wvl shape:", alb_wvl.shape)
-    print("alb_corr shape:", alb_corr.shape)
-    print("alb_corr_mask shape:", alb_corr_mask.shape)
-    print("alb_corr_fit shape:", alb_corr_fit.shape)
-    print("alb_corr_fit_smooth shape:", alb_corr_fit_smooth.shape)
+    # print("alb_wvl shape:", alb_wvl.shape)
+    # print("alb_corr shape:", alb_corr.shape)
+    # print("alb_corr_mask shape:", alb_corr_mask.shape)
+    # print("alb_corr_fit shape:", alb_corr_fit.shape)
+    # print("alb_corr_fit_smooth shape:", alb_corr_fit_smooth.shape)
     
     return alb_corr_fit_smooth
 
@@ -2253,7 +1954,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     # 1) Load all instrument & satellite metadata
     data_hsk  = load_h5(config.hsk(date_s))
     data_ssfr = load_h5(config.ssfr(date_s))
-    data_ssrr = load_h5(config.ssrr(date_s))
     data_hsr1 = load_h5(config.hsr1(date_s))
     
     if date_s != '20240603':
@@ -2274,7 +1974,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     
     t_ssfr = data_ssfr['time']/3600.0  # convert to hours
     t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
-    t_ssrr = data_ssrr['time']/3600.0  # convert to hours
     t_marli = data_marli['time'] # in hours
 
     
@@ -2372,31 +2071,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     # Solar spectrum interpolation function
     flux_solar_interp = solar_interpolation_func(solar_flux_file='arcsix_ssfr_solar_flux_slit.dat', date=date)
 
-    # check rsp l1b folder
-    rsp_l1b_dir = f'{_fdir_general_}/rsp/ARCSIX-RSP-L1B_P3B_{date_s}_R01'
-    if os.path.exists(rsp_l1b_dir):
-        rsp_l1b_files = sorted(glob.glob(f'{rsp_l1b_dir}/ARCSIX-RSP-L1B_P3B_{date_s}*.h5'))
-        print("rsp_l1b_files:", rsp_l1b_files)
-        if len(rsp_l1b_files) == 0:
-            print(f"No RSP L1B files found in {rsp_l1b_dir}")
-            rsp_1lb_avail = False
-        else:
-            rsp_l1b_files = np.array(rsp_l1b_files)
-            log.info(f"Found {len(rsp_l1b_files)} RSP L1B files in {rsp_l1b_dir}")
-            # ARCSIX-RSP-L1B_P3B_20240605111213_R01.h5
-            print([os.path.basename(f).split('_')[2] for f in rsp_l1b_files])
-            rsp_l1b_times = np.array([int(os.path.basename(f).split('_')[2][8:10]) + int(os.path.basename(f).split('_')[2][10:12])/60.0 + int(os.path.basename(f).split('_')[2][12:14])/3600.0 for f in rsp_l1b_files])
-            rsp_1lb_avail = True
-    else:
-        print(f"RSP L1B directory {rsp_l1b_dir} does not exist")
-        rsp_1lb_avail = False
-
     # read satellite granule
     #/----------------------------------------------------------------------------\#
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     os.makedirs(fdir_cld_obs_info, exist_ok=True)
     fname_cld_obs_info = '%s/%s_cld_obs_info_%s_%s_%s_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag)
-    if not os.path.exists(fname_cld_obs_info) or iter==0:      
+    if not os.path.exists(fname_cld_obs_info):# or iter==0:      
         
         # Loop legs: load raw NC, apply cloud logic, interpolate, plot
         for i, mask in enumerate(leg_masks):
@@ -2405,79 +2085,14 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             times_leg = t_hsk[mask]
             print(f"Leg {i+1}: time range {times_leg.min()}-{times_leg.max()}h")
             
-            sel_ssfr, sel_hsr1, sel_ssrr = (
+            sel_ssfr, sel_hsr1 = (
                 nearest_indices(t_hsk, mask, arr)
-                for arr in (t_ssfr, t_hsr1, t_ssrr)
+                for arr in (t_ssfr, t_hsr1)
             )
             
             if len(t_marli) > 0:
                 sel_marli = nearest_indices(t_hsk, mask, t_marli)
             
-            # choose the rsp l1b file for this leg
-            if rsp_1lb_avail:
-                time_leg_start = times_leg.min()
-                time_leg_end = times_leg.max()
-                rsp_l1b_sel = np.zeros(rsp_l1b_times.shape, dtype=bool)
-                rsp_file_start = np.where(rsp_l1b_times==rsp_l1b_times[((rsp_l1b_times - time_leg_start)<0)][-1])[0][0]
-                try:
-                    rsp_file_end = np.where(rsp_l1b_times==rsp_l1b_times[((rsp_l1b_times - time_leg_end)>0)][0])[0][0]
-                    rsp_l1b_sel[rsp_file_start:rsp_file_end] = True
-                except IndexError:
-                    rsp_l1b_sel[rsp_file_start:] = True
-                if len(rsp_l1b_sel) == 0:
-                    print(f"No RSP L1B files found for leg {i+1} time range {time_leg_start}-{time_leg_end}h")
-                    rsp_l1b_files_leg = None
-                rsp_l1b_files_leg = rsp_l1b_files[rsp_l1b_sel]
-                
-                rsp_time_all = []
-                rsp_rad_all = []
-                rsp_ref_all = []
-                rsp_rad_norm_all = []
-                rsp_lon_all = []
-                rsp_lat_all = []
-                rsp_mu0_all = []
-                rsp_sd_all = []
-                for rsp_file_name in rsp_l1b_files_leg:
-                    log.info(f"Reading RSP L1B file: {rsp_file_name}")
-                    data_rsp = load_h5(rsp_file_name)
-                    t_rsp = data_rsp['Platform/Fraction_of_Day']*24.0  # in hours, (dim_Scans)
-                    rsp_vza = data_rsp['Geometry/Viewing_Zenith']  # in degrees, (dim_Scans, dim_Scene_Sectors)
-                    rsp_ground_lat = data_rsp['Geometry/Ground_Latitude']  # (dim_Scans, dim_Scene_Sectors)
-                    rsp_ground_lon = data_rsp['Geometry/Ground_Longitude']  # (dim_Scans, dim_Scene_Sectors)
-                    rsp_sza = data_rsp['Platform/Platform_Solar_Zenith']  # (dim_Scans), in radians
-                    rsp_sd = data_rsp['Platform/Solar_Distance']  # (dim_Scans), in AU
-                    
-                    intensity_1 = data_rsp['Data/Intensity_1']  # (dim_Scans, dim_Scene_Sectors, bands)
-                    intensity_2 = data_rsp['Data/Intensity_2']  # (dim_Scans, dim_Scene_Sectors, bands)
-                    rsp_wvl = data_rsp['Data/Wavelength']  # in nm, (bands,)
-                    rsp_solar_const = data_rsp['Calibration/Solar_Constant']  # in W/m^2/nm, (bands,)
-                    
-                    
-                    nadir_select = np.argmax(rsp_vza, axis=1)  # select the nadir sector
-                    sel_rsp = nearest_indices(t_hsk, mask, t_rsp)
-                    
-                    rsp_time_sel = t_rsp[sel_rsp]
-                    rsp_int_1_sel = intensity_1[sel_rsp, nadir_select[sel_rsp], :]  # (time, bands)
-                    rsp_int_2_sel = intensity_2[sel_rsp, nadir_select[sel_rsp], :]  # (time, bands)
-                    rsp_lon_sel = rsp_ground_lon[sel_rsp, nadir_select[sel_rsp]]
-                    rsp_lat_sel = rsp_ground_lat[sel_rsp, nadir_select[sel_rsp]]
-                    rsp_sza_sel = rsp_sza[sel_rsp]
-                    rsp_sd_sel = rsp_sd[sel_rsp]
-                    
-                    rsp_rad_norm = (rsp_int_1_sel + rsp_int_2_sel) / 2  # (time, bands), in counts
-                    rsp_rad = rsp_rad_norm * rsp_solar_const[np.newaxis, :] / np.pi
-                    rsp_ref_cal = rsp_rad_norm * rsp_sd_sel[:, np.newaxis]**2 / np.cos(rsp_sza_sel[:, np.newaxis])  # (time, bands), in W/m^2/sr/nm
-                    
-                    rsp_time_all.extend(rsp_time_sel)
-                    rsp_rad_all.extend(rsp_rad)
-                    rsp_rad_norm_all.extend(rsp_rad_norm)
-                    rsp_ref_all.extend(rsp_ref_cal)
-                    rsp_lon_all.extend(rsp_lon_sel)
-                    rsp_lat_all.extend(rsp_lat_sel)
-                    rsp_mu0_all.extend(np.cos(np.deg2rad(rsp_sza_sel)))
-                    rsp_sd_all.extend(rsp_sd_sel)
-                    
-
 
             # assemble a small dict for this leg
             leg = {
@@ -2491,16 +2106,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 "lat":     data_hsk["lat"][mask],
                 "sza":     data_hsk["sza"][mask],
                 "saa":     data_hsk["saa"][mask],
-                "p3_alt":  data_hsk["alt"][mask] / 1000.0,
-                
-                "rsp_lon": np.array(rsp_lon_all) if rsp_1lb_avail else None,
-                "rsp_lat": np.array(rsp_lat_all) if rsp_1lb_avail else None,
-                "rsp_rad": np.array(rsp_rad_all) if rsp_1lb_avail else None,
-                "rsp_rad_norm": np.array(rsp_rad_norm_all) if rsp_1lb_avail else None,
-                "rsp_ref": np.array(rsp_ref_all) if rsp_1lb_avail else None,
-                "rsp_wvl": rsp_wvl if rsp_1lb_avail else None,
-                "rsp_mu0": np.array(rsp_mu0_all) if rsp_1lb_avail else None,
-                "rsp_sd":  np.array(rsp_sd_all) if rsp_1lb_avail else None,   
             }
 
             if len(data_marli['time']) > 0:
@@ -2580,18 +2185,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             leg['ssfr_nad_wvl'] = ssfr_zen_wvl
             leg['ssfr_toa'] = ssfr_zen_toa
             
-            
-            # ssrr
-            # interpolate ssrr zenith radiance to nadir wavelength grid
-            f_zen_rad_interp = interp1d(data_ssrr["wvl_dn"], data_ssrr["i_dn"][sel_ssrr, :], axis=1, bounds_error=False, fill_value=np.nan)
-            ssrr_rad_zen_i = f_zen_rad_interp(ssfr_zen_wvl)
-            f_nad_rad_interp = interp1d(data_ssrr["wvl_up"], data_ssrr["i_up"][sel_ssrr, :], axis=1, bounds_error=False, fill_value=np.nan)
-            ssrr_rad_nad_i = f_nad_rad_interp(ssfr_zen_wvl)
-            
-            leg['ssrr_zen_rad'] = ssrr_rad_zen_i
-            leg['ssrr_nad_rad'] = ssrr_rad_nad_i
-            leg['ssrr_zen_wvl'] = ssfr_zen_wvl
-            leg['ssrr_nad_wvl'] = ssfr_zen_wvl
 
             vars()["cld_leg_%d" % i] = leg
         
@@ -2601,13 +2194,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 pickle.dump(vars()["cld_leg_%d" % i], f, protocol=pickle.HIGHEST_PROTOCOL)
 
             del leg  # free memory
-            del sel_ssfr, sel_ssrr, sel_hsr1
-            if rsp_1lb_avail:
-                del rsp_time_all, rsp_rad_all, rsp_ref_all, rsp_lon_all, rsp_lat_all
-                del rsp_mu0_all, rsp_sd_all
-                del data_rsp
-                del t_rsp, intensity_1, intensity_2, rsp_solar_const
-                del rsp_ground_lon, rsp_ground_lat, rsp_sza, rsp_vza
+            del sel_ssfr, sel_hsr1
             gc.collect()
         
     else:
@@ -3119,12 +2706,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 'simu_fdn_mean': Fdn_p3_mean_interp,
                 'simu_fup_toa_mean': Fup_toa_mean_interp,
                 'toa_mean': toa_mean,
-                'ssrr_zen_wvl': cld_leg['ssrr_zen_wvl'],
-                'ssrr_nad_wvl': cld_leg['ssrr_zen_wvl'],
-                'ssrr_rad_dn_mean': np.nanmean(cld_leg['ssrr_zen_rad'], axis=0),
-                'ssrr_rad_up_mean': np.nanmean(cld_leg['ssrr_nad_rad'], axis=0),
-                'ssrr_rad_dn_std': np.nanstd(cld_leg['ssrr_zen_rad'], axis=0),
-                'ssrr_rad_up_std': np.nanstd(cld_leg['ssrr_nad_rad'], axis=0),
             }
             
             output_df = pd.DataFrame(output_dict)
@@ -3720,59 +3301,60 @@ if __name__ == '__main__':
     #                 config=config,
     #                 )
     
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-    #                     tmhr_ranges_select=[
-    #                                         [11.33, 11.88],
-    #                                         [12.00, 12.20],
-    #                                         [12.33, 13.80],
-    #                                         ],
-    #                     case_tag='clear_sky_track_atm_corr',
-    #                     config=config,
-    #                     simulation_interval=15,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=True,
-    #                     manual_cloud=False,
-    #                     iter=iter,
-    #                     )
-
-    # atm_corr_plot(date=datetime.datetime(2024, 6, 5),
-    #                     tmhr_ranges_select=[
-    #                                         [11.33, 11.88],
-    #                                         [12.00, 12.20],
-    #                                         [12.33, 13.80],
-    #                                         ],
-    #                 case_tag='clear_sky_track_atm_corr',
-    #                 simulation_interval=15,
-    #                 config=config,
-    #                 )
-    
-    
-    for iter in range(1):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
                         tmhr_ranges_select=[
-                                            # [11.29, 13.31],
-                                            # [17.26, 18.32],
-                                            [11.29, 11.40],
+                                            # [11.33, 11.88],
+                                            [12.00, 12.20],
+                                            # [12.33, 13.80],
                                             ],
                         case_tag='clear_sky_track_atm_corr',
                         config=config,
-                        simulation_interval=1,
+                        simulation_interval=15,
                         clear_sky=True,
                         overwrite_lrt=True,
                         manual_cloud=False,
                         iter=iter,
                         )
+
+    atm_corr_plot(date=datetime.datetime(2024, 6, 5),
+                        tmhr_ranges_select=[
+                                            # [11.33, 11.88],
+                                            [12.00, 12.20],
+                                            # [12.33, 13.80],
+                                            ],
+                    case_tag='clear_sky_track_atm_corr',
+                    simulation_interval=15,
+                    config=config,
+                    )
+    
+    
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
+    #                     tmhr_ranges_select=[
+    #                                         # [11.29, 13.31],
+    #                                         # [17.26, 18.32],
+    #                                         [11.29, 11.40],
+    #                                         ],
+    #                     case_tag='clear_sky_track_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=1,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     iter=iter,
+    #                     )
         
     sys.exit()
 
     atm_corr_plot(date=datetime.datetime(2024, 6, 6),
                         tmhr_ranges_select=[
-                                            [11.29, 13.31],
-                                            [17.26, 18.32],
+                                            # [11.29, 13.31],
+                                            # [17.26, 18.32],
+                                            [11.29, 11.40]
                                             ],
                     case_tag='clear_sky_track_atm_corr',
-                    simulation_interval=15,
+                    simulation_interval=1,
                     config=config,
                     )
     

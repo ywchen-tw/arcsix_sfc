@@ -904,7 +904,7 @@ class FlightConfig:
     
     def hsk(self, date_s):    return f"{self.data_root}/{self.mission}-HSK_{self.platform}_{date_s}_v0.h5"
     def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R1.h5"
-    # def ssrr(self, date_s):   return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_R0.h5"
+    def ssrr(self, date_s):   return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_R0.h5"
     def hsr1(self, date_s):   return f"{self.data_root}/{self.mission}-HSR1_{self.platform}_{date_s}_R0.h5"
     def logic(self, date_s):  return f"{self.data_root}/{self.mission}-LOGIC_{self.platform}_{date_s}_RA.h5"
     def sat_coll(self, date_s): return f"{self.data_root}/{self.mission}-SAT-CLD_{self.platform}_{date_s}_v0.h5"
