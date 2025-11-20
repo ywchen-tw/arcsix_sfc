@@ -150,7 +150,7 @@ _dates2_ = [
 _dates_ = _dates1_
 
 
-o2a_1_start, o2a_1_end = 748, 776
+o2a_1_start, o2a_1_end = 748, 780
 h2o_1_start, h2o_1_end = 672, 706
 h2o_2_start, h2o_2_end = 705, 746
 h2o_3_start, h2o_3_end = 884, 996
@@ -158,7 +158,7 @@ h2o_4_start, h2o_4_end = 1084, 1175
 h2o_5_start, h2o_5_end = 1230, 1286
 h2o_6_start, h2o_6_end = 1290, 1509
 h2o_7_start, h2o_7_end = 1748, 2050
-h2o_8_start, h2o_8_end = 803, 842
+h2o_8_start, h2o_8_end = 801, 843
 final_start, final_end = 2110, 2200
 
 gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h2o_2_end),
@@ -290,8 +290,8 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     for i in range(len(tmhr_ranges_select)):
-        print(f"Processing time range {i+1}/{len(tmhr_ranges_select)}: {tmhr_ranges_select[i][0]:.2f} - {tmhr_ranges_select[i][1]:.2f} UTC")
         fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_%d_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, i)
+        
         with open(fname_pkl, 'rb') as f:
             cld_leg = pickle.load(f)
         time = cld_leg['time']
@@ -317,6 +317,10 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
         ori_csv_name = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_0.csv'
         updated_csv_name_1 = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_1.csv'
         updated_csv_name_2 = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_2.csv'
+        
+        if not os.path.exists(ori_csv_name):
+            log.error("Original CSV file not found: %s", ori_csv_name)
+            continue
         
         
         # p3_up_dn_ratio_20240605_13.79_13.81_5.80_1.dat
@@ -377,7 +381,9 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
         fdn_1600_all.append(cld_leg['ssfr_zen'][:, ssfr_1600_ind])
         fup_1600_all.append(cld_leg['ssfr_nad'][:, ssfr_1600_ind])
         
-        
+        print("i:", i)
+        print("alb_ratio['alb'] shape:", alb_ratio['alb'].shape)
+        print("alb_ratio_all shape:", alb_ratio_all.shape)
         alb_ratio_all[i, :] = alb_ratio['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
         alb1_all[i, :] = alb_1['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
         alb2_all[i, :] = alb_2['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
@@ -406,6 +412,11 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
         simu_fup_toa_mean_all_iter1[i, :] = df_upd1['simu_fup_toa_mean'].values
         simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
         toa_mean_all[i, :] = df_ori['toa_mean'].values
+        
+        
+        print(f"date_s: {date_s}, time: {time_start:.2f}-{time_end:.2f}, alt_avg: {alt_avg:.2f} km")
+    
+    
     
         
     
@@ -415,6 +426,54 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
             min_idx = np.unravel_index(np.argmin(dist, axis=None), dist.shape)
             modis_alb_leg = modis_sur_alb[min_idx[0], min_idx[1], :7]
             modis_alb_legs.append(modis_alb_leg)
+    
+    
+    time_all = np.array(time_all)
+    fdn_550_all = np.array(fdn_550_all)
+    fup_550_all = np.array(fup_550_all)
+    fdn_1600_all = np.array(fdn_1600_all)
+    fup_1600_all = np.array(fup_1600_all)
+
+    print("lon avg all mean:", lon_avg_all.mean())
+    print("lat avg all mean:", lat_avg_all.mean())
+    
+    select = np.full(len(tmhr_ranges_select), True)
+    # remove invalid time
+    for i in range(len(tmhr_ranges_select)):
+        if np.all(alb_ratio_all[i, :] == 0):
+            select[i] = False
+            
+    for data_arr in [alb_ratio_all, alb1_all, alb2_all, p3_ratio1_all, p3_ratio2_all, 
+                     lon_avg_all, lat_avg_all, lon_min_all, lon_max_all, lat_min_all, lat_max_all, alt_avg_all,
+                     ssfr_fup_mean_all, ssfr_fdn_mean_all, ssfr_fup_std_all, ssfr_fdn_std_all, 
+                     simu_fup_mean_all_iter0, simu_fdn_mean_all_iter0,
+                     simu_fup_mean_all_iter1, simu_fdn_mean_all_iter1,
+                     simu_fup_mean_all_iter2, simu_fdn_mean_all_iter2, 
+                     simu_fup_toa_mean_all_iter0, simu_fup_toa_mean_all_iter1, simu_fup_toa_mean_all_iter2, toa_mean_all]:
+        data_arr = data_arr[select]
+        
+    broadband_alb_iter0 = np.sum(alb_ratio_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
+    broadband_alb_iter1 = np.sum(alb1_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
+    broadband_alb_iter2 = np.sum(alb2_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
+    gas_mask = np.isfinite(gas_abs_masking(alb_wvl, np.ones_like(alb_wvl, dtype=float)))
+    broadband_alb_iter0_filter = np.sum(alb_ratio_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
+    broadband_alb_iter1_filter = np.sum(alb1_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
+    broadband_alb_iter2_filter = np.sum(alb2_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
+    
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4.5))
+    ax.plot(lon_avg_all, broadband_alb_iter0, 'o-', label='Iteration 0')
+    ax.plot(lon_avg_all, broadband_alb_iter1, 's-', label='Iteration 1')
+    ax.plot(lon_avg_all, broadband_alb_iter2, 'd-', label='Iteration 2')
+    ax.plot(lon_avg_all, broadband_alb_iter0_filter, 'o-.', label='Iteration 0 (gas masked)')
+    ax.plot(lon_avg_all, broadband_alb_iter1_filter, 's--', label='Iteration 1 (gas masked)')
+    ax.plot(lon_avg_all, broadband_alb_iter2_filter, 'd--', label='Iteration 2 (gas masked)')
+    ax.set_xlabel('Longitude', fontsize=12)
+    ax.set_ylabel('Broadband Surface Albedo', fontsize=12)
+    ax.set_title(f'Broadband Surface Albedo vs Longitude {date_s} {case_tag}', fontsize=14)
+    ax.legend(fontsize=10)
+    fig.tight_layout()
+    fig.savefig(f'fig/{date_s}/{date_s}_{case_tag}_broadband_albedo_vs_longitude.png', bbox_inches='tight', dpi=150)
+    log.info("Saved broadband albedo vs longitude plot to fig/%s/%s_%s_broadband_albedo_vs_longitude.png", date_s, date_s, case_tag)
     
     # save alb1 and alb2 to a pkl file
     alb_update_dict = {
@@ -455,7 +514,6 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.log(alt_avg_all/alt_avg_all.max()))               
     
-    alb_wvl = alb_ratio['wvl'].values[1:-1] # skip the first value at 348 nm and last value at 2050 nm
     ssfr_alb_plot(date_s, tmhr_ranges_select, alb_wvl, alb_ratio_all, color_series, 
                    alt_avg_all,
                    modis_bands_nm, modis_alb_legs, modis_alb_file,
@@ -772,6 +830,7 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     for i in range(len(tmhr_ranges_select)):
         fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_%d_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, i)
+        
         with open(fname_pkl, 'rb') as f:
             cld_leg = pickle.load(f)
         time = cld_leg['time']
@@ -780,6 +839,8 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         alt_avg = np.nanmean(data_hsk['alt'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])/1000  # in km
         lon_avg = np.nanmean(data_hsk['lon'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])
         lat_avg = np.nanmean(data_hsk['lat'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])
+        lon_all = data_hsk['lon'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)]
+        lat_all = data_hsk['lat'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)]
         
     
         ratio_fname = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km_iter_0.dat'
@@ -788,10 +849,17 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         update_p3_1_fname = f'{_fdir_general_}/sfc_alb/p3_up_dn_ratio_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}_1.dat'
         update_p3_2_fname = f'{_fdir_general_}/sfc_alb/p3_up_dn_ratio_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}_2.dat'
         
-        fdir_spiral = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_clear'
+        if "cloudy" in case_tag:
+            fdir_spiral = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
+        else:
+            fdir_spiral = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_clear'
         ori_csv_name = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_0.csv'
         updated_csv_name_1 = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_1.csv'
         updated_csv_name_2 = f'{fdir_spiral}/ssfr_simu_flux_{date_s}_{time_start:.2f}-{time_end:.2f}_alt-{alt_avg:.2f}km_iteration_2.csv'
+        
+        if not os.path.exists(ori_csv_name):
+            log.error("Original CSV file not found: %s", ori_csv_name)
+            continue
         
         
         # p3_up_dn_ratio_20240605_13.79_13.81_5.80_1.dat
@@ -812,7 +880,7 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
             fup_550_all = []
             fdn_1600_all = []
             fup_1600_all = []
-            alb_wvl = alb_ratio['wvl'].values
+            alb_wvl = alb_ratio['wvl'].values[1:-1] # skip the first value at 348 nm and last value at 2050 nm
             alb_ratio_all = np.zeros((len(tmhr_ranges_select), len(alb_wvl)))
             alb1_all = np.zeros((len(tmhr_ranges_select), len(alb_wvl)))
             alb2_all = np.zeros((len(tmhr_ranges_select), len(alb_wvl)))
@@ -843,7 +911,6 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
             simu_fup_toa_mean_all_iter2 = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             toa_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
 
-
         time_all.append(time)
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
         ssfr_550_ind = np.argmin(np.abs(ssfr_wvl - 550))
@@ -853,10 +920,12 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         fdn_1600_all.append(cld_leg['ssfr_zen'][:, ssfr_1600_ind])
         fup_1600_all.append(cld_leg['ssfr_nad'][:, ssfr_1600_ind])
         
-        
-        alb_ratio_all[i, :] = alb_ratio['alb'].values
-        alb1_all[i, :] = alb_1['alb'].values
-        alb2_all[i, :] = alb_2['alb'].values
+        print("i:", i)
+        print("alb_ratio['alb'] shape:", alb_ratio['alb'].shape)
+        print("alb_ratio_all shape:", alb_ratio_all.shape)
+        alb_ratio_all[i, :] = alb_ratio['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
+        alb1_all[i, :] = alb_1['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
+        alb2_all[i, :] = alb_2['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
         p3_ratio1_all[i, :] = p3_ratio_1['ratio'].values
         p3_ratio2_all[i, :] = p3_ratio_2['ratio'].values
         lon_avg_all[i] = lon_avg.copy()
@@ -886,10 +955,30 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         
         print(f"date_s: {date_s}, time: {time_start:.2f}-{time_end:.2f}, alt_avg: {alt_avg:.2f} km")
     
+    time_all = np.array(time_all)
+    fdn_550_all = np.array(fdn_550_all)
+    fup_550_all = np.array(fup_550_all)
+    fdn_1600_all = np.array(fdn_1600_all)
+    fup_1600_all = np.array(fup_1600_all)
 
-        
     print("lon avg all mean:", lon_avg_all.mean())
     print("lat avg all mean:", lat_avg_all.mean())
+    
+    select = np.full(len(tmhr_ranges_select), True)
+    # remove invalid time
+    for i in range(len(tmhr_ranges_select)):
+        if np.all(alb_ratio_all[i, :] == 0):
+            select[i] = False
+            
+    for data_arr in [alb_ratio_all, alb1_all, alb2_all, p3_ratio1_all, p3_ratio2_all, 
+                     lon_avg_all, lat_avg_all, lon_min_all, lon_max_all, lat_min_all, lat_max_all, alt_avg_all,
+                     ssfr_fup_mean_all, ssfr_fdn_mean_all, ssfr_fup_std_all, ssfr_fdn_std_all, 
+                     simu_fup_mean_all_iter0, simu_fdn_mean_all_iter0,
+                     simu_fup_mean_all_iter1, simu_fdn_mean_all_iter1,
+                     simu_fup_mean_all_iter2, simu_fdn_mean_all_iter2, 
+                     simu_fup_toa_mean_all_iter0, simu_fup_toa_mean_all_iter1, simu_fup_toa_mean_all_iter2, toa_mean_all]:
+        data_arr = data_arr[select]
+            
         
     
 
@@ -1100,6 +1189,9 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
         min_idx = np.unravel_index(np.argmin(dist, axis=None), dist.shape)
         modis_alb_leg = modis_sur_alb[min_idx[0], min_idx[1], :7]
         modis_bands_nm = np.array([float(i) for i in modis_bands[:7]])*1000  # in nm
+    else:
+        modis_bands_nm = None
+        modis_alb_leg = None
 
 
     # Create a ScalarMappable
@@ -1109,54 +1201,60 @@ def atm_corr_spiral_plot(date=datetime.datetime(2024, 5, 31),
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.log(alt_avg_all/alt_avg_all.max()))
     
-    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_ratio['wvl'], alb_ratio_all, color_series, alt_avg_all, case_tag,
+    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_wvl, alb_ratio_all, color_series, alt_avg_all, case_tag,
                           albedo_used='albedo used: SSFR upward/downward ratio',
                           file_suffix='')
 
-    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_ratio['wvl'], p3_ratio1_all, color_series, alt_avg_all, case_tag,
+    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_wvl, p3_ratio1_all, color_series, alt_avg_all, case_tag,
                           albedo_used='albedo used: Atmospheric corrected albedo',
                           file_suffix='_updated_1')
     
-    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_ratio['wvl'], p3_ratio2_all, color_series, alt_avg_all, case_tag,
+    ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, alb_wvl, p3_ratio2_all, color_series, alt_avg_all, case_tag,
                           albedo_used='albedo used: Atmospheric corrected albedo (smoothed)',
                           file_suffix='_updated_2')
-     
-    ssfr_alb_plot(date_s, tmhr_ranges_select, alb_ratio['wvl'], alb_ratio_all, color_series, 
-                   alt_avg_all, lon_avg_all, lat_avg_all,
+    
+    ssfr_alb_plot(date_s, tmhr_ranges_select, alb_wvl, alb_ratio_all, color_series, 
+                   alt_avg_all,
                    modis_bands_nm, modis_alb_leg, modis_alb_file,
                    case_tag,
                    ylabel='SSFR upward/downward ratio',
                    title='SSFR measurement',
                    suptitle='SSFR upward/downward ratio Comparison',
                    file_description='SSFR_ratio_aviris',
+                   lon_avg_all=lon_avg_all,
+                   lat_avg_all=lat_avg_all,
                    aviris_file=aviris_file,
                    aviris_closest=aviris_closest,
                    aviris_reflectance_wvl=aviris_reflectance_wvl,
                    aviris_reflectance_spectrum=aviris_reflectance_spectrum,
                    aviris_reflectance_spectrum_unc=aviris_reflectance_spectrum_unc)
         
-    ssfr_alb_plot(date_s, tmhr_ranges_select, alb1_all['wvl'], alb1_all, color_series, 
-                   alt_avg_all, lon_avg_all, lat_avg_all,
+    ssfr_alb_plot(date_s, tmhr_ranges_select, alb_wvl, alb1_all, color_series, 
+                   alt_avg_all,
                    modis_bands_nm, modis_alb_leg, modis_alb_file,
                    case_tag,
                    ylabel='Atmospheric corrected Surface Albedo',
                    title='Albedo used: atmospheric corrected surface albedo (smooth and fit)',
                    suptitle='Atmospheric corrected Surface Albedo (smooth and fit) Comparison',
                    file_description='corrected_alb_aviris',
+                   lon_avg_all=lon_avg_all,
+                   lat_avg_all=lat_avg_all,
                    aviris_file=aviris_file,
                    aviris_closest=aviris_closest,
                    aviris_reflectance_wvl=aviris_reflectance_wvl,
                    aviris_reflectance_spectrum=aviris_reflectance_spectrum,
                    aviris_reflectance_spectrum_unc=aviris_reflectance_spectrum_unc)
     
-    ssfr_alb_plot(date_s, tmhr_ranges_select, alb2_all['wvl'], alb2_all, color_series, 
-                   alt_avg_all, lon_avg_all, lat_avg_all,
+    ssfr_alb_plot(date_s, tmhr_ranges_select, alb_wvl, alb2_all, color_series, 
+                   alt_avg_all,
                    modis_bands_nm, modis_alb_leg, modis_alb_file,
                    case_tag,
                    ylabel='Atmospheric corrected Surface Albedo (smooth and fit)',
                    title='Albedo used: atmospheric corrected surface albedo (smooth and fit)',
                    suptitle='Atmospheric corrected Surface Albedo (smooth and fit) Comparison',
                    file_description='corrected_alb_smooth_fit_aviris',
+                   lon_avg_all=lon_avg_all,
+                   lat_avg_all=lat_avg_all,
                    aviris_file=aviris_file,
                    aviris_closest=aviris_closest,
                    aviris_reflectance_wvl=aviris_reflectance_wvl,
@@ -1438,7 +1536,16 @@ def fit_1d_poly(x, y, order=1, dx=None, x0=None):
     return p
 
 
-def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag):
+from enum import IntFlag, auto
+class ssfr_flags(IntFlag):
+    pitcth_roll_exceed_threshold = auto()  #condition when the pitch or roll angle exceeded a certain threshold
+    camera_icing = auto()  #condition when the camera experienced icing issues at the moment of measurement
+    camera_icing_pre = auto()  #condition when the camera experienced icing issues within 1 hour prior to the moment of measurement
+    zen_toa_over_threshold = auto()  #condition when the zenith TOA irradiance is over a certain threshold 
+    alp_ang_pit_rol_issue = auto()  #condition when the leveling platform angle is over a certain threshold
+    
+
+def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0):
     t_hsk = np.array(data_hsk["tmhr"])    
     t_ssfr = data_ssfr['time']/3600.0  # convert to hours
     t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
@@ -1458,7 +1565,11 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     hsr1_diff_ratio = data_hsr1["f_dn_dif"]/data_hsr1["f_dn_tot"]
     hsr1_diff_ratio_530_570_mean = np.nanmean(hsr1_diff_ratio[:, hsr_530_ind:hsr_570_ind+1], axis=1)
     
-    pitch_roll_mask = np.sqrt(pitch_ang**2 + roll_ang**2) < 2.5  # pitch and roll greater < 2.5 deg
+    pitch_roll_mask = np.sqrt(pitch_ang**2 + roll_ang**2) < pitch_roll_thres  # pitch and roll greater < pitch_roll_thres
+    pitch_ang_valid = pitch_ang.copy()
+    roll_ang_valid = roll_ang.copy()
+    pitch_ang_valid[~pitch_roll_mask] = np.nan
+    roll_ang_valid[~pitch_roll_mask] = np.nan
     # pitch_roll_mask = np.logical_and(np.abs(pitch_ang) < 2.5, np.abs(roll_ang) < 2.5)  # pitch and roll greater < 2.5 deg
     pitch_roll_mask = pitch_roll_mask[tmhr_hsk_mask]
     
@@ -1480,15 +1591,19 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     hsr_dif_ratio = hsr_dif_ratio[t_hsr1_tmhr_mask]
     hsr1_diff_ratio_530_570_mean = hsr1_diff_ratio_530_570_mean[t_hsr1_tmhr_mask]
     
-    hsr1_530_570_thresh = 0.18
-    cloud_mask_hsr1 = hsr1_diff_ratio_530_570_mean > hsr1_530_570_thresh
-    ssfr_fup_tmhr[cloud_mask_hsr1] = np.nan
-    ssfr_fdn_tmhr[cloud_mask_hsr1] = np.nan
+    # hsr1_530_570_thresh = 0.18
+    # cloud_mask_hsr1 = hsr1_diff_ratio_530_570_mean > hsr1_530_570_thresh
+    # ssfr_fup_tmhr[cloud_mask_hsr1] = np.nan
+    # ssfr_fdn_tmhr[cloud_mask_hsr1] = np.nan
     
+    icing = (data_ssfr['flag'] & ssfr_flags.camera_icing) != 0
+    pitch_roll_exceed = (data_ssfr['flag'] & ssfr_flags.pitcth_roll_exceed_threshold) != 0
+    alp_ang_pit_rol_issue = (data_ssfr['flag'] & ssfr_flags.alp_ang_pit_rol_issue) != 0
     
-    print("ssfr_fdn_tmhr shape:", ssfr_fdn_tmhr.shape)
-    print("pitch_roll_mask shape:", pitch_roll_mask.shape)
-    print("ssfr_fdn_tmhr[pitch_roll_mask, ssfr_zen_550_ind] shape:", ssfr_fdn_tmhr[pitch_roll_mask, :].shape)
+    alp_ang_pit_rol_issue_tmhr = alp_ang_pit_rol_issue[t_ssfr_tmhr_mask]
+    ssfr_fup_tmhr[alp_ang_pit_rol_issue_tmhr] = np.nan
+    ssfr_fdn_tmhr[alp_ang_pit_rol_issue_tmhr] = np.nan
+    
     
     ssfr_zen_550_ind = np.argmin(np.abs(ssfr_zen_wvl - 550))
     ssfr_nad_550_ind = np.argmin(np.abs(ssfr_nad_wvl - 550))
@@ -1509,8 +1624,10 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     ax11.set_ylabel('HSR1 Diff Ratio 550nm', fontsize=14)
     
     # ax2.plot(t_hsk, data_hsk['ang_hed'], 'r-', label='HSK Heading')
-    ax20.plot(t_hsk, pitch_ang, 'g-', label='HSK Pitch')
-    ax20.plot(t_hsk, roll_ang, 'b-', label='HSK Roll')
+    ax20.plot(t_hsk, pitch_ang, 'g-', label='HSK Pitch', linewidth=1.0)
+    ax20.plot(t_hsk, roll_ang, 'b-', label='HSK Roll', linewidth=1.0)
+    ax20.plot(t_hsk, pitch_ang_valid, 'g-', linewidth=3.0)
+    ax20.plot(t_hsk, roll_ang_valid, 'b-', linewidth=3.0)
     for i, (lo, hi) in enumerate(tmhr_ranges_select):
         for ax in [ax10, ax20]:
             ax.fill_betweenx([0, 6], lo, hi, color='gray', alpha=0.3, transform=ax.get_xaxis_transform(),)# label=f'Leg {i+1}' if i==0 else None)
@@ -1546,7 +1663,7 @@ def write_2col_file(filename, wvl, val, header):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')
 
 def gas_abs_masking(wvl, alb):
-    o2a_1_start, o2a_1_end = 748, 776
+    o2a_1_start, o2a_1_end = 748, 780
     h2o_1_start, h2o_1_end = 672, 706
     h2o_2_start, h2o_2_end = 705, 746
     h2o_3_start, h2o_3_end = 884, 996
@@ -1554,7 +1671,7 @@ def gas_abs_masking(wvl, alb):
     h2o_5_start, h2o_5_end = 1230, 1286
     h2o_6_start, h2o_6_end = 1290, 1509
     h2o_7_start, h2o_7_end = 1748, 2050
-    h2o_8_start, h2o_8_end = 803, 842
+    h2o_8_start, h2o_8_end = 801, 843
     final_start, final_end = 2110, 2200
     
     alb_mask = alb.copy()
@@ -1765,15 +1882,15 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
 def snowice_alb_fitting(alb_wvl, alb_corr, clear_sky=False):
     snicar_albedo_list = []
     if clear_sky:
-        snicar_filename = 'snicar_model_results.pkl'
+        snicar_filename = 'snicar_model_results_direct.pkl'
     else:
-        snicar_filename = 'snicar_model_results.pkl'
+        snicar_filename = 'snicar_model_results_diffuse.pkl'
     with open(snicar_filename, 'rb') as f:
         snicar_data = pickle.load(f)
-        wvl = list(snicar_data.values())[0]['wvl']
-        for key in snicar_data:
-            snicar_albedo_list.append((key, snicar_data[key]['albedo']))
-    snicar_albedo_arr = np.array(snicar_albedo_list)  
+    #     wvl = list(snicar_data.values())[0]['wvl']
+    #     for key in snicar_data:
+    #         snicar_albedo_list.append((key, snicar_data[key]['albedo']))
+    # snicar_albedo_arr = np.array(snicar_albedo_list)  
           
     alb_corr_mask = alb_corr.copy()
     alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask)
@@ -1887,11 +2004,11 @@ def snowice_alb_fitting(alb_wvl, alb_corr, clear_sky=False):
     # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
     # plt.show()
     
-    # smooth with window size of 3
+    # smooth with window size of 5
     alb_corr_fit_smooth = alb_corr_fit.copy()
-    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=3)
-    alb_corr_fit_smooth[:1] = alb_corr_fit_smooth[1]
-    alb_corr_fit_smooth[-1:] = alb_corr_fit_smooth[-1]
+    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5)
+    alb_corr_fit_smooth[:2] = alb_corr_fit_smooth[2]
+    alb_corr_fit_smooth[-2:] = alb_corr_fit_smooth[-2]
     alb_corr_fit_smooth[alb_corr_fit_smooth<0.0] = 0.0
     alb_corr_fit_smooth[alb_corr_fit_smooth>1.0] = 1.0
     
@@ -1923,14 +2040,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                      manual_cloud_cot=6.26,
                      iter=0
                     ):
-
-    # case specification
-    #/----------------------------------------------------------------------------\#
-    vname_x = 'lon'
-    colors1 = ['r', 'g', 'b', 'brown']
-    colors2 = ['hotpink', 'springgreen', 'dodgerblue', 'orange']
-    #\----------------------------------------------------------------------------/#
-    
     
     log = logging.getLogger("lrt")
     log.info("Starting processing for %s", date.strftime("%Y%m%d"))
@@ -1966,7 +2075,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     log.info("ssfr filename:", config.ssfr(date_s))
     
     # plot ssfr time series for checking sable legs selection
-    ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag)
+    ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0)
 
     # Build leg masks
     t_hsk = np.array(data_hsk["tmhr"])
@@ -2076,7 +2185,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     os.makedirs(fdir_cld_obs_info, exist_ok=True)
     fname_cld_obs_info = '%s/%s_cld_obs_info_%s_%s_%s_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag)
-    if not os.path.exists(fname_cld_obs_info):# or iter==0:      
+    if not os.path.exists(fname_cld_obs_info) or iter==0:      
         
         # Loop legs: load raw NC, apply cloud logic, interpolate, plot
         for i, mask in enumerate(leg_masks):
@@ -2164,19 +2273,27 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 f_nad_flux_interp = interp1d(ssfr_nad_wvl, ssfr_nad_flux[j, :], axis=0, bounds_error=False, fill_value='extrapolate')
                 ssfr_nad_flux_interp[j, :] = f_nad_flux_interp(ssfr_zen_wvl)
         
-            pitch_roll_mask = np.sqrt(data_hsk["ang_pit"][mask]**2 + data_hsk["ang_rol"][mask]**2) < 2.0
+            pitch_roll_mask = np.sqrt(data_hsk["ang_pit"][mask]**2 + data_hsk["ang_rol"][mask]**2) < 3.0
             ssfr_zen_flux[~pitch_roll_mask, :] = np.nan
             ssfr_nad_flux_interp[~pitch_roll_mask, :] = np.nan
             ssfr_zen_toa[~pitch_roll_mask, :] = np.nan
             
-            hsr1_530nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 530.0))
-            hsr1_570nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 570.0))
-            hsr1_diff_ratio = data_hsr1["f_dn_dif"][sel_hsr1]/data_hsr1["f_dn_tot"][sel_hsr1]
-            hsr1_diff_ratio_530_570_mean = np.nanmean(hsr1_diff_ratio[:, hsr1_530nm_ind:hsr1_570nm_ind+1], axis=1)
-            hsr1_530_570_thresh = 0.18
-            cloud_mask_hsr1 = hsr1_diff_ratio_530_570_mean > hsr1_530_570_thresh
-            ssfr_zen_flux[cloud_mask_hsr1, :] = np.nan
-            ssfr_nad_flux_interp[cloud_mask_hsr1, :] = np.nan
+            # hsr1_530nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 530.0))
+            # hsr1_570nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 570.0))
+            # hsr1_diff_ratio = data_hsr1["f_dn_dif"][sel_hsr1]/data_hsr1["f_dn_tot"][sel_hsr1]
+            # hsr1_diff_ratio_530_570_mean = np.nanmean(hsr1_diff_ratio[:, hsr1_530nm_ind:hsr1_570nm_ind+1], axis=1)
+            # hsr1_530_570_thresh = 0.18
+            # cloud_mask_hsr1 = hsr1_diff_ratio_530_570_mean > hsr1_530_570_thresh
+            # ssfr_zen_flux[cloud_mask_hsr1, :] = np.nan
+            # ssfr_nad_flux_interp[cloud_mask_hsr1, :] = np.nan
+            
+            icing = (data_ssfr['flag'] & ssfr_flags.camera_icing) != 0
+            pitch_roll_exceed = (data_ssfr['flag'] & ssfr_flags.pitcth_roll_exceed_threshold) != 0
+            alp_ang_pit_rol_issue = (data_ssfr['flag'] & ssfr_flags.alp_ang_pit_rol_issue) != 0
+            
+            alp_ang_pit_rol_issue_tmhr = alp_ang_pit_rol_issue[sel_ssfr]
+            ssfr_zen_flux[alp_ang_pit_rol_issue_tmhr] = np.nan
+            ssfr_nad_flux_interp[alp_ang_pit_rol_issue_tmhr] = np.nan
             
             
             leg['ssfr_zen'] = ssfr_zen_flux
@@ -2260,12 +2377,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             #/----------------------------------------------------------------------------\#
             os.makedirs(f'{_fdir_general_}/sfc_alb', exist_ok=True)
             iter_0_fname = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km_iter_0.dat'
-            if 1:#not os.path.exists(iter_0_fname) or overwrite_alb:
+            if 1:#not os.path.exists(iter_0_fname):
                 
                 alb_wvl = np.concatenate(([348.0], cld_leg['ssfr_zen_wvl'], [2050.]))
                 alb_avg = np.nanmean(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'], axis=0)
-                print("cld_leg['ssfr_nad']:", np.nanmean(cld_leg['ssfr_nad'], axis=0))
-                print("cld_leg['ssfr_zen']:", np.nanmean(cld_leg['ssfr_zen'], axis=0))
+                # print("cld_leg['ssfr_nad']:", np.nanmean(cld_leg['ssfr_nad'], axis=0))
+                # print("cld_leg['ssfr_zen']:", np.nanmean(cld_leg['ssfr_zen'], axis=0))
                 
                 if np.all(np.isnan(alb_avg)):
                     raise ValueError(f"All nadir/zenith ratios are NaN for leg {ileg+1}, cannot compute average albedo")
@@ -2339,7 +2456,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 # lrt_cfg['atmosphere_file'] = lrt_cfg['atmosphere_file'].replace('afglus.dat', 'afglss.dat')
                 lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw.dat'
                 # lrt_cfg['solar_file'] = lrt_cfg['solar_file'].replace('kurudz_0.1nm.dat', 'kurudz_1.0nm.dat')
-                lrt_cfg['number_of_streams'] = 4
+                import platform
+                # run less streams on Mac for testing, higher resolution on Linux cluster
+                if platform.system() == 'Darwin':
+                    lrt_cfg['number_of_streams'] = 4
+                elif platform.system() == 'Linux':
+                    lrt_cfg['number_of_streams'] = 8
                 lrt_cfg['mol_abs_param'] = 'reptran coarse'
                 # lrt_cfg['mol_abs_param'] = f'reptran medium'
                 input_dict_extra_general = {
@@ -2566,9 +2688,17 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             corr_dn = Fdn_p3_mean_interp / fdn_mean
             
             alb_wvl = cld_leg['ssfr_zen_wvl']
-            alb_obs = np.nanmean(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'], axis=0)
-            alb_obs[alb_obs<0.0] = 0.0
-            alb_obs[alb_obs>1.0] = 1.0
+            
+            if iter == 0:
+                alb_obs = np.nanmean(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'], axis=0)
+                alb_obs[alb_obs<0.0] = 0.0
+                alb_obs[alb_obs>1.0] = 1.0
+            else:
+                alb_file = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km_iter_{iter}.dat'
+                alb_data = np.loadtxt(alb_file, comments='#', skiprows=2)
+                alb_obs = alb_data[:, 1][1:-1]
+            print("alb_obs shape:", alb_obs.shape)
+            print("corr_dn shape:", corr_dn.shape)
             
             
             alb_corr = alb_obs * (corr_dn/corr_up)
@@ -2676,7 +2806,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_toa_dnflux_toa_ratio_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
 
             
-            if iter == 0:
+            if 1:#iter == 0:
                 fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
                 ax.plot(alb_wvl, alb_avg, label='SSFR upward/downward ratio')
                 ax.plot(alb_wvl, alb_corr, label='updated albedo (Odell)')
@@ -3301,35 +3431,35 @@ if __name__ == '__main__':
     #                 config=config,
     #                 )
     
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-                        tmhr_ranges_select=[
-                                            # [11.33, 11.88],
-                                            [12.00, 12.20],
-                                            # [12.33, 13.80],
-                                            ],
-                        case_tag='clear_sky_track_atm_corr',
-                        config=config,
-                        simulation_interval=15,
-                        clear_sky=True,
-                        overwrite_lrt=True,
-                        manual_cloud=False,
-                        iter=iter,
-                        )
-
-    atm_corr_plot(date=datetime.datetime(2024, 6, 5),
-                        tmhr_ranges_select=[
-                                            # [11.33, 11.88],
-                                            [12.00, 12.20],
-                                            # [12.33, 13.80],
-                                            ],
-                    case_tag='clear_sky_track_atm_corr',
-                    simulation_interval=15,
-                    config=config,
-                    )
-    
-    
     # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
+    #                     tmhr_ranges_select=[
+    #                                         # [11.33, 11.88],
+    #                                         [12.00, 12.20],
+    #                                         # [12.33, 13.80],
+    #                                         ],
+    #                     case_tag='clear_sky_track_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=15,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     iter=iter,
+    #                     )
+
+    # atm_corr_plot(date=datetime.datetime(2024, 6, 5),
+    #                     tmhr_ranges_select=[
+    #                                         # [11.33, 11.88],
+    #                                         [12.00, 12.20],
+    #                                         # [12.33, 13.80],
+    #                                         ],
+    #                 case_tag='clear_sky_track_atm_corr',
+    #                 simulation_interval=15,
+    #                 config=config,
+    #                 )
+    
+    
+    # for iter in range(2):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
     #                     tmhr_ranges_select=[
     #                                         # [11.29, 13.31],
@@ -3345,18 +3475,18 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    sys.exit()
+    # sys.exit()
 
-    atm_corr_plot(date=datetime.datetime(2024, 6, 6),
-                        tmhr_ranges_select=[
-                                            # [11.29, 13.31],
-                                            # [17.26, 18.32],
-                                            [11.29, 11.40]
-                                            ],
-                    case_tag='clear_sky_track_atm_corr',
-                    simulation_interval=1,
-                    config=config,
-                    )
+    # atm_corr_plot(date=datetime.datetime(2024, 6, 6),
+    #                     tmhr_ranges_select=[
+    #                                         # [11.29, 13.31],
+    #                                         # [17.26, 18.32],
+    #                                         [11.29, 11.40]
+    #                                         ],
+    #                 case_tag='clear_sky_track_atm_corr',
+    #                 simulation_interval=1,
+    #                 config=config,
+    #                 )
     
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
@@ -3757,39 +3887,37 @@ if __name__ == '__main__':
     #                     )
     # sys.exit()
     
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
-    #                     tmhr_ranges_select=[
-    #                                         [16.251, 16.280], 
-    #                                         [16.293, 16.325],
-    #                                         [16.704, 16.780],
-    #                                         ],
-    #                     case_tag='clear_sky_track_atm_corr_before',
-    #                     config=config,
-    #                     simulation_interval=10, # in minute
-    #                     clear_sky=True,
-    #                     overwrite_atm=False,
-    #                     overwrite_alb=False,
-    #                     overwrite_lrt=True,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
+                        tmhr_ranges_select=[
+                                            [16.251, 16.280], 
+                                            [16.293, 16.325],
+                                            [16.704, 16.780],
+                                            ],
+                        case_tag='clear_sky_track_atm_corr_before',
+                        config=config,
+                        simulation_interval=20, # in minute
+                        clear_sky=True,
+                        overwrite_lrt=True,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
+                        iter=iter,
+                        )
         
-    # atm_corr_plot(date=datetime.datetime(2024, 6, 6),
-    #                     tmhr_ranges_select=[
-    #                                         [16.251, 16.280], 
-    #                                         [16.293, 16.325],
-    #                                         [16.704, 16.780],
-    #                                         ],
-    #                 case_tag='clear_sky_track_atm_corr_before',
-    #                 config=config,
-    #                 simulation_interval=1, # in minute
-    #                 )
+    atm_corr_plot(date=datetime.datetime(2024, 6, 6),
+                        tmhr_ranges_select=[
+                                            [16.251, 16.280], 
+                                            [16.293, 16.325],
+                                            [16.704, 16.780],
+                                            ],
+                    case_tag='clear_sky_track_atm_corr_before',
+                    config=config,
+                    simulation_interval=20, # in minute
+                    )
     
     # atm_corr_plot(date=datetime.datetime(2024, 6, 6),
     #                     tmhr_ranges_select=[
@@ -3993,12 +4121,13 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-    #                     tmhr_ranges_select=[[13.7889, 13.8010],
+    #                     tmhr_ranges_select=[
+    #                                         [13.7889, 13.8010],
     #                                         [13.8350, 13.8395],
     #                                         [13.8780, 13.8885],
-    #                                         [13.9240, 13.9255],
+    #                                         # [13.9240, 13.9255],
     #                                         # [13.9389, 13.9403],
     #                                         [13.9540, 13.9715],
     #                                         [13.9980, 14.0153],
@@ -4011,9 +4140,9 @@ if __name__ == '__main__':
     #                                         [14.2194, 14.2420],
     #                                         [14.2605, 14.2810]
     #                                         ],
-    #                     case_tag='clear_sky_spiral_atm_corr_after_corr_R5_v2',
+    #                     case_tag='clear_sky_spiral_atm_corr_R1',
     #                     config=config,
-    #                     simulation_interval=50,
+    #                     # simulation_interval=50,
     #                     clear_sky=True,
     #                     overwrite_lrt=True,
     #                     manual_cloud=False,
@@ -4042,8 +4171,64 @@ if __name__ == '__main__':
     #                                         [14.2194, 14.2420],
     #                                         [14.2605, 14.2810]
     #                                         ],
-    #                 case_tag='clear_sky_spiral_atm_corr_after_corr_R5_v2',
+    #                 case_tag='clear_sky_spiral_atm_corr_R1',
     #                 config=config,
     #                 )
         
 
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
+    #                     tmhr_ranges_select=[[15.610, 15.822],
+    #                                         [16.905, 17.404] 
+    #                                         ],
+    #                     case_tag='clear_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=50,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+        
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
+    #                     tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
+    #                                         [16.905, 17.404] 
+    #                                         ],
+    #                     case_tag='clear_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=50,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+
+
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
+    #                     tmhr_ranges_select=[[15.013, 15.358], # 100m, some low clouds or fog below
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=50,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
