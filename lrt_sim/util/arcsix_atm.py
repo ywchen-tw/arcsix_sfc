@@ -45,7 +45,7 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
                                 ):
     
     from er3t.util.modis import get_filename_tag
-    from util.modis07_download import modis_download
+    from .modis07_download import modis_download
     
     
     mod_extent = [np.float64(i) for i in mod_extent]
