@@ -2388,7 +2388,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
-    
+
+        mod_extent=[np.round(np.nanmin(cld_leg['lon']), 2), 
+                                                        np.round(np.nanmax(cld_leg['lon']), 2),
+                                                        np.round(np.nanmin(cld_leg['lat']), 2),
+                                                        np.round(np.nanmax(cld_leg['lat']), 2)]
+        print("mod_extent:", mod_extent)
         
         if not os.path.exists(fname_h5) or overwrite_lrt: 
             if iter==0:
@@ -4510,26 +4515,26 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    for iter in range(1):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
-                        tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
-                                            [14.739, 15.053], # 550m
-                                            ],
-                        case_tag='clear_atm_corr',
-                        config=config,
-                        simulation_interval=3,
-                        clear_sky=True,
-                        overwrite_lrt=True,
-                        manual_cloud=False,
-                        manual_cloud_cer=0.0,
-                        manual_cloud_cwp=0.0,
-                        manual_cloud_cth=0.0,
-                        manual_cloud_cbh=0.0,
-                        manual_cloud_cot=0.0,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
+    #                     tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
+    #                                         [14.739, 15.053], # 550m
+    #                                         ],
+    #                     case_tag='clear_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=3,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
         
-    sys.exit()
+   
         
     for iter in range(3):
         flt_trk_atm_corr(date=datetime.datetime(2024, 8, 2),
@@ -4538,7 +4543,7 @@ if __name__ == '__main__':
                                             ],
                         case_tag='clear_atm_corr',
                         config=config,
-                        simulation_interval=3,
+                        simulation_interval3,
                         clear_sky=True,
                         overwrite_lrt=True,
                         manual_cloud=False,
@@ -4549,6 +4554,9 @@ if __name__ == '__main__':
                         manual_cloud_cot=0.0,
                         iter=iter,
                         )
+    
+    
+    sys.exit()
         
     
     # for iter in range(3):
