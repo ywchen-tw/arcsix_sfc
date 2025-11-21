@@ -1165,7 +1165,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                         s_ffill = s_ffill.fillna(method='ffill', limit=2)
                         s_ffill = s_ffill.fillna(method='bfill', limit=2)
                         
-                alb_avg[s_mask] = s_ffill[s_mask]
+                    alb_avg[s_mask] = s_ffill[s_mask]
                         
                 alb_avg_extend = np.concatenate(([alb_avg[0]], alb_avg, [alb_avg[-1]]))
 
