@@ -4173,7 +4173,7 @@ if __name__ == '__main__':
                                             ],
                         case_tag='clear_atm_corr',
                         config=config,
-                        simulation_interval=300,
+                        simulation_interval=3,
                         clear_sky=True,
                         overwrite_lrt=True,
                         manual_cloud=False,
@@ -4184,8 +4184,7 @@ if __name__ == '__main__':
                         manual_cloud_cot=0.0,
                         iter=iter,
                         )
-        
-    sys.exit()
+
         
     for iter in range(3):
         flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
