@@ -94,8 +94,8 @@ _aspect_ = 'equal'
 
 if platform.system() == 'Darwin':
     _fdir_data_ = '/Volumes/argus/field/%s/processed' % _mission_
-    _fdir_data_ = 'data/processed' 
-    _fdir_general_ = 'data'
+    _fdir_data_ = '../data/processed' 
+    _fdir_general_ = '../data'
     _fdir_tmp_ = './tmp'
 elif platform.system() == 'Linux':
     _fdir_data_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data/processed"
@@ -114,6 +114,7 @@ def flt_trk_lwc(
         fname_cloud_micro_FCDP: str = "data/cloud_prob/ARCSIX-FCDP_P3B_20240611105230_R1.ict",
         timeoff_2DGRAY50: float = -0.0,  # hours
         timeoff_FCDP: float = -0.0,      # hours
+        timeoff_total: float = 0.0,      # hours
         config: Optional[FlightConfig] = None,
     ):
 
@@ -140,9 +141,9 @@ def flt_trk_lwc(
     
     t_ssfr = data_ssfr['time']/3600.0  # convert to hours
     t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
-    t_lwc = np.array(data_lwc['tmhr'])
-    t_cm_2DGRAY50 = np.array(data_cloud_2DGRAY50['tmhr']) + timeoff_2DGRAY50
-    t_cm_FCDP = np.array(data_cloud_FCDP['tmhr']) + timeoff_FCDP
+    t_lwc = np.array(data_lwc['tmhr']) + timeoff_total
+    t_cm_2DGRAY50 = np.array(data_cloud_2DGRAY50['tmhr']) + timeoff_2DGRAY50 + timeoff_total
+    t_cm_FCDP = np.array(data_cloud_FCDP['tmhr']) + timeoff_FCDP + timeoff_total
 
     # --- LOOP LEGS ---
     for i, mask in enumerate(leg_masks):
@@ -178,7 +179,8 @@ def flt_trk_lwc(
 
         # --- FIND THRESHOLD CROSSINGS ---
         thr = 0.005  # TWC threshold
-        above = (leg["lwc1"] > thr).astype(int)
+        # above = (leg["lwc1"] > thr).astype(int)
+        above = (leg["lwc_fcdp"] > thr).astype(int)
         crossings = np.where(np.diff(above))[0]
         if crossings.size:
             start, end = crossings[0], crossings[-1]
@@ -379,8 +381,8 @@ if __name__ == '__main__':
     config = FlightConfig(mission='ARCSIX',
                             platform='P3B',
                             data_root=_fdir_data_,
-                            sat_root_mac='/Volumes/argus/field/arcsix/sat-data',
-                            sat_root_linux='/pl/active/vikas-arcsix/yuch8913/arcsix/data/sat-data',)
+                            root_mac='/Volumes/argus/field/arcsix/sat-data',
+                            root_linux='/pl/active/vikas-arcsix/yuch8913/arcsix/data/sat-data',)
        
     
     # flt_trk_lwc(date=datetime.datetime(2024, 6, 5),
@@ -393,15 +395,15 @@ if __name__ == '__main__':
     #             config=config
     #             )
     
-    flt_trk_lwc(date=datetime.datetime(2024, 6, 11),
-                tmhr_ranges_select=[[13.9111, 15.7139], [14.03, 14.075], [16.268, 16.345]],
-                output_lwp_alt=[False, True, True],
-                fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240611_R1.ict',
-                fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240611105230_R1.ict',
-                fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240611_R1.ict',
-                timeoff_FCDP=0.001,
-                config=config
-                )
+    # flt_trk_lwc(date=datetime.datetime(2024, 6, 11),
+    #             tmhr_ranges_select=[[13.9111, 15.7139], [14.03, 14.075], [16.268, 16.345]],
+    #             output_lwp_alt=[False, True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240611_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240611105230_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240611_R1.ict',
+    #             timeoff_FCDP=0.001,
+    #             config=config
+    #             )
     
     
     # flt_trk_lwc(date=datetime.datetime(2024, 6, 7),
@@ -438,7 +440,7 @@ if __name__ == '__main__':
     #             tmhr_ranges_select=[[14.51, 15.76], [14.84, 14.97], [13.23, 13.95], [13.39, 13.60], [13.73, 13.83]],
     #             output_lwp_alt=[False, True, False, True, False, True],
     #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240603_R1.ict',
-    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240611105230_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240603122700_R1.ict',
     #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240603_R1.ict',
     #             timeoff_FCDP=0.043,
     #             config=config
@@ -454,4 +456,87 @@ if __name__ == '__main__':
     #             config=config
     #             )
 
-    pass
+    # flt_trk_lwc(date=datetime.datetime(2024, 6, 3),
+    #             tmhr_ranges_select=[[13.504, 13.560], [13.758, 13.835], [14.608, 14.705], [14.860, 14.952],],
+    #             output_lwp_alt=[True, True, True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240603_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240603122700_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240603_R1.ict',
+    #             timeoff_FCDP=0.043,
+    #             timeoff_2DGRAY50=0.043,
+    #             timeoff_total=-0.043,
+    #             config=config
+    #             )
+    
+    # flt_trk_lwc(date=datetime.datetime(2024, 6, 7),
+    #             tmhr_ranges_select=[[15.243, 15.295], [15.764, 15.814]],
+    #             output_lwp_alt=[True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240607_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240607104243_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240607_R1.ict',
+    #             timeoff_FCDP=0.002,
+    #             timeoff_total=-0.002,
+    #             config=config
+    #             )
+    
+    # flt_trk_lwc(date=datetime.datetime(2024, 6, 13),
+    #             tmhr_ranges_select=[[14.060, 14.117], [14.120, 14.184], [15.883, 15.927], [15.987, 16.033]],
+    #             output_lwp_alt=[True, True, True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240613_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240613104330_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240613_R1.ict',
+    #             timeoff_FCDP=0.0175,
+    #             timeoff_2DGRAY50=0.0175,
+    #             timeoff_total=-0.0175,
+    #             config=config
+    #             )
+    
+    # flt_trk_lwc(date=datetime.datetime(2024, 7, 25),
+    #             tmhr_ranges_select=[[15.855, 15.883]],
+    #             output_lwp_alt=[True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240725_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240725103230_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240725_R1.ict',
+    #             timeoff_FCDP=0.0052,
+    #             # timeoff_2DGRAY50=0.0175,
+    #             timeoff_total=-0.0052,
+    #             config=config
+    #             )
+    
+    # flt_trk_lwc(date=datetime.datetime(2024, 8, 7),
+    #             tmhr_ranges_select=[[13.205, 13.218], [15.400, 15.440]],
+    #             output_lwp_alt=[True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240807_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240807104910_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240807_R1.ict',
+    #             timeoff_FCDP=0.0017,
+    #             timeoff_2DGRAY50=0.0017,
+    #             timeoff_total=-0.0017,
+    #             config=config
+    #             )
+    
+    # flt_trk_lwc(date=datetime.datetime(2024, 8, 8),
+    #             tmhr_ranges_select=[[13.320, 13.505], [15.575, 15.625]],
+    #             output_lwp_alt=[True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240808_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240808105121_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240808_R1.ict',
+    #             timeoff_FCDP=0.001,
+    #             timeoff_2DGRAY50=0.001,
+    #             timeoff_total=-0.001,
+    #             config=config
+    #             )
+    
+    flt_trk_lwc(date=datetime.datetime(2024, 8, 9),
+                tmhr_ranges_select=[[13.145, 13.286], [13.614, 13.676], [16.230, 16.270]],
+                output_lwp_alt=[True, True, True],
+                fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240809_R1.ict',
+                fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240809105414_R1.ict',
+                fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240809_R1.ict',
+                timeoff_FCDP=0.003,
+                timeoff_2DGRAY50=0.003,
+                timeoff_total=-0.003,
+                config=config
+                )
+    
+    
