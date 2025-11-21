@@ -4543,7 +4543,7 @@ if __name__ == '__main__':
                                             ],
                         case_tag='clear_atm_corr',
                         config=config,
-                        simulation_interval3,
+                        simulation_interval=3,
                         clear_sky=True,
                         overwrite_lrt=True,
                         manual_cloud=False,
