@@ -297,16 +297,18 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             
     print("modis_alb_file:", modis_alb_file)
     
+    t_hsk = np.array(data_hsk["tmhr"])
+    leg_masks = [(t_hsk>=lo)&(t_hsk<=hi) for lo,hi in tmhr_ranges_select]
     
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     for i in range(len(tmhr_ranges_select)):
-        fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_%d_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, i)
-        
-        with open(fname_pkl, 'rb') as f:
-            cld_leg = pickle.load(f)
         time = cld_leg['time']
         time_start = tmhr_ranges_select[i][0]
         time_end = tmhr_ranges_select[i][1]
+        fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, time_start, time_end)
+        
+        with open(fname_pkl, 'rb') as f:
+            cld_leg = pickle.load(f)
         alt_avg = np.nanmean(data_hsk['alt'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])/1000  # in km
         lon_avg = np.nanmean(data_hsk['lon'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])
         lat_avg = np.nanmean(data_hsk['lat'][(data_hsk['tmhr']>=time_start)&(data_hsk['tmhr']<=time_end)])
@@ -358,6 +360,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             fdn_1600_all = []
             fup_1600_all = []
             fdn_all = []
+            fup_all = []
             
             alb_wvl = alb_ratio['wvl'].values[1:-1] # skip the first value at 348 nm and last value at 2050 nm
             alb_ratio_all = np.zeros((len(tmhr_ranges_select), len(alb_wvl)))
@@ -398,6 +401,8 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         fup_550_all.append(cld_leg['ssfr_nad'][:, ssfr_550_ind])
         fdn_1600_all.append(cld_leg['ssfr_zen'][:, ssfr_1600_ind])
         fup_1600_all.append(cld_leg['ssfr_nad'][:, ssfr_1600_ind])
+        fdn_all.append(cld_leg['ssfr_zen'])
+        fup_all.append(cld_leg['ssfr_nad'])
         
         print("i:", i)
         print("alb_ratio['alb'] shape:", alb_ratio['alb'].shape)
@@ -434,10 +439,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
         print(f"date_s: {date_s}, time: {time_start:.2f}-{time_end:.2f}, alt_avg: {alt_avg:.2f} km")
     
-    
-    
-        
-    
+
         # find the modis location closest to the flight leg center
         if modis_alb_file is not None:
             dist = np.sqrt((modis_lon - lon_avg)**2 + (modis_lat - lat_avg)**2)
@@ -451,6 +453,8 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     fup_550_all = np.array(fup_550_all)
     fdn_1600_all = np.array(fdn_1600_all)
     fup_1600_all = np.array(fup_1600_all)
+    fdn_all = np.array(fdn_all)
+    fup_all = np.array(fup_all)
 
     print("lon avg all mean:", lon_avg_all.mean())
     print("lat avg all mean:", lat_avg_all.mean())
