@@ -2872,7 +2872,7 @@ if __name__ == '__main__':
     #                     )
         
     
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
+    flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
                         tmhr_ranges_select=[
                                             [15.347, 15.813], # 100m
                                             [15.813, 16.115], # 100-450m, clear, some cloud
