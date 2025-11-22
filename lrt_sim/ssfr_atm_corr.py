@@ -1127,13 +1127,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
 
-        mod_extent=[np.round(np.nanmin(cld_leg['lon']), 2), 
-                                                        np.round(np.nanmax(cld_leg['lon']), 2),
-                                                        np.round(np.nanmin(cld_leg['lat']), 2),
-                                                        np.round(np.nanmax(cld_leg['lat']), 2)]
-        print("mod_extent:", mod_extent)
         
-        if not os.path.exists(fname_h5) or overwrite_lrt: 
+        if not os.path.exists(fname_h5) or overwrite_lrt:
+            print("Start leg %d atmospheric correction ..." % (ileg+1))
+            print(f"Date: {date_s}, Time: {time_start:.2f}-{time_end:.2f}h, Alt: {alt_avg:.2f}km")
             if iter==0:
                 prepare_atmospheric_profile(_fdir_general_, date_s, case_tag, ileg, date, time_start, time_end,
                                             alt_avg, data_dropsonde,
@@ -1151,7 +1148,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             #/----------------------------------------------------------------------------\#
             os.makedirs(f'{_fdir_general_}/sfc_alb', exist_ok=True)
             iter_0_fname = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km_iter_0.dat'
-            if 1:#not os.path.exists(iter_0_fname):
+            if not os.path.exists(iter_0_fname):
                 
                 alb_wvl = np.concatenate(([348.0], cld_leg['ssfr_zen_wvl'], [2050.]))
                 alb_avg = np.nanmean(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'], axis=0)
@@ -1208,10 +1205,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             
             for ix in range(1):
                 flux_key_all = []
-                flux_down_result_dict = {}
-                flux_down_dir_result_dict = {}
-                flux_down_diff_result_dict = {}
-                flux_up_result_dict = {}
                 
                 flux_down_results = []
                 flux_down_dir_results = []
@@ -1347,10 +1340,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     er3t.rtm.lrt.lrt_run_mp(inits_rad, Ncpu=NCPU)        
                     for i in range(len(inits_rad)):
                         data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                        flux_down_result_dict[flux_key_all[i]] = np.squeeze(data.f_down)
-                        flux_down_dir_result_dict[flux_key_all[i]] = np.squeeze(data.f_down_direct)
-                        flux_down_diff_result_dict[flux_key_all[i]] = np.squeeze(data.f_down_diffuse)
-                        flux_up_result_dict[flux_key_all[i]] = np.squeeze(data.f_up)
                         
                         flux_down_results.append(np.squeeze(data.f_down))
                         flux_down_dir_results.append(np.squeeze(data.f_down_direct))
@@ -1364,10 +1353,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     for i in range(len(inits_rad)):
                         er3t.rtm.lrt.lrt_run(inits_rad[i])
                         data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                        flux_down_result_dict[flux_key_all[i]] = np.squeeze(data.f_down)
-                        flux_down_dir_result_dict[flux_key_all[i]] = np.squeeze(data.f_down_direct)
-                        flux_down_diff_result_dict[flux_key_all[i]] = np.squeeze(data.f_down_diffuse)
-                        flux_up_result_dict[flux_key_all[i]] = np.squeeze(data.f_up)
                         
                         flux_down_results.append(np.squeeze(data.f_down))
                         flux_down_dir_results.append(np.squeeze(data.f_down_direct))
@@ -1390,7 +1375,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 for iz in range(3):
                     for iset in range(flux_down_results.shape[0]):
                         flux_dn[iset, :, iz] = ssfr_slit_convolve(effective_wvl, flux_dn[iset, :, iz], wvl_joint=950)
-            
             
             
             # simulated fluxes at p3 altitude            
@@ -1463,25 +1447,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             # alb_ice_fit = ice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg)
             alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
             
-
-            
+ 
             heading_saa_diff = heading_avg - saa_avg
             if heading_saa_diff < 0:
                 heading_saa_diff += 360.0
-            phase_diff = 135
-            fdn_mean_scale = fdn_mean * np.sin(np.radians(heading_saa_diff - phase_diff)) * 0.03 + 0.97 #+ 0.015
-            
-            
-            pop, pcov = curve_fit(exp_decay, cld_leg['hsr1_wvl'], hsr1_dn_dif_ratio_mean, p0=[0.3, 500.0, 0.1],)# bounds=([0.0, 400.0, 0.0], [1.0, 700.0, 1.0]))
-            hsr1_dn_dif_ratio_mean_interp = exp_decay(cld_leg['ssfr_zen_wvl'], *pop)
-            hsr1_dn_dif_ratio_mean_interp[hsr1_dn_dif_ratio_mean_interp<0.0] = 0.0
-            hsr1_dn_dif_ratio_mean_interp[hsr1_dn_dif_ratio_mean_interp>1.0] = 1
-            f_dn_direct = fdn_mean * (1-hsr1_dn_dif_ratio_mean_interp)
-            f_dn_diff = fdn_mean * hsr1_dn_dif_ratio_mean_interp
-            f_dn_diff_scale = f_dn_diff * Fdn_p3_diff_ratio_mean_interp/hsr1_dn_dif_ratio_mean_interp
-            fdn_mean_low_dif = f_dn_direct + f_dn_diff_scale
-            
-            fdn_sim_high_dif = Fdn_p3_direct_mean_interp +  Fdn_p3_diff_mean_interp * hsr1_dn_dif_ratio_mean_interp / Fdn_p3_diff_ratio_mean_interp
             
             fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
             toa_mean = np.nanmean(cld_leg['ssfr_toa'], axis=0)
@@ -1512,7 +1481,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_flux_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
             # plt.show()
             
-        
 
             fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
             toa_mean = np.nanmean(cld_leg['ssfr_toa'], axis=0)
@@ -1561,7 +1529,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             if 1:#iter == 0:
                 fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
                 ax.plot(alb_wvl, alb_avg, label='SSFR upward/downward ratio')
-                ax.plot(alb_wvl, alb_corr, label='updated albedo (Odell)')
+                ax.plot(alb_wvl, alb_corr, label='updated albedo (Odele)')
                 ax.plot(alb_wvl, alb_ice_fit, label='updated albedo (fit)')
                 # fill between wavelengths where T_total < 0.05
                 ax.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
@@ -2781,6 +2749,8 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------------------
     # --------------------------------------------------------------------------------------------------------------------------
 
+    atm_corr_overwrite_lrt = False
+    
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
     #                     tmhr_ranges_select=[[15.610, 15.822],
@@ -2790,7 +2760,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2810,7 +2780,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2832,7 +2802,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=13.0 ,
     #                     manual_cloud_cwp=77.82,
@@ -2855,7 +2825,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=7.0,
     #                     manual_cloud_cwp=113.65,
@@ -2866,17 +2836,54 @@ if __name__ == '__main__':
     #                     )
         
         
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
+                        tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
+                                            ],
+                        case_tag='clear_atm_corr',
+                        config=config,
+                        simulation_interval=0.5,
+                        clear_sky=True,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
+                        iter=iter,
+                        )
+        
+    
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-    #                     tmhr_ranges_select=[[12.405, 13.812], # 5.7m, 
+    #                     tmhr_ranges_select=[
     #                                         [14.250, 15.036], # 100m
-    #                                         [15.535, 15.931], # 450m
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_2',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+        
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
+    #                     tmhr_ranges_select=[
+    #                                         [15.535, 15.931], # 450m
+    #                                         ],
+    #                     case_tag='clear_atm_corr_3',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2909,7 +2916,7 @@ if __name__ == '__main__':
     #                     case_tag='clear_sky_spiral_atm_corr',
     #                     config=config,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2930,7 +2937,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2952,7 +2959,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=6.7,
     #                     manual_cloud_cwp=26.96,
@@ -2978,7 +2985,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=None,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -2997,7 +3004,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3015,7 +3022,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3037,7 +3044,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=17.4,
     #                     manual_cloud_cwp=90.51,
@@ -3059,7 +3066,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=22.4,
     #                     manual_cloud_cwp=35.6 ,
@@ -3081,7 +3088,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=8.9,
     #                     manual_cloud_cwp=21.29,
@@ -3099,7 +3106,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3122,7 +3129,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=11.4,
     #                     manual_cloud_cwp=9.94,
@@ -3144,7 +3151,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=11.4,
     #                     manual_cloud_cwp=9.94,
@@ -3169,7 +3176,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=None,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3190,7 +3197,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3217,7 +3224,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=None,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3236,7 +3243,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3255,7 +3262,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3277,7 +3284,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3301,7 +3308,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=10.7,
     #                     manual_cloud_cwp=11.28,
@@ -3325,7 +3332,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=7.2,
     #                     manual_cloud_cwp=77.5,
@@ -3344,7 +3351,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3363,7 +3370,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3382,7 +3389,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3405,7 +3412,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=15.3,
     #                     manual_cloud_cwp=143.94,
@@ -3428,7 +3435,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=7.8,
     #                     manual_cloud_cwp=64.18,
@@ -3443,7 +3450,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [13.376, 13.600], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr_1',
+    #                     case_tag='cloudy_atm_corr',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.34, 0.4, 0.6, 0.77, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -3451,7 +3458,7 @@ if __name__ == '__main__':
     #                                            np.array([15, 20, 30., 40., 45.]))),
     #                     simulation_interval=0.5,
     #                     clear_sky=False,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=True,
     #                     manual_cloud_cer=9.0,
     #                     manual_cloud_cwp=83.49,
@@ -3471,7 +3478,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
@@ -3481,28 +3488,28 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
-                        tmhr_ranges_select=[
-                                            [16.029, 16.224], # 100m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr_2',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=0.5,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=8.3,
-                        manual_cloud_cwp=49.10,
-                        manual_cloud_cth=0.62,
-                        manual_cloud_cbh=0.29,
-                        manual_cloud_cot=8.93,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
+    #                     tmhr_ranges_select=[
+    #                                         [16.029, 16.224], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr_2',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=0.5,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=8.3,
+    #                     manual_cloud_cwp=49.10,
+    #                     manual_cloud_cth=0.62,
+    #                     manual_cloud_cbh=0.29,
+    #                     manual_cloud_cot=8.93,
+    #                     iter=iter,
+    #                     )
         
     
     # for iter in range(3):
@@ -3516,7 +3523,7 @@ if __name__ == '__main__':
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
-    #                     overwrite_lrt=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
     #                     manual_cloud=False,
     #                     manual_cloud_cer=0.0,
     #                     manual_cloud_cwp=0.0,
