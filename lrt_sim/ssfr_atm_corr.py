@@ -1116,19 +1116,19 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         
         
         if clear_sky:
-            fname_h5 = '%s/%s-%s-%s-%s-time_%.3f-%.3f-alt_%.2f-clear.h5' % ('.', sys._getframe().f_code.co_name, solver.lower(), date_s, case_tag, time_start, time_end, alt_avg)
             fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_clear'
             fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_clear'
         else:
-            fname_h5 = '%s/%s-%s-%s-%s-time_%.3f-%.3f-alt_%.2f-cloud.h5' % ('.', sys._getframe().f_code.co_name, solver.lower(), date_s, case_tag, time_start, time_end, alt_avg)
             fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
             fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
+            
+        output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
 
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
 
         
-        if not os.path.exists(fname_h5) or overwrite_lrt:
+        if not os.path.exists(output_csv_name) or overwrite_lrt:
             print("Start leg %d atmospheric correction ..." % (ileg+1))
             print(f"Date: {date_s}, Time: {time_start:.3f}-{time_end:.3f}h, Alt: {alt_avg:.2f}km")
             if iter==0:
@@ -1328,7 +1328,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     flux_key_ix.append(dict_key)
                     
             # # Run RT
-            print(f"Start running libratran calculations for {fname_h5.replace('.h5', '')} ")
+            print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
             # #/----------------------------------------------------------------------------\#
             import platform
             if platform.system() == 'Darwin':
@@ -1563,7 +1563,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             }
             
             output_df = pd.DataFrame(output_dict)
-            output_df.to_csv(f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv', index=False)
+            output_df.to_csv(output_csv_name, index=False)
             if iter == 0:
                 alb_wvl_extend = np.concatenate(([348.0], alb_wvl, [2050.0]))
                 alb_corr_extend = np.concatenate(([alb_corr[0]], alb_corr, [alb_corr[-1]]))
@@ -2692,23 +2692,23 @@ if __name__ == '__main__':
     #                     )
         
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-                        tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
-                                            ],
-                        case_tag='clear_atm_corr_1',
-                        config=config,
-                        simulation_interval=0.5,
-                        clear_sky=True,
-                        overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=False,
-                        manual_cloud_cer=0.0,
-                        manual_cloud_cwp=0.0,
-                        manual_cloud_cth=0.0,
-                        manual_cloud_cbh=0.0,
-                        manual_cloud_cot=0.0,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
+    #                     tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
+    #                                         ],
+    #                     case_tag='clear_atm_corr_1',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
         
     
     # for iter in range(3):
@@ -2749,38 +2749,38 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
-    #                     tmhr_ranges_select=[
-    #                                         [13.7889, 13.8010],
-    #                                         [13.8350, 13.8395],
-    #                                         [13.8780, 13.8885],
-    #                                         [13.9240, 13.9255],
-    #                                         [13.9389, 13.9403],
-    #                                         [13.9540, 13.9715],
-    #                                         [13.9980, 14.0153],
-    #                                         [14.0417, 14.0575],
-    #                                         [14.0417, 14.0475],
-    #                                         [14.0560, 14.0590],
-    #                                         [14.0825, 14.0975],
-    #                                         [14.1264, 14.1525],
-    #                                         [14.1762, 14.1975],
-    #                                         [14.2194, 14.2420],
-    #                                         [14.2605, 14.2810]
-    #                                         ],
-    #                     case_tag='clear_sky_spiral_atm_corr',
-    #                     config=config,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
+    # #                     tmhr_ranges_select=[
+    # #                                         [13.7889, 13.8010],
+    # #                                         [13.8350, 13.8395],
+    # #                                         [13.8780, 13.8885],
+    # #                                         [13.9240, 13.9255],
+    # #                                         [13.9389, 13.9403],
+    # #                                         [13.9540, 13.9715],
+    # #                                         [13.9980, 14.0153],
+    # #                                         [14.0417, 14.0575],
+    # #                                         [14.0417, 14.0475],
+    # #                                         [14.0560, 14.0590],
+    # #                                         [14.0825, 14.0975],
+    # #                                         [14.1264, 14.1525],
+    # #                                         [14.1762, 14.1975],
+    # #                                         [14.2194, 14.2420],
+    # #                                         [14.2605, 14.2810]
+    # #                                         ],
+    # #                     case_tag='clear_sky_spiral_atm_corr',
+    # #                     config=config,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=0.0,
+    # #                     manual_cloud_cwp=0.0,
+    # #                     manual_cloud_cth=0.0,
+    # #                     manual_cloud_cbh=0.0,
+    # #                     manual_cloud_cot=0.0,
+    # #                     iter=iter,
+    # #                     )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),
@@ -3103,32 +3103,32 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 30),
-    #                     tmhr_ranges_select=[[13.886, 13.908],
-    #                                         [13.934, 13.950],
-    #                                         [13.976, 14.000],
-    #                                         [14.031, 14.051],
-    #                                         [14.073, 14.096],
-    #                                         [14.115, 14.134],
-    #                                         [14.157, 14.179],
-    #                                         [14.202, 14.219],
-    #                                         [14.239, 14.254],
-    #                                         [14.275, 14.294],
-    #                                         ],
-    #                     case_tag='clear_sky_spiral_atm_corr',
-    #                     config=config,
-    #                     simulation_interval=None,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 7, 30),
+                        tmhr_ranges_select=[[13.886, 13.908],
+                                            [13.934, 13.950],
+                                            [13.976, 14.000],
+                                            [14.031, 14.051],
+                                            [14.073, 14.096],
+                                            [14.115, 14.134],
+                                            [14.157, 14.179],
+                                            [14.202, 14.219],
+                                            [14.239, 14.254],
+                                            [14.275, 14.294],
+                                            ],
+                        case_tag='clear_sky_spiral_atm_corr',
+                        config=config,
+                        simulation_interval=None,
+                        clear_sky=True,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
+                        iter=iter,
+                        )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 30),
