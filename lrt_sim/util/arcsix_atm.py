@@ -206,7 +206,7 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
     
     zpt_filename = f'zpt_{date_s}_{case_tag}_leg_{ileg}.h5'
                 
-    fname_atm = f'modis_dropsonde_atm_{date_s}_{case_tag}_leg_{ileg}.pk'
+    fname_atm = f'{zpt_filedir}/modis_dropsonde_atm_{date_s}_{case_tag}_leg_{ileg}.pk'
     
     status, ws10m = er3t.pre.atm.create_modis_dropsonde_atm(o2mix=0.20935, output_dir=zpt_filedir, output=zpt_filename, 
                                             fname_mod07=modis_07_file, dropsonde_df=data_dropsonde,
@@ -231,7 +231,7 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
         raise ValueError("NaN values found in pressure profile, please check the dropsonde data and MODIS 07 data coverage")
 
     # write out the atmospheric profile in ascii format
-    with open(os.path.join(zpt_filedir, f'atm_profiles_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.dat'), 'w') as f:
+    with open(os.path.join(zpt_filedir, f'atm_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat'), 'w') as f:
         header = ('# Combined atmospheric profile\n'
                 '#      z(km)      p(mb)        T(K)    air(cm-3)    o3(cm-3)     o2(cm-3)    h2o(cm-3)    co2(cm-3)     no2(cm-3)\n'
                 )
@@ -244,7 +244,7 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
                 ]
         f.write(header + "\n".join(lines))
     
-    with open(f'{zpt_filedir}/ch4_profiles_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.dat', 'w') as f:  
+    with open(f'{zpt_filedir}/ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat', 'w') as f:  
         header = ('# Combined atmospheric profile for ch4 only\n'
                 '#      z(km)      ch4(cm-3)\n'
                 )
