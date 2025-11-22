@@ -2963,27 +2963,27 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
-                        tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=3,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=6.7,
-                        manual_cloud_cwp=26.96,
-                        manual_cloud_cth=0.43,
-                        manual_cloud_cbh=0.15,
-                        manual_cloud_cot=6.02,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
+    #                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=3,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=6.7,
+    #                     manual_cloud_cwp=26.96,
+    #                     manual_cloud_cth=0.43,
+    #                     manual_cloud_cbh=0.15,
+    #                     manual_cloud_cot=6.02,
+    #                     iter=iter,
+    #                     )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
@@ -3048,71 +3048,71 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
-                        tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.4, 0.52, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=3,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=17.4,
-                        manual_cloud_cwp=90.51,
-                        manual_cloud_cth=0.52,
-                        manual_cloud_cbh=0.15,
-                        manual_cloud_cot=7.82,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
+    #                     tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.4, 0.52, 0.6, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=3,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=17.4,
+    #                     manual_cloud_cwp=90.51,
+    #                     manual_cloud_cth=0.52,
+    #                     manual_cloud_cbh=0.15,
+    #                     manual_cloud_cot=7.82,
+    #                     iter=iter,
+    #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
-                        tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=3,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=22.4,
-                        manual_cloud_cwp=35.6 ,
-                        manual_cloud_cth=0.58,
-                        manual_cloud_cbh=0.28,
-                        manual_cloud_cot=2.39,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
+    #                     tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=3,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=22.4,
+    #                     manual_cloud_cwp=35.6 ,
+    #                     manual_cloud_cth=0.58,
+    #                     manual_cloud_cbh=0.28,
+    #                     manual_cloud_cot=2.39,
+    #                     iter=iter,
+    #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
-                        tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.38, 0.5, 0.68, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=3,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=8.9,
-                        manual_cloud_cwp=21.29,
-                        manual_cloud_cth=0.68,
-                        manual_cloud_cbh=0.38,
-                        manual_cloud_cot=3.59,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
+    #                     tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.38, 0.5, 0.68, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=3,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=8.9,
+    #                     manual_cloud_cwp=21.29,
+    #                     manual_cloud_cth=0.68,
+    #                     manual_cloud_cbh=0.38,
+    #                     manual_cloud_cot=3.59,
+    #                     iter=iter,
+    #                     )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
@@ -3133,27 +3133,27 @@ if __name__ == '__main__':
     #                     )
 
 
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
-    #                     tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog below
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0,]),
-    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=3,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=True,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=11.4,
-    #                     manual_cloud_cwp=9.94,
-    #                     manual_cloud_cth=0.30,
-    #                     manual_cloud_cbh=0.16,
-    #                     manual_cloud_cot=1.31,
-    #                     iter=iter,
-    #                     )
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
+                        tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog below
+                                            ],
+                        case_tag='cloudy_atm_corr',
+                        config=config,
+                        levels=np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0,]),
+                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                               np.arange(5.0, 10.1, 2.5),
+                                               np.array([15, 20, 30., 40., 45.]))),
+                        simulation_interval=3,
+                        clear_sky=False,
+                        overwrite_lrt=True,
+                        manual_cloud=True,
+                        manual_cloud_cer=11.4,
+                        manual_cloud_cwp=9.94,
+                        manual_cloud_cth=0.30,
+                        manual_cloud_cbh=0.16,
+                        manual_cloud_cot=1.31,
+                        iter=iter,
+                        )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
