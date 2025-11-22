@@ -1296,7 +1296,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                         cth_ind_cld = bisect.bisect_left(z_list, cth_x)
                         cbh_ind_cld = bisect.bisect_left(z_list, cbh_x)
                         
-                        fname_cld = f'{fdir_tmp}/cld_{ix:04d}.txt'
+                        fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.txt'
                         if os.path.exists(fname_cld):
                             os.remove(fname_cld)
                         cld_cfg = er3t.rtm.lrt.get_cld_cfg()
@@ -1332,8 +1332,8 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 else:
                     input_dict_extra_alb = copy.deepcopy(input_dict_extra)
                     init = er3t.rtm.lrt.lrt_init_mono_flx(
-                            input_file  = '%s/input_%04d.txt'  % (fdir_tmp, ix),
-                            output_file = '%s/output_%04d.txt' % (fdir_tmp, ix),
+                            input_file  = f'{fdir_tmp}/input_{ix:04d}_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.txt',
+                            output_file = f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.txt',
                             date        = date,
                             # surface_albedo=0.08,
                             solar_zenith_angle = sza_avg,
@@ -1348,7 +1348,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     #\----------------------------------------------------------------------------/#
 
                     inits_rad.append(copy.deepcopy(init))
-                    output_list.append('%s/output_%04d.txt' % (fdir_tmp, ix))
+                    output_list.append(f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.txt')
                     flux_key_all.append(dict_key)
                     flux_key_ix.append(dict_key)
                     
@@ -1396,9 +1396,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                         flux_up_results.append(np.squeeze(data.f_up))
             # #\----------------------------------------------------------------------------/#
             ###### delete input, output, cld txt files
-            # for prefix in ['input', 'output', 'cld']:
-            #     for filename in glob.glob(os.path.join(fdir_tmp, f'{prefix}_*.txt')):
-            #         os.remove(filename)
+            for prefix in ['input', 'output', 'cld']:
+                for filename in glob.glob(os.path.join(fdir_tmp, f'{prefix}_*.txt')):
+                    os.remove(filename)
             ###### delete atmospheric profile files for lw
 
             
