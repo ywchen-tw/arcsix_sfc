@@ -2650,7 +2650,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
     #                     tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_1',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
     #                                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
@@ -2673,7 +2673,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
     #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_2',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
     #                                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
@@ -2696,7 +2696,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),
     #                     tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_1',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -2874,7 +2874,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[13.704, 13.817], # 100-450m, clear, some cloud
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_1',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -2892,7 +2892,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_1',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.4, 0.52, 0.6, 0.8, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -2914,7 +2914,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_2',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -2936,7 +2936,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_3',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.38, 0.5, 0.68, 0.8, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -2958,7 +2958,7 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[16.550, 17.581], # 100-500m, clear
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_2',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3046,10 +3046,28 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 29),
     #                     tmhr_ranges_select=[[13.939, 14.200], # 100m, clear
     #                                         [14.438, 14.714], # 3.7km
+    #                                         ],
+    #                     case_tag='clear_atm_corr_1',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+    
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 29),
+    #                     tmhr_ranges_select=[
     #                                         [15.214, 15.804], # 1.3km
     #                                         [16.176, 16.304], # 1.3km
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_2',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3134,9 +3152,8 @@ if __name__ == '__main__':
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 2),
     #                     tmhr_ranges_select=[
     #                                         [14.557, 15.100], # 100m
-    #                                         [15.244, 16.635], # 1km
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_1',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3150,13 +3167,31 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
     
-        
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 2),
+    #                     tmhr_ranges_select=[
+    #                                         [15.244, 16.635], # 1km
+    #                                         ],
+    #                     case_tag='clear_atm_corr_2',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+
     
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
     #                     tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_1',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.6, 0.65, 0.69, 0.78, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -3180,7 +3215,7 @@ if __name__ == '__main__':
     #                                         [15.472, 15.567], # 180m, cloudy
     #                                         [15.580, 15.921], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_2',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
@@ -3203,7 +3238,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [12.990, 13.180], # 180m, clear
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_1',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3222,7 +3257,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [14.250, 14.373], # 180m, clear
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_2',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3241,7 +3276,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [16.471, 16.601], # 180m, clear
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_3',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
@@ -3260,7 +3295,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [13.212, 13.347], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_1',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.67, 0.8, 1.0,]),
     #                                            np.array([1.5, 1.98, 2.5, 3.0, 4.0]), 
@@ -3283,7 +3318,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [15.314, 15.504], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_2',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.78, 1.0,]),
     #                                            np.array([1.5, 1.81, 2.21, 2.5, 3.0, 4.0]), 
@@ -3306,7 +3341,7 @@ if __name__ == '__main__':
     #                     tmhr_ranges_select=[
     #                                         [13.376, 13.600], # 100m, cloudy
     #                                         ],
-    #                     case_tag='cloudy_atm_corr',
+    #                     case_tag='cloudy_atm_corr_1',
     #                     config=config,
     #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.34, 0.4, 0.6, 0.77, 1.0,]),
     #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
