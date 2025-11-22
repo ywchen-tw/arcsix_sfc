@@ -1208,27 +1208,15 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             
             for ix in range(1):
                 flux_key_all = []
-                if 0:#os.path.exists(f'{fdir}/flux_down_result_dict_sw_atm_corr.pk') and not new_compute:
-                    print(f'Loading flux_down_result_dict_sw_atm_corr.pk from {fdir} ...')
-                    with open(f'{fdir}/flux_down_result_dict_sw_atm_corr.pk', 'rb') as f:
-                        flux_down_result_dict = pickle.load(f)
-                    with open(f'{fdir}/flux_down_dir_result_dict_sw_atm_corr.pk', 'rb') as f:
-                        flux_down_dir_result_dict = pickle.load(f)
-                    with open(f'{fdir}/flux_down_diff_result_dict_sw_atm_corr.pk', 'rb') as f:
-                        flux_down_diff_result_dict = pickle.load(f)
-                    with open(f'{fdir}/flux_up_result_dict_sw_atm_corr.pk', 'rb') as f:
-                        flux_up_result_dict = pickle.load(f)
-                    flux_key_all.extend(flux_down_result_dict.keys())
-                else:
-                    flux_down_result_dict = {}
-                    flux_down_dir_result_dict = {}
-                    flux_down_diff_result_dict = {}
-                    flux_up_result_dict = {}
-                    
-                    flux_down_results = []
-                    flux_down_dir_results = []
-                    flux_down_diff_results = []
-                    flux_up_results = []
+                flux_down_result_dict = {}
+                flux_down_dir_result_dict = {}
+                flux_down_diff_result_dict = {}
+                flux_up_result_dict = {}
+                
+                flux_down_results = []
+                flux_down_dir_results = []
+                flux_down_diff_results = []
+                flux_up_results = []
                 
                 flux_key = np.zeros_like(flux_output, dtype=object)
                 cloudy = 0
@@ -1269,9 +1257,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 inits_rad = []
                 flux_key_ix = []
                 output_list = []
-
-                # cot_x = cld_leg['cot'][ix]
-                # cwp_x = cld_leg['cwp'][ix]
                 
                 cot_x = np.nanmean(cld_leg['cot'])
                 cwp_x = np.nanmean(cld_leg['cwp'])
@@ -1280,12 +1265,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     input_dict_extra = copy.deepcopy(input_dict_extra_general)
                     if ((cot_x >= 0.1 and np.isfinite(cwp_x))):
                         cloudy += 1
-                        
-                        # cer_x = cld_leg['cer'][ix]
-                        # cwp_x = cld_leg['cwp'][ix]
-                        # cth_x = cld_leg['cth'][ix]
-                        # cbh_x = cld_leg['cbh'][ix]
-                        # cgt_x = cld_leg['cgt'][ix]
 
                         cer_x = np.nanmean(cld_leg['cer'])
                         cwp_x = np.nanmean(cld_leg['cwp'])
@@ -1401,18 +1380,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     os.remove(filename)
             ###### delete atmospheric profile files for lw
 
-            
-            
-            # save dict
-            # status = 'wb'
-            # with open(f'{fdir}/flux_down_result_dict_sw_atm_corr.pk', status) as f:
-            #     pickle.dump(flux_down_result_dict, f)
-            # with open(f'{fdir}/flux_down_dir_result_dict_sw_atm_corr.pk', status) as f:
-            #     pickle.dump(flux_down_dir_result_dict, f)
-            # with open(f'{fdir}/flux_down_diff_result_dict_sw_atm_corr.pk', status) as f:
-            #     pickle.dump(flux_down_diff_result_dict, f)
-            # with open(f'{fdir}/flux_up_result_dict_sw_atm_corr.pk', status) as f:
-            #     pickle.dump(flux_up_result_dict, f)
 
             flux_down_results = np.array(flux_down_results)
             flux_down_dir_results = np.array(flux_down_dir_results)
@@ -3080,27 +3047,27 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
-                        tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
-                                            ],
-                        case_tag='cloudy_atm_corr',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=0.5,
-                        clear_sky=False,
-                        overwrite_lrt=True,
-                        manual_cloud=True,
-                        manual_cloud_cer=22.4,
-                        manual_cloud_cwp=35.6 ,
-                        manual_cloud_cth=0.58,
-                        manual_cloud_cbh=0.28,
-                        manual_cloud_cot=2.39,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
+    #                     tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=0.5,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=True,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=22.4,
+    #                     manual_cloud_cwp=35.6 ,
+    #                     manual_cloud_cth=0.58,
+    #                     manual_cloud_cbh=0.28,
+    #                     manual_cloud_cot=2.39,
+    #                     iter=iter,
+    #                     )
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
@@ -3514,28 +3481,28 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
-    #                     tmhr_ranges_select=[
-    #                                         [16.029, 16.224], # 100m, cloudy
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
-    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=True,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=8.3,
-    #                     manual_cloud_cwp=49.10,
-    #                     manual_cloud_cth=0.62,
-    #                     manual_cloud_cbh=0.29,
-    #                     manual_cloud_cot=8.93,
-    #                     iter=iter,
-    #                     )
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
+                        tmhr_ranges_select=[
+                                            [16.029, 16.224], # 100m, cloudy
+                                            ],
+                        case_tag='cloudy_atm_corr',
+                        config=config,
+                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
+                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                               np.arange(5.0, 10.1, 2.5),
+                                               np.array([15, 20, 30., 40., 45.]))),
+                        simulation_interval=0.5,
+                        clear_sky=False,
+                        overwrite_lrt=True,
+                        manual_cloud=True,
+                        manual_cloud_cer=8.3,
+                        manual_cloud_cwp=49.10,
+                        manual_cloud_cth=0.62,
+                        manual_cloud_cbh=0.29,
+                        manual_cloud_cot=8.93,
+                        iter=iter,
+                        )
         
     
     # for iter in range(3):

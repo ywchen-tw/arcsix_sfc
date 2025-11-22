@@ -518,7 +518,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     if modis_alb_file is None:
         modis_bands_nm = None
         modis_alb_legs = None
-    with open(f'{_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}.pkl', 'wb') as f:
+    with open(f'{_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}_time_{tmhr_ranges_select[0][0]}_{tmhr_ranges_select[-1][-1]}.pkl', 'wb') as f:
         pickle.dump(alb_update_dict, f)
     log.info(f"Saved surface albedo updates to {_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}.pkl")
 
