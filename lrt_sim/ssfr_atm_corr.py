@@ -3207,7 +3207,7 @@ if __name__ == '__main__':
                         tmhr_ranges_select=[
                                             [14.739, 15.053], # 550m
                                             ],
-                        case_tag='clear_atm_corr_2',
+                        case_tag='clear_atm_corr',
                         config=config,
                         simulation_interval=0.5,
                         clear_sky=True,
