@@ -719,15 +719,15 @@ if __name__ == '__main__':
 
     
 
-    atm_corr_processing(date=datetime.datetime(2024, 5, 31),
-                    tmhr_ranges_select=[
-                                        [16.905, 17.404] 
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 5, 31),
+    #                 tmhr_ranges_select=[
+    #                                     [16.905, 17.404] 
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
     # sys.exit()
 
