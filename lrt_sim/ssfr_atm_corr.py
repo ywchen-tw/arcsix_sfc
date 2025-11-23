@@ -2607,10 +2607,29 @@ if __name__ == '__main__':
 
     atm_corr_overwrite_lrt = False
     
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
+    #                     tmhr_ranges_select=[[15.610, 15.822],
+    #                                         [16.905, 17.404] 
+    #                                         ],
+    #                     case_tag='clear_atm_corr',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
+
+        
     for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
-                        tmhr_ranges_select=[[15.610, 15.822],
-                                            [16.905, 17.404] 
+        flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
+                        tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
                                             ],
                         case_tag='clear_atm_corr',
                         config=config,
@@ -2625,14 +2644,13 @@ if __name__ == '__main__':
                         manual_cloud_cot=0.0,
                         iter=iter,
                         )
-
         
     # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
-    #                     tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
+    #                     tmhr_ranges_select=[
     #                                         [16.905, 17.404] 
     #                                         ],
-    #                     case_tag='clear_atm_corr',
+    #                     case_tag='clear_atm_corr_2',
     #                     config=config,
     #                     simulation_interval=0.5,
     #                     clear_sky=True,
