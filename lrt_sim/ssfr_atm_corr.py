@@ -83,8 +83,9 @@ from pyproj import Transformer
 
 import er3t
 
-from util.util import *
-from util.arcsix_atm import prepare_atmospheric_profile
+# from util.util import *
+# from util.arcsix_atm import prepare_atmospheric_profile
+from util import *
 
 _mission_      = 'arcsix'
 _platform_     = 'p3b'
