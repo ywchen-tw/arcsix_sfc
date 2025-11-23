@@ -422,362 +422,7 @@ def gas_abs_masking(wvl, alb, alt):
         
     
     return alb_mask
-    
-
-def ice_alb_fitting(alb_wvl, alb_corr, alt):
-    ice_alb_model_data = pd.read_csv('ice_alb_prior.dat', delim_whitespace=True, comment='#', header=None, names=['wvl', 'alb', 'res'])
-    f_ice_alb_model = interp1d(ice_alb_model_data['wvl']*1000, ice_alb_model_data['alb'], bounds_error=False, fill_value='extrapolate')
-    ice_alb_model_i = f_ice_alb_model(alb_wvl)
-    
-    alb_ice_fit = ice_alb_model_i.copy()
-    alb_wvl_sep_1nd = 370
-    alb_wvl_sep_2nd = 525
-    alb_wvl_sep_2nd_2 = 625
-    alb_wvl_sep_3rd = 800
-    alb_wvl_sep_4th = 880
-    alb_wvl_sep_5th = 1015
-    alb_wvl_sep_6th = 1030 
-    alb_wvl_sep_7th = 1035
-    alb_wvl_sep_8th = 1080 
-    alb_wvl_sep_9th = 1200
-    alb_wvl_sep_10th = 1288
-    alb_wvl_sep_11th = 1520
-    alb_wvl_sep_12th = 1700
-    alb_wvl_sep_13th =  2100
-    band_12 = (alb_wvl >= alb_wvl_sep_1nd) & (alb_wvl < alb_wvl_sep_2nd)
-    band_225 = (alb_wvl >= alb_wvl_sep_2nd) & (alb_wvl < alb_wvl_sep_2nd_2)
-    band_253 = (alb_wvl >= alb_wvl_sep_2nd_2) & (alb_wvl < alb_wvl_sep_3rd)
-    band_23 = (alb_wvl >= alb_wvl_sep_2nd) & (alb_wvl < alb_wvl_sep_3rd)
-    band_34 = (alb_wvl >= alb_wvl_sep_3rd) & (alb_wvl < alb_wvl_sep_4th)
-    band_45 = (alb_wvl >= alb_wvl_sep_4th) & (alb_wvl < alb_wvl_sep_5th)   
-    band_56 = (alb_wvl >= alb_wvl_sep_5th) & (alb_wvl < alb_wvl_sep_6th)
-    band_67 = (alb_wvl >= alb_wvl_sep_6th) & (alb_wvl < alb_wvl_sep_7th)
-    band_78 = (alb_wvl >= alb_wvl_sep_7th) & (alb_wvl < alb_wvl_sep_8th)
-    band_89 = (alb_wvl >= alb_wvl_sep_8th) & (alb_wvl <= alb_wvl_sep_9th)
-    band_910 = (alb_wvl > alb_wvl_sep_9th) & (alb_wvl <= alb_wvl_sep_10th)
-    band_1011 = (alb_wvl > alb_wvl_sep_10th) & (alb_wvl <= alb_wvl_sep_11th)
-    band_1112 = (alb_wvl > alb_wvl_sep_11th) & (alb_wvl <= alb_wvl_sep_12th)
-    band_1213 = (alb_wvl > alb_wvl_sep_12th) & (alb_wvl <= alb_wvl_sep_13th)
-    scale_factors = np.ones_like(alb_ice_fit)
-    scale_factors[...] = np.nan
-    alb_corr_to_ice_alb_ratio = (alb_corr / ice_alb_model_i).copy()
-    # smooth the ratio
-    
-    alb_corr_to_ice_alb_ratio = uniform_filter1d(alb_corr_to_ice_alb_ratio, size=3)
-    alb_corr_to_ice_alb_ratio[:2] = alb_corr_to_ice_alb_ratio[2]
-    alb_corr_to_ice_alb_ratio[-2:] = alb_corr_to_ice_alb_ratio[-2]
-    
-    alb_corr_mask_to_ice_alb_ratio = alb_corr_to_ice_alb_ratio.copy()
-    
-
-    
-    alb_corr_mask_to_ice_alb_ratio = interp1d(alb_wvl, alb_corr_mask_to_ice_alb_ratio, bounds_error=False, fill_value=np.nan)
-    fit_wvl = np.arange(alb_wvl[0], alb_wvl[-1], 0.5)
-    alb_corr_mask_to_ice_alb_ratio = alb_corr_mask_to_ice_alb_ratio(fit_wvl)
-    
-    band_12_fit = (fit_wvl >= alb_wvl_sep_1nd) & (fit_wvl < alb_wvl_sep_2nd)
-    band_23_fit = (fit_wvl >= alb_wvl_sep_2nd) & (fit_wvl < alb_wvl_sep_3rd)
-    band_34_fit = (fit_wvl >= alb_wvl_sep_3rd) & (fit_wvl < alb_wvl_sep_4th)
-    band_45_fit = (fit_wvl >= alb_wvl_sep_4th) & (fit_wvl < alb_wvl_sep_5th)   
-    band_56_fit = (fit_wvl >= alb_wvl_sep_5th) & (fit_wvl < alb_wvl_sep_6th)
-    band_67_fit = (fit_wvl >= alb_wvl_sep_6th) & (fit_wvl < alb_wvl_sep_7th)
-    band_78_fit = (fit_wvl >= alb_wvl_sep_7th) & (fit_wvl < alb_wvl_sep_8th)
-    band_89_fit = (fit_wvl >= alb_wvl_sep_8th) & (fit_wvl <= alb_wvl_sep_9th)
-    band_910_fit = (fit_wvl > alb_wvl_sep_9th) & (fit_wvl <= alb_wvl_sep_10th)
-    band_1011_fit = (fit_wvl > alb_wvl_sep_10th) & (fit_wvl <= alb_wvl_sep_11th)
-    band_1112_fit = (fit_wvl > alb_wvl_sep_11th) & (fit_wvl <= alb_wvl_sep_12th)
-    band_1213_fit = (fit_wvl > alb_wvl_sep_12th) & (fit_wvl <= alb_wvl_sep_13th)
-    
-    exp_width = 2.0
-    band_12_fit = (fit_wvl >= alb_wvl_sep_1nd-exp_width) & (fit_wvl < alb_wvl_sep_2nd+exp_width)
-    band_225_fit = (fit_wvl >= alb_wvl_sep_2nd-exp_width) & (fit_wvl < alb_wvl_sep_2nd_2+exp_width)
-    band_253_fit = (fit_wvl >= alb_wvl_sep_2nd_2-exp_width) & (fit_wvl < alb_wvl_sep_3rd+exp_width)
-    band_23_fit = (fit_wvl >= alb_wvl_sep_2nd-exp_width) & (fit_wvl < alb_wvl_sep_3rd+exp_width)
-    band_34_fit = (fit_wvl >= alb_wvl_sep_3rd-exp_width) & (fit_wvl < alb_wvl_sep_4th+exp_width)
-    band_45_fit = (fit_wvl >= alb_wvl_sep_4th-exp_width) & (fit_wvl < alb_wvl_sep_5th+exp_width)
-    band_56_fit = (fit_wvl >= alb_wvl_sep_5th-exp_width) & (fit_wvl < alb_wvl_sep_6th+exp_width)
-    band_67_fit = (fit_wvl >= alb_wvl_sep_6th-exp_width) & (fit_wvl < alb_wvl_sep_7th+exp_width)
-    band_78_fit = (fit_wvl >= alb_wvl_sep_7th-exp_width) & (fit_wvl < alb_wvl_sep_8th+exp_width)
-    band_89_fit = (fit_wvl >= alb_wvl_sep_8th-exp_width) & (fit_wvl <= alb_wvl_sep_9th+exp_width)
-    band_910_fit = (fit_wvl > alb_wvl_sep_9th-exp_width) & (fit_wvl <= alb_wvl_sep_10th+exp_width)
-    band_1011_fit = (fit_wvl > alb_wvl_sep_10th-exp_width) & (fit_wvl <= alb_wvl_sep_11th+exp_width)
-    band_1112_fit = (fit_wvl > alb_wvl_sep_11th-exp_width) & (fit_wvl <= alb_wvl_sep_12th+exp_width)
-    band_1213_fit = (fit_wvl > alb_wvl_sep_12th-exp_width) & (fit_wvl <= alb_wvl_sep_13th+exp_width)
-    
-    alb_corr_mask_to_ice_alb_ratio = gas_abs_masking(fit_wvl, alb_corr_mask_to_ice_alb_ratio, alt=alt)
-    
-                
-    for band, band_fit in zip([band_12, band_225, band_253,
-                            #    band_23, 
-                                band_34, band_45, band_56, band_67, band_78, band_89, band_910, band_1112, band_1213],
-                                [band_12_fit, band_225_fit, band_253_fit,
-                            #    band_23_fit, 
-                                band_34_fit, band_45_fit, band_56_fit, band_67_fit, band_78_fit, band_89_fit, band_910_fit, band_1112_fit, band_1213_fit]):
-        
-        scale_factors[band] = fit_1d_poly(fit_wvl[band_fit], alb_corr_mask_to_ice_alb_ratio[band_fit], order=1)(alb_wvl[band])
-        alb_ice_fit[band] = alb_ice_fit[band] * fit_1d_poly(fit_wvl[band_fit], alb_corr_mask_to_ice_alb_ratio[band_fit], order=1)(alb_wvl[band])
-        
-    # special treatment for band 10 and 11 due to the discontinuity around 1375 nm
-    div = 1375
-    band_1011_first = (alb_wvl > alb_wvl_sep_10th) & (alb_wvl <= div)
-    band_1011_last = (alb_wvl > div) & (alb_wvl <= alb_wvl_sep_11th)
-    band_1011_fit_first = (fit_wvl > alb_wvl_sep_10th - exp_width) & (fit_wvl <= div + exp_width)
-    band_1011_fit_last = (fit_wvl > div - exp_width) & (fit_wvl <= alb_wvl_sep_11th + exp_width)
-    dx = np.nanmean(fit_wvl[band_1011_fit_last][-2:]) - np.nanmean(fit_wvl[band_1011_fit_last][:2])
-    x0 = np.nanmean(fit_wvl[band_1011_fit_last][:2])
-    scales = fit_1d_poly(fit_wvl[band_1011_fit], alb_corr_mask_to_ice_alb_ratio[band_1011_fit], order=1, dx=dx, x0=x0)(alb_wvl[band_1011_last])
-    
-    
-    scale_factors[band_1011_last] = scales
-    scale_factors[band_1011_first] = scales[0]
-    alb_ice_fit[band_1011_last] = alb_ice_fit[band_1011_last] * scales
-    alb_ice_fit[band_1011_first] = alb_ice_fit[band_1011_first] * scales[0]
-    # end of special treatment
-    
-    del band_12, band_23, band_34, band_45, band_56, band_67, band_78, band_89, band_910, band_1011, band_1112, band_1213
-    del band_12_fit, band_23_fit, band_34_fit, band_45_fit, band_56_fit, band_67_fit, band_78_fit, band_89_fit, band_910_fit, band_1011_fit, band_1112_fit, band_1213_fit
-    del band_225, band_253
-    del band_225_fit, band_253_fit
-    
-    gc.collect()
-    
-    alb_ice_fit[alb_wvl<370] = np.nan
-    alb_ice_fit[np.logical_and(alb_wvl>=360, alb_wvl<370)] = alb_ice_fit[np.where(np.logical_and(np.isfinite(alb_ice_fit), (alb_wvl>=370)))[0][0]]
-    alb_ice_fit[alb_wvl>2100] = np.nan
-    alb_ice_fit[alb_ice_fit<0.0] = 0.0
-    alb_ice_fit[alb_ice_fit>1.0] = 1.0
-    
-    # smooth with window size of 7
-    alb_ice_fit_smooth = alb_ice_fit[np.isfinite(alb_ice_fit)].copy()
-    alb_ice_fit_smooth = uniform_filter1d(alb_ice_fit_smooth, size=3)
-    alb_ice_fit_smooth[:1] = alb_ice_fit_smooth[1]
-    alb_ice_fit_smooth[-1:] = alb_ice_fit_smooth[-1]
-    alb_ice_fit_smooth[alb_ice_fit_smooth<0.0] = 0.0
-    alb_ice_fit_smooth[alb_ice_fit_smooth>1.0] = 1.0
-    
-    alb_ice_fit[np.isfinite(alb_ice_fit)] = alb_ice_fit_smooth
-    
-    return alb_ice_fit
-
-def find_best_fit(model_library, obs_wvl, obs_albedo):
-    """
-    Finds the best-fit model spectrum from a library by minimizing RMSE
-    at *only* the provided obs_wvl points.
-    """
-    
-    best_fit_params = None
-    best_fit_spectrum = None
-    min_rmse = np.inf
-    
-    obs_wvl_nanmask = np.isfinite(obs_albedo)
-    
-    # Loop through every pre-run model spectrum in your library
-    for key in model_library.keys():
-        
-        model_run = model_library[key]
-        model_wvl = model_run['wvl']      # Full wvl (0.2-5.0 um)
-        model_wvl *= 1000  # Convert to nm
-        model_albedo = model_run['albedo']  # Full albedo spectrum
-        
-        # -----------------------------------------------------------------
-        # THIS IS THE KEY STEP:
-        # It takes the full model (model_wvl, model_albedo) and
-        # interpolates it, pulling out *only* the values at the
-        # exact points you have in obs_wvl.
-        # -----------------------------------------------------------------
-        
-        interpolated_model_albedo = np.interp(obs_wvl, model_wvl, model_albedo)
-        
-        # The gaps (0.9-1.1, 1.3-1.5) are automatically
-        # and correctly ignored in the next step.
-        
-        # 3. Calculate RMSE *only* on the valid, non-gap data
-        rmse = np.sqrt(np.mean((interpolated_model_albedo[obs_wvl_nanmask] - obs_albedo[obs_wvl_nanmask])**2))
-        
-        # 4. Check if this is the best fit so far
-        if rmse < min_rmse:
-            min_rmse = rmse
-            best_fit_params = key
-            # best_fit_spectrum = model_run # Store the whole run
-            best_fit_spectrum = interpolated_model_albedo # Store the interpolation
-        
-    # plt.close('all')
-    # plt.plot(obs_wvl, best_fit_spectrum, '-', color='r', label='Best Fit Model')
-    # plt.plot(obs_wvl, obs_albedo, '-', color='k', label='Observed')
-    # plt.xlabel('Wavelength (nm)')
-    # plt.ylabel('Albedo')
-    # plt.legend()
-    # plt.title(f'Best Fit Model: {best_fit_params}, RMSE: {min_rmse:.4f}')
-    # plt.show()
-    
-        
-    return best_fit_params, best_fit_spectrum, min_rmse
-
-def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False):
-    # snicar_albedo_list = []
-    if clear_sky:
-        snicar_filename = 'snicar_model_results_direct.pkl'
-    else:
-        snicar_filename = 'snicar_model_results_diffuse.pkl'
-    with open(snicar_filename, 'rb') as f:
-        snicar_data = pickle.load(f)
-    #     wvl = list(snicar_data.values())[0]['wvl']
-    #     for key in snicar_data:
-    #         snicar_albedo_list.append((key, snicar_data[key]['albedo']))
-    # snicar_albedo_arr = np.array(snicar_albedo_list)  
-          
-    alb_corr_mask = alb_corr.copy()
-    alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask, alt=alt)
-    best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
-        model_library=snicar_data,
-        obs_wvl=alb_wvl,
-        obs_albedo=alb_corr_mask
-    )
-    
-    alb_corr_best_fit = np.copy(alb_corr_mask)
-    mask_bands = np.isnan(alb_corr_mask)
-    alb_corr_best_fit[mask_bands] = best_fit_spectrum[mask_bands]
-    
-    # plt.close('all')
-    # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
-    # plt.plot(alb_wvl, alb_corr_mask, '-', color='g', label='Masked Corrected Albedo')
-    # plt.plot(alb_wvl, best_fit_spectrum, '-', color='r', label='Best Fitted Albedo')
-    # plt.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-
-    # plt.xlabel('Wavelength (nm)')
-    # plt.ylabel('Albedo')
-    # plt.legend()
-    # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
-    # plt.show()
-    
-    
-    
-    alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 795
-    alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
-    alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
-    alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
-    alb_wvl_sep_5th_s, alb_wvl_sep_5th_e = 1185, 1700
-    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1550, 2100
-    
-    band_1_fit = (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e)
-    band_2_fit = (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e)
-    band_3_fit = (alb_wvl >= alb_wvl_sep_3rd_s) & (alb_wvl < alb_wvl_sep_3rd_e)
-    band_4_fit = (alb_wvl >= alb_wvl_sep_4th_s) & (alb_wvl < alb_wvl_sep_4th_e)
-    band_5_fit = (alb_wvl >= alb_wvl_sep_5th_s) & (alb_wvl < alb_wvl_sep_5th_e)
-    band_6_fit = (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e)
-    
-    alb_corr_fit = copy.deepcopy(alb_corr_mask)
-    for bands_fit in [band_1_fit, band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
-        
-        # if np.isnan(alb_corr_mask[bands_fit]).any():
-            # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
-            #     model_library=snicar_data,
-            #     obs_wvl=alb_wvl[bands_fit],
-            #     obs_albedo=alb_corr_mask[bands_fit]
-            #     )
-        bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
-        if bandfit_nan.sum() == 0:
-            continue
-        bandfit_nan_ind = np.where(bandfit_nan)[0]
-        if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
-            bandfit_nan_ind = bandfit_nan_ind[:-1]
-        left_mean_ind_num = 5
-        if bandfit_nan_ind[0] < left_mean_ind_num:
-            left_mean_ind_num = bandfit_nan_ind[0]
-        xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
-        right_mean_ind_num = 5
-        if (len(bandfit_nan) - bandfit_nan_ind[-1] -1) < right_mean_ind_num:
-            right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] -1
-            
-        print("bandfit_nan_ind[-1]:", bandfit_nan_ind[-1])
-        print("len(bandfit_nan):", len(bandfit_nan))
-        print("xr_origin start end:", bandfit_nan_ind[-1]+1, bandfit_nan_ind[-1]+right_mean_ind_num)
-        xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
-        xl_fit, xr_fit = best_fit_spectrum[bands_fit][bandfit_nan_ind[0]-1], best_fit_spectrum[bands_fit][bandfit_nan_ind[-1]+1]
-        xfit_base = np.min([xl_fit, xr_fit])
-        if np.isfinite(xl_origin) and np.isfinite(xr_origin):
-            base = np.min([xl_origin, xr_origin])
-            scale = (xr_origin - xl_origin) / (xr_fit - xl_fit)
-            scale = np.abs(scale)
-            replace_array = base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale
-            print("rescale replace_array shape:", replace_array.shape)
-        elif np.isfinite(xl_origin) and not np.isfinite(xr_origin):
-            # only have value on xl_origin
-            # use valid point to scale
-            xl_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][0:5].mean()
-            xr_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][-6:-1].mean()
-            xl_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][0:6].mean()
-            xr_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][-6:-1].mean()
-            xfit_base_new = xl_fit_new
-            base = np.min([xl_origin_new, xr_origin_new])
-            scale = (xr_origin_new - xl_origin_new) / (xr_fit_new - xl_fit_new)
-            scale = np.abs(scale)
-            replace_array_all = base + (best_fit_spectrum[bands_fit] - xfit_base_new) * scale
-            replace_array = replace_array_all[bandfit_nan]
-            print("rescale replace_array_all shape:", replace_array_all.shape)
-            print("rescale replace_array shape:", replace_array.shape)
-            # plt.close('all')
-            # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
-            # plt.plot(alb_wvl[bands_fit], replace_array_all, '--', color='b', label='Replace All')
-            # plt.legend()
-            # plt.show()
-            # sys.exit()
-        elif not np.isfinite(xl_origin) and np.isfinite(xr_origin):
-            # only have value on xr_origin
-            # not supported yet
-            raise NotImplementedError("Only have value on right side is not supported yet.")
-        
-        alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
-        print('replace_array shape:', replace_array.shape)
-        print('alb_corr_fit_replace shape:', alb_corr_fit_replace.shape)
-        print('bandfit_nan sum:', print(np.sum(bandfit_nan)))
-        
-        alb_corr_fit_replace[bandfit_nan] = copy.deepcopy(replace_array)
-        alb_corr_fit[bands_fit] = copy.deepcopy(alb_corr_fit_replace)
-            
-        # print("base, scale:", base, scale)
-        # print("base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale:", replace_array)
-        # print("alb_corr_fit[bands_fit][bandfit_nan] after adjustment:", alb_corr_fit[bands_fit][bandfit_nan])
-        # plt.close('all')
-        # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
-        # plt.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
-        # plt.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
-        # plt.xlabel('Wavelength (nm)')
-        # plt.ylabel('Albedo')
-        # plt.legend()
-        # plt.show()
-            
-    
-    
-    alb_corr_fit[alb_corr_fit<0.0] = 0.0
-    alb_corr_fit[alb_corr_fit>1.0] = 1.0
-    
-    # plt.close('all')
-    # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
-    # plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo')
-    # plt.xlabel('Wavelength (nm)')
-    # plt.ylabel('Albedo')
-    # plt.legend()
-    # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
-    # plt.show()
-    
-    # smooth with window size of 5
-    alb_corr_fit_smooth = alb_corr_fit.copy()
-    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5)
-    alb_corr_fit_smooth[:2] = alb_corr_fit_smooth[2]
-    alb_corr_fit_smooth[-2:] = alb_corr_fit_smooth[-2]
-    alb_corr_fit_smooth[alb_corr_fit_smooth<0.0] = 0.0
-    alb_corr_fit_smooth[alb_corr_fit_smooth>1.0] = 1.0
-    
-    alb_corr_fit_smooth[np.isfinite(alb_corr_fit_smooth)] = alb_corr_fit_smooth
-    
-    # print("alb_wvl shape:", alb_wvl.shape)
-    # print("alb_corr shape:", alb_corr.shape)
-    # print("alb_corr_mask shape:", alb_corr_mask.shape)
-    # print("alb_corr_fit shape:", alb_corr_fit.shape)
-    # print("alb_corr_fit_smooth shape:", alb_corr_fit_smooth.shape)
-    
-    return alb_corr_fit_smooth
+   
 
 
 
@@ -2627,24 +2272,24 @@ if __name__ == '__main__':
     # #                     iter=iter,
     # #                     )
 
-    
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
-                        tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
-                                            ],
-                        case_tag='clear_atm_corr',
-                        config=config,
-                        simulation_interval=0.5,
-                        clear_sky=True,
-                        overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=False,
-                        manual_cloud_cer=0.0,
-                        manual_cloud_cwp=0.0,
-                        manual_cloud_cth=0.0,
-                        manual_cloud_cbh=0.0,
-                        manual_cloud_cot=0.0,
-                        iter=iter,
-                        )
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
+    # #                     tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
+    # #                                         ],
+    # #                     case_tag='clear_atm_corr',
+    # #                     config=config,
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=0.0,
+    # #                     manual_cloud_cwp=0.0,
+    # #                     manual_cloud_cth=0.0,
+    # #                     manual_cloud_cbh=0.0,
+    # #                     manual_cloud_cot=0.0,
+    # #                     iter=iter,
+    # #                     )
     
     # done
     # # for iter in range(3):
@@ -2689,28 +2334,28 @@ if __name__ == '__main__':
     # #                     iter=iter,
     # #                     )
 
-    
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
-    #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr_2',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
-    #                                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=7.0,
-    #                     manual_cloud_cwp=113.65,
-    #                     manual_cloud_cth=1.91,
-    #                     manual_cloud_cbh=0.50,
-    #                     manual_cloud_cot=24.31,
-    #                     iter=iter,
-    #                     )
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
+    # #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
+    # #                                         ],
+    # #                     case_tag='cloudy_atm_corr_2',
+    # #                     config=config,
+    # #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
+    # #                                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+    # #                                            np.arange(5.0, 10.1, 2.5),
+    # #                                            np.array([15, 20, 30., 40., 45.]))),
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=False,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=True,
+    # #                     manual_cloud_cer=7.0,
+    # #                     manual_cloud_cwp=113.65,
+    # #                     manual_cloud_cth=1.91,
+    # #                     manual_cloud_cbh=0.50,
+    # #                     manual_cloud_cot=24.31,
+    # #                     iter=iter,
+    # #                     )
         
     # done  
     # # for iter in range(3):
@@ -2895,26 +2540,27 @@ if __name__ == '__main__':
     # #                     manual_cloud_cot=0.0,
     # #                     iter=iter,
     # #                     )
-        
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
-    #                     tmhr_ranges_select=[
-    #                                         [15.347, 15.813], # 100m
-    #                                         [15.813, 16.115], # 100-450m, clear, some cloud
-    #                                         ],
-    #                     case_tag='clear_atm_corr_2',
-    #                     config=config,
-    #                     simulation_interval=0.5,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
+    
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
+    # #                     tmhr_ranges_select=[
+    # #                                         [15.347, 15.813], # 100m
+    # #                                         [15.813, 16.115], # 100-450m, clear, some cloud
+    # #                                         ],
+    # #                     case_tag='clear_atm_corr_2',
+    # #                     config=config,
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=0.0,
+    # #                     manual_cloud_cwp=0.0,
+    # #                     manual_cloud_cth=0.0,
+    # #                     manual_cloud_cbh=0.0,
+    # #                     manual_cloud_cot=0.0,
+    # #                     iter=iter,
+    # #                     )
     
     # done
     # # for iter in range(3):
@@ -3183,43 +2829,45 @@ if __name__ == '__main__':
     # #                     manual_cloud_cot=0.0,
     # #                     iter=iter,
     # #                     )
-        
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
-    #                     tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
-    #                                         ],
-    #                     case_tag='clear_atm_corr',
-    #                     config=config,
-    #                     simulation_interval=0.5,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
-        
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
-                        tmhr_ranges_select=[
-                                            [14.739, 15.053], # 550m
-                                            ],
-                        case_tag='clear_atm_corr',
-                        config=config,
-                        simulation_interval=0.5,
-                        clear_sky=True,
-                        overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=False,
-                        manual_cloud_cer=0.0,
-                        manual_cloud_cwp=0.0,
-                        manual_cloud_cth=0.0,
-                        manual_cloud_cbh=0.0,
-                        manual_cloud_cot=0.0,
-                        iter=iter,
-                        )
+    
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
+    # #                     tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
+    # #                                         ],
+    # #                     case_tag='clear_atm_corr',
+    # #                     config=config,
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=0.0,
+    # #                     manual_cloud_cwp=0.0,
+    # #                     manual_cloud_cth=0.0,
+    # #                     manual_cloud_cbh=0.0,
+    # #                     manual_cloud_cot=0.0,
+    # #                     iter=iter,
+    # #                     )
+    
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
+    # #                     tmhr_ranges_select=[
+    # #                                         [14.739, 15.053], # 550m
+    # #                                         ],
+    # #                     case_tag='clear_atm_corr',
+    # #                     config=config,
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=0.0,
+    # #                     manual_cloud_cwp=0.0,
+    # #                     manual_cloud_cth=0.0,
+    # #                     manual_cloud_cbh=0.0,
+    # #                     manual_cloud_cot=0.0,
+    # #                     iter=iter,
+    # #                     )
         
    
     # done
@@ -3263,51 +2911,52 @@ if __name__ == '__main__':
     # #                     )
 
     
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
-    #                     tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
-    #                                         ],
-    #                     case_tag='clear_atm_corr_1',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.6, 0.65, 0.69, 0.78, 1.0,]),
-    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=10.7,
-    #                     manual_cloud_cwp=11.28,
-    #                     manual_cloud_cth=0.78,
-    #                     manual_cloud_cbh=0.69,
-    #                     manual_cloud_cot=1.59,
-    #                     iter=iter,
-    #                     )
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
+                        tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
+                                            ],
+                        case_tag='clear_atm_corr_1',
+                        config=config,
+                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.6, 0.65, 0.69, 0.78, 1.0,]),
+                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                               np.arange(5.0, 10.1, 2.5),
+                                               np.array([15, 20, 30., 40., 45.]))),
+                        simulation_interval=0.5,
+                        clear_sky=False,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=True,
+                        manual_cloud_cer=10.7,
+                        manual_cloud_cwp=11.28,
+                        manual_cloud_cth=0.78,
+                        manual_cloud_cbh=0.69,
+                        manual_cloud_cot=1.59,
+                        iter=iter,
+                        )
     
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
-    #                     tmhr_ranges_select=[
-    #                                         [15.472, 15.567], # 180m, cloudy
-    #                                         [15.580, 15.921], # 100m, cloudy
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr_2',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
-    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=7.2,
-    #                     manual_cloud_cwp=77.5,
-    #                     manual_cloud_cth=0.96,
-    #                     manual_cloud_cbh=0.62,
-    #                     manual_cloud_cot=16.21,
-    #                     iter=iter,
-    #                     )
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
+    # #                     tmhr_ranges_select=[
+    # #                                         [15.472, 15.567], # 180m, cloudy
+    # #                                         [15.580, 15.921], # 100m, cloudy
+    # #                                         ],
+    # #                     case_tag='cloudy_atm_corr_2',
+    # #                     config=config,
+    # #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
+    # #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    # #                                            np.arange(5.0, 10.1, 2.5),
+    # #                                            np.array([15, 20, 30., 40., 45.]))),
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=False,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=True,
+    # #                     manual_cloud_cer=7.2,
+    # #                     manual_cloud_cwp=77.5,
+    # #                     manual_cloud_cth=0.96,
+    # #                     manual_cloud_cbh=0.62,
+    # #                     manual_cloud_cot=16.21,
+    # #                     iter=iter,
+    # #                     )
     
     # done
     # # for iter in range(3):
@@ -3393,28 +3042,29 @@ if __name__ == '__main__':
     # #                     iter=iter,
     # #                     )
     
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
-    #                     tmhr_ranges_select=[
-    #                                         [15.314, 15.504], # 100m, cloudy
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr_2',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.78, 1.0,]),
-    #                                            np.array([1.5, 1.81, 2.21, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=7.8,
-    #                     manual_cloud_cwp=64.18,
-    #                     manual_cloud_cth=2.21,
-    #                     manual_cloud_cbh=1.81,
-    #                     manual_cloud_cot=12.41,
-    #                     iter=iter,
-    #                     )
+    # done
+    # # for iter in range(3):
+    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
+    # #                     tmhr_ranges_select=[
+    # #                                         [15.314, 15.504], # 100m, cloudy
+    # #                                         ],
+    # #                     case_tag='cloudy_atm_corr_2',
+    # #                     config=config,
+    # #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.78, 1.0,]),
+    # #                                            np.array([1.5, 1.81, 2.21, 2.5, 3.0, 4.0]), 
+    # #                                            np.arange(5.0, 10.1, 2.5),
+    # #                                            np.array([15, 20, 30., 40., 45.]))),
+    # #                     simulation_interval=0.5,
+    # #                     clear_sky=True,
+    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    # #                     manual_cloud=False,
+    # #                     manual_cloud_cer=7.8,
+    # #                     manual_cloud_cwp=64.18,
+    # #                     manual_cloud_cth=2.21,
+    # #                     manual_cloud_cbh=1.81,
+    # #                     manual_cloud_cot=12.41,
+    # #                     iter=iter,
+    # #                     )
     
     # done
     # # for iter in range(3):

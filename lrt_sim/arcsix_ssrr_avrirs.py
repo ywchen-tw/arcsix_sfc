@@ -46,7 +46,6 @@ from scipy import ndimage
 from scipy.optimize import curve_fit
 from scipy.signal import convolve
 from scipy.interpolate import interp1d
-from scipy.ndimage import uniform_filter1d
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.path as mpl_path
