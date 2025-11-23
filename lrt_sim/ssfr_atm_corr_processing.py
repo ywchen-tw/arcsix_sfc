@@ -444,15 +444,15 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         ssfr_fdn_mean_all[i, :] = df_ori['ssfr_fdn_mean'].values
         ssfr_fup_std_all[i, :] = df_ori['ssfr_fup_std'].values
         ssfr_fdn_std_all[i, :] = df_ori['ssfr_fdn_std'].values
-        simu_fup_mean_all_iter0[i, :] = df_ori['simu_fup_mean'].values
-        simu_fdn_mean_all_iter0[i, :] = df_ori['simu_fdn_mean'].values
-        simu_fup_mean_all_iter1[i, :] = df_upd1['simu_fup_mean'].values
-        simu_fdn_mean_all_iter1[i, :] = df_upd1['simu_fdn_mean'].values
-        simu_fup_mean_all_iter2[i, :] = df_upd2['simu_fup_mean'].values
-        simu_fdn_mean_all_iter2[i, :] = df_upd2['simu_fdn_mean'].values
-        simu_fup_toa_mean_all_iter0[i, :] = df_ori['simu_fup_toa_mean'].values
-        simu_fup_toa_mean_all_iter1[i, :] = df_upd1['simu_fup_toa_mean'].values
-        simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
+        # simu_fup_mean_all_iter0[i, :] = df_ori['simu_fup_mean'].values
+        # simu_fdn_mean_all_iter0[i, :] = df_ori['simu_fdn_mean'].values
+        # simu_fup_mean_all_iter1[i, :] = df_upd1['simu_fup_mean'].values
+        # simu_fdn_mean_all_iter1[i, :] = df_upd1['simu_fdn_mean'].values
+        # simu_fup_mean_all_iter2[i, :] = df_upd2['simu_fup_mean'].values
+        # simu_fdn_mean_all_iter2[i, :] = df_upd2['simu_fdn_mean'].values
+        # simu_fup_toa_mean_all_iter0[i, :] = df_ori['simu_fup_toa_mean'].values
+        # simu_fup_toa_mean_all_iter1[i, :] = df_upd1['simu_fup_toa_mean'].values
+        # simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
         toa_mean_all[i, :] = df_ori['toa_mean'].values
         
         
@@ -708,16 +708,16 @@ if __name__ == '__main__':
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 5, 31),
-                    tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 5, 31),
+    #                 tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
-
+    
 
     atm_corr_processing(date=datetime.datetime(2024, 5, 31),
                     tmhr_ranges_select=[
@@ -729,7 +729,7 @@ if __name__ == '__main__':
                     clear_sky=True,
                     )
 
-
+    # sys.exit()
 
     atm_corr_processing(date=datetime.datetime(2024, 6, 3),
                     tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
