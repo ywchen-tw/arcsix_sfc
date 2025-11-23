@@ -49,6 +49,31 @@ def gas_abs_masking(wvl, alb, alt):
                 ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
                 ((wvl>=final_start) & (wvl<=final_end))
                 ] = np.nan
+    elif alt <= 0.5 and alt > 0.2:
+        alb_mask[
+                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
+                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
+                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
+                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
+                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
+                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
+                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
+                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
+                ((wvl>=final_start) & (wvl<=final_end))
+                ] = np.nan
+        effective_mask_[
+                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
+                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
+                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
+                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
+                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
+                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
+                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
+                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
+                ((wvl>=final_start) & (wvl<=final_end))
+                ] = np.nan
     else: 
         # Not mask O2 band and water abs band at VIS and NIR if altitude is low
         alb_mask[
