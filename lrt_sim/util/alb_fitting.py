@@ -10,14 +10,14 @@ from scipy.ndimage import uniform_filter1d
 # mpl.use('Agg')
 
 
-def gas_abs_masking(wvl, alb, alt):
+def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
     o2a_1_start, o2a_1_end = 748, 780
     h2o_1_start, h2o_1_end = 672, 706
     h2o_2_start, h2o_2_end = 705, 746
     h2o_3_start, h2o_3_end = 884, 996
     h2o_4_start, h2o_4_end = 1084, 1175
     h2o_5_start, h2o_5_end = 1230, 1286
-    h2o_6_start, h2o_6_end = 1290, 1509
+    h2o_6_start, h2o_6_end = 1290, h2o_6_end
     h2o_7_start, h2o_7_end = 1748, 2050
     h2o_8_start, h2o_8_end = 801, 843
     final_start, final_end = 2110, 2200
@@ -183,7 +183,7 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
         
     return best_fit_params, best_fit_spectrum, min_rmse
 
-def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False):
+def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
     # snicar_albedo_list = []
     if clear_sky:
         snicar_filename = 'snicar_model_results_direct.pkl'
@@ -197,7 +197,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False):
     # snicar_albedo_arr = np.array(snicar_albedo_list)  
           
     alb_corr_mask = alb_corr.copy()
-    alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask, alt=alt)
+    alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask, alt=alt, h2o_6_end=h2o_6_end)
     best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
         model_library=snicar_data,
         obs_wvl=alb_wvl,

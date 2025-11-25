@@ -298,6 +298,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     print("modis_alb_file:", modis_alb_file)
     
     t_hsk = np.array(data_hsk["tmhr"])
+    mistmatch_count = 0
     
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     initiation = True
@@ -402,6 +403,19 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             toa_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             
             initiation = False
+            
+            
+            
+        
+        if corr_factor.shape[0] != cld_leg['ssfr_zen'].shape[1]:
+            print("Mismatch in shape between corr_factor and ssfr_zen, skipping this leg.")
+            print("i:", i)
+            print("alb_wvl shape:", alb_wvl.shape)
+            print("flux_wvl shape:", flux_wvl.shape)
+            print("corr_factor shape:", corr_factor.shape)
+            print("cld_leg['ssfr_zen'] shape:", cld_leg['ssfr_zen'].shape)
+            mistmatch_count += 1
+            continue
 
         time_all.append(time)
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
@@ -419,7 +433,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         fup_all.extend(cld_leg['ssfr_nad'])
         toa_expand_all.extend(cld_leg['ssfr_toa'])
         correction_factor_all.extend(corr_factor * np.ones_like(cld_leg['ssfr_zen']))
-        fdn_up_ratio_all.extend(cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])#*corr_factor)
+        fdn_up_ratio_all.extend(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'])#*corr_factor)
         icing_all.extend(leg_icing_all)
         icing_pre_all.extend(leg_icing_pre_all)
         
@@ -457,6 +471,51 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
         
         print(f"date_s: {date_s}, time: {time_start:.3f}-{time_end:.3f}, alt_avg: {alt_avg:.2f} km")
+        
+        
+        # if np.all(np.isnan((cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :])):
+        #     continue
+        # alb_corr = copy.deepcopy((cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :])
+        # alb_corr[alb_corr < 0] = 0
+        # alb_corr[alb_corr > 1] = 1
+        
+        # if np.any(np.isnan(alb_corr)):
+        #     s = pd.Series(alb_corr)
+        #     s_mask = np.isnan(alb_corr)
+        #     # Fills NaN with the value immediately preceding it
+        #     s_ffill = s.fillna(method='ffill', limit=2)
+        #     s_ffill = s_ffill.fillna(method='bfill', limit=2)
+        #     while np.any(np.isnan(s_ffill)):
+        #         s_ffill = s_ffill.fillna(method='ffill', limit=2)
+        #         s_ffill = s_ffill.fillna(method='bfill', limit=2)
+                
+        #     alb_corr[s_mask] = s_ffill[s_mask]
+        
+        # alb_corr = alb_corr * corr_factor
+        # fdn_up_ratio_all_corr_test = alb_corr.copy()
+        # fdn_up_ratio_all_corr_test[fdn_up_ratio_all_corr_test < 0] = 0
+        # fdn_up_ratio_all_corr_test[fdn_up_ratio_all_corr_test > 1] = 1
+                    
+        # alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=cld_leg['alt'][0])
+        # alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
+        
+        # fdn_up_ratio_all_corr_fit_test = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
+        # print("fdn_up_ratio_all_corr_test shape:", fdn_up_ratio_all_corr_test.shape)
+        # print("cld_leg['ssfr_toa'] shape:", cld_leg['ssfr_toa'].shape)
+
+        # broadband_alb_iter1_test = np.sum(fdn_up_ratio_all_corr_fit_test * cld_leg['ssfr_toa'][0, :]) / np.sum(cld_leg['ssfr_toa'][0, :])
+           
+        # plt.close('all')
+        # fig, ax = plt.subplots(figsize=(8, 6))
+        # # ax.plot(alb_wvl, (cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :], '-', color='r', label='Original albedo')
+        # ax.plot(alb_wvl, fdn_up_ratio_all_corr_fit_test, '-', color='b', label='Corrected albedo (iter 1)')
+        # ax.set_xlabel('Wavelength (nm)', fontsize=14)
+        # ax.set_ylabel('Surface Albedo', fontsize=14)
+        # ax.set_title(f'Surface Albedo after Atmospheric Correction {date_s} {case_tag}, broadband alb: {broadband_alb_iter1_test:.3f}', fontsize=13)
+        # fig.suptitle(f'Flight leg at Z={alt_avg_all[0]:.2f} km, lon={lon_avg_all[0]:.2f}, lat={lat_avg_all[0]:.2f}', fontsize=12, y=0.98)
+        # fig.tight_layout()
+        # plt.show()
+        # sys.exit()
     
 
         # find the modis location closest to the flight leg center
@@ -466,6 +525,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             modis_alb_leg = modis_sur_alb[min_idx[0], min_idx[1], :7]
             modis_alb_legs.append(modis_alb_leg)
     
+    print(f"Total mismatch count: {mistmatch_count}")
     
     time_all = np.array(time_all)
     fdn_550_all = np.array(fdn_550_all)
@@ -515,9 +575,14 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             alb_corr[s_mask] = s_ffill[s_mask]
         
         alb_corr = alb_corr * correction_factor_all[i, :]
+        alb_corr[alb_corr < 0] = 0
+        alb_corr[alb_corr > 1] = 1
         fdn_up_ratio_all_corr[i, :] = alb_corr.copy()
-                    
-        alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i])
+        
+        if date_s not in ['20240603', '20240807']:
+            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i])
+        else:
+            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1600) # extend h2o_6 to 1600 nm for this date
         alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
         
         fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
@@ -550,6 +615,17 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     broadband_alb_iter2_filter = np.sum(alb2_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
     broadband_alb_iter1_all_filter = np.sum(fdn_up_ratio_all_corr[:, gas_mask] * toa_expand_all[:, gas_mask], axis=1) / np.sum(toa_expand_all[:, gas_mask], axis=1)
     broadband_alb_iter2_all_filter = np.sum(fdn_up_ratio_all_corr_fit[:, gas_mask] * toa_expand_all[:, gas_mask], axis=1) / np.sum(toa_expand_all[:, gas_mask], axis=1)
+    
+    # plt.close('all')
+    # fig, ax = plt.subplots(figsize=(8, 6))
+    # ax.plot(alb_wvl, fdn_up_ratio_all_corr[0, :], '-', color='b', label='Corrected albedo (iter 1)')
+    # ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    # ax.set_ylabel('Surface Albedo', fontsize=14)
+    # ax.set_title(f'Surface Albedo after Atmospheric Correction {date_s} {case_tag}, broadband alb: {broadband_alb_iter1[0]:.3f}', fontsize=13)
+    # fig.suptitle(f'Flight leg at Z={alt_avg_all[0]:.2f} km, lon={lon_avg_all[0]:.2f}, lat={lat_avg_all[0]:.2f}', fontsize=12, y=0.98)
+    # fig.tight_layout()
+    # plt.show()
+    # sys.exit()
     
     fig_dir = f'fig/sfc_alb_corr_lonlat'
     os.makedirs(fig_dir, exist_ok=True)
@@ -601,7 +677,9 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             except Exception:
                 # fallback: don't set extent if projection complains
                 pass
-
+        ax.tick_params('both', labelsize=10)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{date_s}_{case_tag}_broadband_albedo_vs_longitude_polar_projection.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
@@ -669,11 +747,12 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
     output_dir = f'{_fdir_general_}/sfc_alb_combined'
     os.makedirs(output_dir, exist_ok=True)
-    with open(f'{_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}_time_{tmhr_ranges_select[0][0]:.3f}_{tmhr_ranges_select[-1][-1]:.3f}.pkl', 'wb') as f:
+    with open(f'{_fdir_general_}/{output_dir}/sfc_alb_update_{date_s}_{case_tag}_time_{tmhr_ranges_select[0][0]:.3f}_{tmhr_ranges_select[-1][-1]:.3f}.pkl', 'wb') as f:
         pickle.dump(alb_update_dict, f)
     log.info(f"Saved surface albedo updates to {_fdir_general_}/sfc_alb/sfc_alb_update_{date_s}_{case_tag}.pkl")
 
     
+    print("Processing completed for date and tag:", date_s, case_tag)
 
 if __name__ == '__main__':
 
@@ -729,489 +808,488 @@ if __name__ == '__main__':
     #                 clear_sky=True,
     #                 )
 
-    # sys.exit()
+    
+    # # done
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 3),
+    #                 tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 3),
-                    tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
 
+    # # done
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 3),
+    #                 tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
+    
 
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 3),
-                    tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 5),
+    #                 tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 5),
-                    tmhr_ranges_select=[[12.405, 13.812], # 5.7m,
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 5),
+    #                 tmhr_ranges_select=[
+    #                                     [14.258, 15.036], # 100m
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 5),
+    #                 tmhr_ranges_select=[
+    #                                     [15.535, 15.931], # 450m
+    #                                     ],
+    #                 case_tag='clear_atm_corr_3',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 5),
-                    tmhr_ranges_select=[
-                                        [14.258, 15.036], # 100m
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 5),
+    #                 tmhr_ranges_select=[
+    #                                     [13.7889, 13.8010],
+    #                                     [13.8350, 13.8395],
+    #                                     [13.8780, 13.8885],
+    #                                     [13.9240, 13.9255],
+    #                                     [13.9389, 13.9403],
+    #                                     [13.9540, 13.9715],
+    #                                     [13.9980, 14.0153],
+    #                                     [14.0417, 14.0575],
+    #                                     [14.0417, 14.0475],
+    #                                     [14.0560, 14.0590],
+    #                                     [14.0825, 14.0975],
+    #                                     [14.1264, 14.1525],
+    #                                     [14.1762, 14.1975],
+    #                                     [14.2194, 14.2420],
+    #                                     [14.2605, 14.2810]
+    #                                     ],
+    #                 case_tag='clear_sky_spiral_atm_corr',
+    #                 config=config,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 5),
-                    tmhr_ranges_select=[
-                                        [15.535, 15.931], # 450m
-                                        ],
-                    case_tag='clear_atm_corr_3',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 6),
+    #                 tmhr_ranges_select=[[16.250, 16.325], # 100m, 
+    #                                     [16.375, 16.632], # 450m
+    #                                     [16.700, 16.794], # 100m
+    #                                     [16.850, 16.952], # 1.2km
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 7),
+    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 11),
+    #                 tmhr_ranges_select=[[14.5667, 14.5694],
+    #                                     [14.5986, 14.6097],
+    #                                     [14.6375, 14.6486], # cloud shadow
+    #                                     [14.6778, 14.6903],
+    #                                     [14.7208, 14.7403],
+    #                                     [14.7653, 14.7875],
+    #                                     [14.8125, 14.8278],
+    #                                     [14.8542, 14.8736],
+    #                                     [14.8986, 14.9389], # more cracks
+    #                                     ],
+    #                 case_tag='clear_sky_spiral_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=None,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 11),
+    #                 tmhr_ranges_select=[
+    #                                     [14.968, 15.229], # 100, clear, some cloud
+    #                                     [14.968, 15.347],
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 11),
+    #                 tmhr_ranges_select=[
+    #                                     [15.347, 15.813], # 100m
+    #                                     [15.813, 16.115], # 100-450m, clear, some cloud
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 13),
+    #                 tmhr_ranges_select=[[13.704, 13.817], # 100-450m, clear, some cloud
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 13),
+    #                 tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 13),
+    #                 tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 5),
-                    tmhr_ranges_select=[
-                                        [13.7889, 13.8010],
-                                        [13.8350, 13.8395],
-                                        [13.8780, 13.8885],
-                                        [13.9240, 13.9255],
-                                        [13.9389, 13.9403],
-                                        [13.9540, 13.9715],
-                                        [13.9980, 14.0153],
-                                        [14.0417, 14.0575],
-                                        [14.0417, 14.0475],
-                                        [14.0560, 14.0590],
-                                        [14.0825, 14.0975],
-                                        [14.1264, 14.1525],
-                                        [14.1762, 14.1975],
-                                        [14.2194, 14.2420],
-                                        [14.2605, 14.2810]
-                                        ],
-                    case_tag='clear_sky_spiral_atm_corr',
-                    config=config,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 13),
+    #                 tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_3',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 6),
-                    tmhr_ranges_select=[[16.250, 16.325], # 100m, 
-                                        [16.375, 16.632], # 450m
-                                        [16.700, 16.794], # 100m
-                                        [16.850, 16.952], # 1.2km
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 6, 13),
+    #                 tmhr_ranges_select=[[16.550, 17.581], # 100-500m, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 7),
-                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 25),
+    #                 tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog below
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 11),
-                    tmhr_ranges_select=[[14.5667, 14.5694],
-                                        [14.5986, 14.6097],
-                                        [14.6375, 14.6486], # cloud shadow
-                                        [14.6778, 14.6903],
-                                        [14.7208, 14.7403],
-                                        [14.7653, 14.7875],
-                                        [14.8125, 14.8278],
-                                        [14.8542, 14.8736],
-                                        [14.8986, 14.9389], # more cracks
-                                        ],
-                    case_tag='clear_sky_spiral_atm_corr',
-                    config=config,
-                    simulation_interval=None,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 11),
-                    tmhr_ranges_select=[
-                                        [14.968, 15.229], # 100, clear, some cloud
-                                        [14.968, 15.347],
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 11),
-                    tmhr_ranges_select=[
-                                        [15.347, 15.813], # 100m
-                                        [15.813, 16.115], # 100-450m, clear, some cloud
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 13),
-                    tmhr_ranges_select=[[13.704, 13.817], # 100-450m, clear, some cloud
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 13),
-                    tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 13),
-                    tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 25),
+    #                 tmhr_ranges_select=[[15.881, 15.903], # 200-500m
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 6, 13),
-                    tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_3',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 6, 13),
-                    tmhr_ranges_select=[[16.550, 17.581], # 100-500m, clear
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 7, 25),
-                    tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog below
-                                        ],
-                    case_tag='cloudy_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 7, 25),
-                    tmhr_ranges_select=[[15.881, 15.903], # 200-500m
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 29),
+    #                 tmhr_ranges_select=[[13.442, 13.465],
+    #                                     [13.490, 13.514],
+    #                                     [13.536, 13.554],
+    #                                     [13.580, 13.611],
+    #                                     [13.639, 13.654],
+    #                                     [13.676, 13.707],
+    #                                     [13.733, 13.775],
+    #                                     [13.793, 13.836],
+    #                                     ],
+    #                 case_tag='clear_sky_spiral_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=None,
+    #                 clear_sky=True,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 7, 29),
-                    tmhr_ranges_select=[[13.442, 13.465],
-                                        [13.490, 13.514],
-                                        [13.536, 13.554],
-                                        [13.580, 13.611],
-                                        [13.639, 13.654],
-                                        [13.676, 13.707],
-                                        [13.733, 13.775],
-                                        [13.793, 13.836],
-                                        ],
-                    case_tag='clear_sky_spiral_atm_corr',
-                    config=config,
-                    simulation_interval=None,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 29),
+    #                 tmhr_ranges_select=[[13.939, 14.200], # 100m, clear
+    #                                     [14.438, 14.714], # 3.7km
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
+
+
+
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 29),
+    #                 tmhr_ranges_select=[
+    #                                     [15.214, 15.804], # 1.3km
+    #                                     [16.176, 16.304], # 1.3km
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 7, 29),
-                    tmhr_ranges_select=[[13.939, 14.200], # 100m, clear
-                                        [14.438, 14.714], # 3.7km
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 30),
+    #                 tmhr_ranges_select=[[13.886, 13.908],
+    #                                     [13.934, 13.950],
+    #                                     [13.976, 14.000],
+    #                                     [14.031, 14.051],
+    #                                     [14.073, 14.096],
+    #                                     [14.115, 14.134],
+    #                                     [14.157, 14.179],
+    #                                     [14.202, 14.219],
+    #                                     [14.239, 14.254],
+    #                                     [14.275, 14.294],
+    #                                     ],
+    #                 case_tag='clear_sky_spiral_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=None,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 7, 29),
-                    tmhr_ranges_select=[
-                                        [15.214, 15.804], # 1.3km
-                                        [16.176, 16.304], # 1.3km
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-    
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 7, 30),
-                    tmhr_ranges_select=[[13.886, 13.908],
-                                        [13.934, 13.950],
-                                        [13.976, 14.000],
-                                        [14.031, 14.051],
-                                        [14.073, 14.096],
-                                        [14.115, 14.134],
-                                        [14.157, 14.179],
-                                        [14.202, 14.219],
-                                        [14.239, 14.254],
-                                        [14.275, 14.294],
-                                        ],
-                    case_tag='clear_sky_spiral_atm_corr',
-                    config=config,
-                    simulation_interval=None,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 7, 30),
+    #                 tmhr_ranges_select=[[14.318, 14.936], # 100-450m, clear
+    #                                     [15.043, 15.140], # 1.5km
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 7, 30),
-                    tmhr_ranges_select=[[14.318, 14.936], # 100-450m, clear
-                                        [15.043, 15.140], # 1.5km
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 1),
+    #                 tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 1),
-                    tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
-
-
-
-    atm_corr_processing(date=datetime.datetime(2024, 8, 1),
-                    tmhr_ranges_select=[
-                                        [14.739, 15.053], # 550m
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 1),
+    #                 tmhr_ranges_select=[
+    #                                     [14.739, 15.053], # 550m
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
     
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 2),
-                    tmhr_ranges_select=[
-                                        [14.557, 15.100], # 100m
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 2),
+    #                 tmhr_ranges_select=[
+    #                                     [14.557, 15.100], # 100m
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 2),
-                    tmhr_ranges_select=[
-                                        [15.244, 16.635], # 1km
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 2),
+    #                 tmhr_ranges_select=[
+    #                                     [15.244, 16.635], # 1km
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 7),
-                    tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 7),
+    #                 tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 7),
-                    tmhr_ranges_select=[
-                                        [15.472, 15.567], # 180m, cloudy
-                                        [15.580, 15.921], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 7),
+    #                 tmhr_ranges_select=[
+    #                                     [15.472, 15.567], # 180m, cloudy
+    #                                     [15.580, 15.921], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-                    tmhr_ranges_select=[
-                                        [12.990, 13.180], # 180m, clear
-                                        ],
-                    case_tag='clear_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+    #                 tmhr_ranges_select=[
+    #                                     [12.990, 13.180], # 180m, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-                    tmhr_ranges_select=[
-                                        [14.250, 14.373], # 180m, clear
-                                        ],
-                    case_tag='clear_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+    #                 tmhr_ranges_select=[
+    #                                     [14.250, 14.373], # 180m, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-                    tmhr_ranges_select=[
-                                        [16.471, 16.601], # 180m, clear
-                                        ],
-                    case_tag='clear_atm_corr_3',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+    #                 tmhr_ranges_select=[
+    #                                     [16.471, 16.601], # 180m, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr_3',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-                    tmhr_ranges_select=[
-                                        [13.212, 13.347], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+    #                 tmhr_ranges_select=[
+    #                                     [13.212, 13.347], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-                    tmhr_ranges_select=[
-                                        [15.314, 15.504], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+    #                 tmhr_ranges_select=[
+    #                                     [15.314, 15.504], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 9),
-                    tmhr_ranges_select=[
-                                        [13.376, 13.600], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 9),
+    #                 tmhr_ranges_select=[
+    #                                     [13.376, 13.600], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 9),
-                    tmhr_ranges_select=[
-                                        [14.750, 15.060], # 100m, clear
-                                        [15.622, 15.887], # 100m, clear
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 9),
+    #                 tmhr_ranges_select=[
+    #                                     [14.750, 15.060], # 100m, clear
+    #                                     [15.622, 15.887], # 100m, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
 
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 9),
-                    tmhr_ranges_select=[
-                                        [16.029, 16.224], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr_2',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 9),
+    #                 tmhr_ranges_select=[
+    #                                     [16.029, 16.224], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 )
     
 
 
-    atm_corr_processing(date=datetime.datetime(2024, 8, 15),
-                    tmhr_ranges_select=[
-                                        [14.085, 14.396], # 100m, clear
-                                        [14.550, 14.968], # 3.5km, clear
-                                        [15.078, 15.163], # 1.7km, clear
-                                        ],
-                    case_tag='clear_atm_corr',
-                    config=config,
-                    simulation_interval=0.5,
-                    clear_sky=True,
-                    )
+    # atm_corr_processing(date=datetime.datetime(2024, 8, 15),
+    #                 tmhr_ranges_select=[
+    #                                     [14.085, 14.396], # 100m, clear
+    #                                     [14.550, 14.968], # 3.5km, clear
+    #                                     [15.078, 15.163], # 1.7km, clear
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 )
