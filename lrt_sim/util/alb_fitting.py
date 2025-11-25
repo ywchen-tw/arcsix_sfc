@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from scipy.ndimage import uniform_filter1d
+import matplotlib.pyplot as plt
 
 # mpl.use('Agg')
 
@@ -80,7 +81,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
                 # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                # ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
+                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
                 ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
                 ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
                 ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
@@ -92,7 +93,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
                 # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                # ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
+                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
                 ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
                 ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
                 ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
@@ -227,7 +228,9 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
     alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
     alb_wvl_sep_5th_s, alb_wvl_sep_5th_e = 1185, 1700
-    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1550, 2100
+    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1520, 2100
+    if h2o_6_end > 1520:
+        alb_wvl_sep_6th_s = h2o_6_end+5
     
     band_1_fit = (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e)
     band_2_fit = (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e)
@@ -265,12 +268,13 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
         xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
         xl_fit, xr_fit = best_fit_spectrum[bands_fit][bandfit_nan_ind[0]-1], best_fit_spectrum[bands_fit][bandfit_nan_ind[-1]+1]
         xfit_base = np.min([xl_fit, xr_fit])
+        # print("xl_origin, xr_origin:", xl_origin, xr_origin)
         if np.isfinite(xl_origin) and np.isfinite(xr_origin):
             base = np.min([xl_origin, xr_origin])
             scale = (xr_origin - xl_origin) / (xr_fit - xl_fit)
             scale = np.abs(scale)
             replace_array = base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale
-            # print("rescale replace_array shape:", replace_array.shape)
+            # print("rescale (1) replace_array shape:", replace_array.shape)
         elif np.isfinite(xl_origin) and not np.isfinite(xr_origin):
             # only have value on xl_origin
             # use valid point to scale
@@ -284,7 +288,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
             scale = np.abs(scale)
             replace_array_all = base + (best_fit_spectrum[bands_fit] - xfit_base_new) * scale
             replace_array = replace_array_all[bandfit_nan]
-            # print("rescale replace_array_all shape:", replace_array_all.shape)
+            # print("rescale (2) replace_array_all shape:", replace_array_all.shape)
             # print("rescale replace_array shape:", replace_array.shape)
             # plt.close('all')
             # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
@@ -296,6 +300,19 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
             # only have value on xr_origin
             # not supported yet
             raise NotImplementedError("Only have value on right side is not supported yet.")
+        else:
+            # print("base, scale:", base, scale)
+            # print("base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale:", replace_array)
+            # print("alb_corr_fit[bands_fit][bandfit_nan] after adjustment:", alb_corr_fit[bands_fit][bandfit_nan])
+            # plt.close('all')
+            # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
+            # plt.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
+            # plt.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
+            # plt.xlabel('Wavelength (nm)')
+            # plt.ylabel('Albedo')
+            # plt.legend()
+            # plt.show()
+            print("Both sides have no valid value, skip rescaling.")
         
         alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
         # print('replace_array shape:', replace_array.shape)
@@ -318,9 +335,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
         # plt.show()
             
     
-    
-    alb_corr_fit[alb_corr_fit<0.0] = 0.0
-    alb_corr_fit[alb_corr_fit>1.0] = 1.0
+    alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     
     # plt.close('all')
     # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
@@ -333,11 +348,8 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     
     # smooth with window size of 5
     alb_corr_fit_smooth = alb_corr_fit.copy()
-    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5)
-    alb_corr_fit_smooth[:2] = alb_corr_fit_smooth[2]
-    alb_corr_fit_smooth[-2:] = alb_corr_fit_smooth[-2]
-    alb_corr_fit_smooth[alb_corr_fit_smooth<0.0] = 0.0
-    alb_corr_fit_smooth[alb_corr_fit_smooth>1.0] = 1.0
+    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5, mode='reflect')
+    alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
     
     alb_corr_fit_smooth[np.isfinite(alb_corr_fit_smooth)] = alb_corr_fit_smooth
     

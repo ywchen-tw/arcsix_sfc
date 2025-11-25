@@ -417,7 +417,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             mistmatch_count += 1
             continue
 
-        time_all.append(time)
+        time_all.append(cld_leg['time'])
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
         ssfr_550_ind = np.argmin(np.abs(ssfr_wvl - 550))
         ssfr_1600_ind = np.argmin(np.abs(ssfr_wvl - 1600))
@@ -555,12 +555,26 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     
     fdn_up_ratio_all_corr = np.full(fdn_up_ratio_all.shape, np.nan)
     fdn_up_ratio_all_corr_fit = np.full(fdn_up_ratio_all.shape, np.nan)
+    
+    wvl1450_ind = np.argmin(np.abs(alb_wvl - 1450))
+    wvl1520_ind = np.argmin(np.abs(alb_wvl - 1520)) 
+    wvl1600_ind = np.argmin(np.abs(alb_wvl - 1600))
+    wvl1650_ind = np.argmin(np.abs(alb_wvl - 1650))
+    wvl1710_ind = np.argmin(np.abs(alb_wvl - 1710))
+    wvl1800_ind = np.argmin(np.abs(alb_wvl - 1800))
+    
     for i in range(fdn_up_ratio_all.shape[0]):
         if np.all(np.isnan(fdn_up_ratio_all[i, :])):
             continue
+        elif np.nansum(fdn_up_ratio_all[i, :] >= 1.0)/(fdn_up_ratio_all[i, :]).shape[0] < 0.1:
+            continue
+        alb_corr_mask = gas_abs_masking(alb_wvl, fdn_up_ratio_all[i, :], alt=alt_all[i])
+        eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(fdn_up_ratio_all[i, :]), alt=alt_all[i])
+        if np.isnan(alb_corr_mask).sum()/np.sum(eff_alb_) > 0.5:
+            continue
+        
         alb_corr = fdn_up_ratio_all[i, :].copy()
-        alb_corr[alb_corr < 0] = 0
-        alb_corr[alb_corr > 1] = 1
+        alb_corr = np.clip(alb_corr, 0, 1)
         
         if np.any(np.isnan(alb_corr)):
             s = pd.Series(alb_corr)
@@ -581,11 +595,93 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
         if date_s not in ['20240603', '20240807']:
             alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i])
-        else:
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1600) # extend h2o_6 to 1600 nm for this date
+            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
+            # start_wvl = alb_wvl[wvl1450_ind:wvl1520_ind][np.argmin(fdn_up_ratio_all_corr_fit[i, wvl1450_ind:wvl1520_ind])]
+            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
+        elif date_s == '20240603':
+            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1650) # extend h2o_6 to 1600 nm for this date
+            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky, h2o_6_end=1650)
+            # start_wvl = 1640
+            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
+        elif date_s == '20240807':
+            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1550) # extend h2o_4 to 1600 nm for this date
+            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky, h2o_6_end=1570)  
+            # start_wvl = 1560
+            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
+        start_wvl = alb_wvl[wvl1450_ind:wvl1520_ind][np.argmin(fdn_up_ratio_all_corr_fit[i, wvl1450_ind:wvl1520_ind])]
+        start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
+        end_wvl = alb_wvl[wvl1800_ind:][np.argmax(fdn_up_ratio_all_corr_fit[i, wvl1800_ind:])]
+        end_ind = np.argmin(np.abs(alb_wvl - end_wvl))-1
         alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
         
-        fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
+        
+        fdn_up_ratio_all_corr_fit_before = fdn_up_ratio_all_corr_fit[i, :].copy()
+        
+        # fit_1D = np.poly1d(np.polyfit(alb_wvl[start_ind:end_ind+1], fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1], 1))
+        fit_1D = interp1d([start_wvl, end_wvl], 
+                          [fdn_up_ratio_all_corr_fit[i, start_ind], fdn_up_ratio_all_corr_fit[i, end_ind]], 
+                          kind='linear', fill_value='extrapolate')
+        interp_wvl = alb_wvl[wvl1650_ind:wvl1710_ind+1:]
+        interp_alb = fit_1D(interp_wvl)
+        interp_alb = np.clip(interp_alb, 0, 1)
+        compare_alb = fdn_up_ratio_all_corr_fit[i, wvl1650_ind:wvl1710_ind+1:].copy()
+        diff_alb = np.abs((compare_alb - interp_alb)/interp_alb)
+        if np.any(diff_alb > 0.05):
+            fdn_up_ratio_all_corr_fit[i, wvl1650_ind:wvl1710_ind+1:] = interp_alb.copy()
+            # print(f"Applied linear fit between 1650-1710 nm for index {i} due to large deviation.")
+
+            
+        min_val =  fdn_up_ratio_all_corr_fit[i, start_ind].copy()
+        fdn_up_ratio_all_corr_fit_lt_min = fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] < min_val
+        fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1][fdn_up_ratio_all_corr_fit_lt_min] = min_val
+        
+        compare_alb_2 = fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1].copy()
+        diff_alb_2 = np.abs((compare_alb_2 - fit_1D(alb_wvl[start_ind:end_ind+1]))/fit_1D(alb_wvl[start_ind:end_ind+1]))
+        if np.nanstd(diff_alb_2) > 0.1:
+            fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] = (fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] + fit_1D(alb_wvl[start_ind:end_ind+1])*7 ) / 8.0 
+            # print(f"Applied extra 1st order polynomial fit smooth weight between {start_wvl:.1f}-{end_wvl:.1f} nm for index {i} due to high std deviation.")
+        elif np.nanstd(diff_alb_2) > 0.05 and np.nanstd(diff_alb_2) <= 0.1:
+            fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] = (fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] + fit_1D(alb_wvl[start_ind:end_ind+1])*3 ) / 4.0 
+            # print(f"Applied extra 1st order polynomial fit smooth weight between {start_wvl:.1f}-{end_wvl:.1f} nm for index {i} due to medium std deviation.")
+        elif np.nanstd(diff_alb_2) > 0.02 and np.nanstd(diff_alb_2) <= 0.05:
+            fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] = (fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] + fit_1D(alb_wvl[start_ind:end_ind+1])*1 ) / 2.0 
+            # print(f"Applied extra 1st order polynomial fit smooth weight between {start_wvl:.1f}-{end_wvl:.1f} nm for index {i} due to low std deviation.")
+        # else:
+        #     fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] = (fdn_up_ratio_all_corr_fit[i, start_ind:end_ind+1] + fit_1D(alb_wvl[start_ind:end_ind+1]) ) / 2 .0 
+            
+        # smooth with window size of 11
+        window_size = 5
+        alb_corr_fit_smooth = fdn_up_ratio_all_corr_fit[i, start_ind:].copy()
+        alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=window_size, mode='reflect')
+        alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
+        
+        fdn_up_ratio_all_corr_fit[i, start_ind:] = alb_corr_fit_smooth
+            
+        if i % 50 == 0:
+            fig_dir = f'fig/{date_s}'
+            os.makedirs(fig_dir, exist_ok=True)
+            fig, ax = plt.subplots(figsize=(9, 5))
+            
+            ax.plot(alb_wvl, fdn_up_ratio_all_corr[i, :], '-', color='b', label='Corrected albedo (atm corr)')
+            ax.plot(alb_wvl, fdn_up_ratio_all_corr_fit_before, '-', color='g', label='Corrected albedo (atm corr + fit) before')
+            # ax.plot(alb_wvl[start_ind:end_ind+1], fit_1D(alb_wvl[start_ind:end_ind+1]), '--', color='orange', label='1st order polynomial fit', linewidth=2.5)
+            ax.plot(alb_wvl, fdn_up_ratio_all_corr_fit[i, :], '-', color='r', label='Corrected albedo (atm corr + fit) after')
+            ax.plot(alb_wvl, fdn_up_ratio_all[i, :], '-', color='k', label='Original ratio')
+            ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+            ax.hlines(min_val, alb_wvl[start_ind], alb_wvl[end_ind], colors='gray', linestyles='dashed', label='Minimum albedo level')
+            for band in gas_bands:
+                ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+            ax.set_xlabel('Wavelength (nm)', fontsize=14)
+            ax.set_ylabel('Surface Albedo', fontsize=14)
+            ax.tick_params(labelsize=12)
+            ax.set_ylim(-0.05, 1.05)
+            ax.set_title(f'Surface Albedo (atm corr + fit) for {date_s} {case_tag} time {time_start:.3f}-{time_end:.3f}, alt {alt_avg:.2f} km ({i})', 
+                        fontsize=13)
+            ax.set_xlim(350, 2000)
+            fig.tight_layout()
+            fig.savefig(f'{fig_dir}/arcsix_albedo_{date_s}_{case_tag}_{time_start:.3f}-{time_end:.3f}_{alt_avg:.2f}km_{i}.png',
+                        bbox_inches='tight', dpi=150)
+            plt.close(fig)
 
     
     select = np.full(len(tmhr_ranges_select), True)
@@ -629,6 +725,25 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     
     fig_dir = f'fig/sfc_alb_corr_lonlat'
     os.makedirs(fig_dir, exist_ok=True)
+    
+    alb_avg = np.nanmean(fdn_up_ratio_all_corr_fit, axis=0)
+    alb_std = np.nanstd(fdn_up_ratio_all_corr_fit, axis=0)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(alb_wvl, alb_avg, '-', color='blue', label='Mean albedo (atm corr + fit)')
+    ax.fill_between(alb_wvl, alb_avg-alb_std, alb_avg+alb_std, color='blue', alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title(f'Surface Albedo (atm corr + fit) for {date_s} {case_tag}', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_albedo_{date_s}_{case_tag}.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    
     # set projection to polar (North Polar Stereographic) and plot lon/lat in that projection
     try:
         plt.close('all')
@@ -722,6 +837,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         'lat_min': lat_min_all,
         'lat_max': lat_max_all,
         'alt_avg': alt_avg_all,
+        'time_all': time_all,
         'lon_all': lon_all,
         'lat_all': lat_all,
         'alt_all': alt_all,
@@ -1185,27 +1301,27 @@ if __name__ == '__main__':
 
 
 
-    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-    #                 tmhr_ranges_select=[
-    #                                     [12.990, 13.180], # 180m, clear
-    #                                     ],
-    #                 case_tag='clear_atm_corr_1',
-    #                 config=config,
-    #                 simulation_interval=0.5,
-    #                 clear_sky=True,
-    #                 )
+    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+                    tmhr_ranges_select=[
+                                        [12.990, 13.180], # 180m, clear
+                                        ],
+                    case_tag='clear_atm_corr_1',
+                    config=config,
+                    simulation_interval=0.5,
+                    clear_sky=True,
+                    )
 
 
 
-    # atm_corr_processing(date=datetime.datetime(2024, 8, 8),
-    #                 tmhr_ranges_select=[
-    #                                     [14.250, 14.373], # 180m, clear
-    #                                     ],
-    #                 case_tag='clear_atm_corr_2',
-    #                 config=config,
-    #                 simulation_interval=0.5,
-    #                 clear_sky=True,
-    #                 )
+    atm_corr_processing(date=datetime.datetime(2024, 8, 8),
+                    tmhr_ranges_select=[
+                                        [14.250, 14.373], # 180m, clear
+                                        ],
+                    case_tag='clear_atm_corr_2',
+                    config=config,
+                    simulation_interval=0.5,
+                    clear_sky=True,
+                    )
 
 
 

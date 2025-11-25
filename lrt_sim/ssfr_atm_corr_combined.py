@@ -581,6 +581,7 @@ def combined_atm_corr():
     ax.set_xlim(350, 2000)
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_albedo_all_flights.png', bbox_inches='tight', dpi=150)
+    plt.show()
     plt.close(fig)
     
     fig, ax = plt.subplots(figsize=(9, 5))
@@ -602,7 +603,7 @@ def combined_atm_corr():
     plt.close(fig)
 
     
-    sys.exit()
+    # sys.exit()
     
     
     for date in sorted((set(dates_spring_all))):

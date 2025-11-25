@@ -794,7 +794,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             #/----------------------------------------------------------------------------\#
             os.makedirs(f'{_fdir_general_}/sfc_alb', exist_ok=True)
             iter_0_fname = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_0.dat'
-            if not os.path.exists(iter_0_fname):
+            if iter == 0:
                 
                 alb_wvl = np.concatenate(([348.0], cld_leg['ssfr_zen_wvl'], [2050.]))
                 alb_avg = np.nanmean(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'], axis=0)
@@ -2961,24 +2961,24 @@ if __name__ == '__main__':
     # #                     )
     
 
-    # for iter in range(1):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
-    #                     tmhr_ranges_select=[
-    #                                         [12.990, 13.180], # 180m, clear
-    #                                         ],
-    #                     case_tag='clear_atm_corr_1',
-    #                     config=config,
-    #                     simulation_interval=0.5,
-    #                     clear_sky=True,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=False,
-    #                     manual_cloud_cer=0.0,
-    #                     manual_cloud_cwp=0.0,
-    #                     manual_cloud_cth=0.0,
-    #                     manual_cloud_cbh=0.0,
-    #                     manual_cloud_cot=0.0,
-    #                     iter=iter,
-    #                     )
+    for iter in range(1):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
+                        tmhr_ranges_select=[
+                                            [12.990, 13.180], # 180m, clear
+                                            ],
+                        case_tag='clear_atm_corr_1',
+                        config=config,
+                        simulation_interval=0.5,
+                        clear_sky=True,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
+                        iter=iter,
+                        )
     
 
     # for iter in range(1):
