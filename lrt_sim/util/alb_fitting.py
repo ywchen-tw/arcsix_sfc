@@ -11,10 +11,12 @@ import matplotlib.pyplot as plt
 # mpl.use('Agg')
 
 
-def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
+def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
     o2a_1_start, o2a_1_end = 748, 780
-    h2o_1_start, h2o_1_end = 672, 706
-    h2o_2_start, h2o_2_end = 705, 746
+    # h2o_1_start, h2o_1_end = 672, 706
+    # h2o_2_start, h2o_2_end = 705, 746
+    h2o_1_start, h2o_1_end = 650 , 706
+    h2o_2_start, h2o_2_end = 705, 760
     h2o_3_start, h2o_3_end = 884, 996
     h2o_4_start, h2o_4_end = 1084, 1175
     h2o_5_start, h2o_5_end = 1230, 1286
@@ -25,7 +27,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
     
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
-    if alt > 0.5:
+    if 1:#alt > 0.5:
         alb_mask[
                 ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
@@ -102,8 +104,9 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
                 ((wvl>=final_start) & (wvl<=final_end))
                 ] = np.nan
     
+    before_interp = alb_mask.copy()
     # interpolation if nan in effective_mask_ range
-    if np.sum(~np.isnan(effective_mask_)) != np.isfinite(alb_mask).sum():
+    if interp_nan and np.sum(~np.isnan(effective_mask_)) != np.isfinite(alb_mask).sum():
         eff_wvl_real_mask = np.logical_and(~np.isnan(effective_mask_), np.isfinite(alb_mask))
         fit_wvl_mask = np.logical_and(~np.isnan(effective_mask_), np.isnan(alb_mask))
         # effective_mask_func = interp1d(wvl[eff_wvl_real_mask], effective_mask_[eff_wvl_real_mask], bounds_error=False, fill_value=np.nan)
@@ -123,7 +126,14 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509):
         
         alb_mask[fit_wvl_mask] = np.array(s_ffill)[s_mask]
         
-        
+    # plt.close('all')
+    # plt.plot(wvl, before_interp, '-o', label='Before fill')
+    # plt.plot(wvl, alb_mask, '-x', label='After fill')
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Albedo')
+    # plt.legend()
+    # plt.show()
+     
     
     return alb_mask
    
@@ -223,7 +233,8 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     
     
     
-    alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 795
+    # alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 795
+    alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 800
     alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
     alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
     alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
@@ -240,7 +251,60 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     band_6_fit = (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e)
     
     alb_corr_fit = copy.deepcopy(alb_corr_mask)
-    for bands_fit in [band_1_fit, band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
+    
+    for bands_fit in [
+                      band_1_fit, 
+                      ]:
+        
+        # if np.isnan(alb_corr_mask[bands_fit]).any():
+            # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
+            #     model_library=snicar_data,
+            #     obs_wvl=alb_wvl[bands_fit],
+            #     obs_albedo=alb_corr_mask[bands_fit]
+            #     )
+        bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
+        if bandfit_nan.sum() == 0:
+            continue
+        bandfit_nan_ind = np.where(bandfit_nan)[0]
+        if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
+            bandfit_nan_ind = bandfit_nan_ind[:-1]
+        left_mean_ind_num = 5 
+        if bandfit_nan_ind[0] < left_mean_ind_num:
+            left_mean_ind_num = bandfit_nan_ind[0]
+        xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
+        right_mean_ind_num = 5
+        if (len(bandfit_nan) - bandfit_nan_ind[-1] -1) < right_mean_ind_num:
+            right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] -1
+            
+        # print("bandfit_nan_ind[-1]:", bandfit_nan_ind[-1])
+        # print("len(bandfit_nan):", len(bandfit_nan))
+        # print("xr_origin start end:", bandfit_nan_ind[-1]+1, bandfit_nan_ind[-1]+right_mean_ind_num)
+        xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
+
+        wvl550nm_ind = np.argmin(np.abs(alb_wvl[bands_fit][~bandfit_nan]-550))
+        fit_2nd = np.poly1d(np.polyfit(alb_wvl[bands_fit][~bandfit_nan][wvl550nm_ind:],
+                                        alb_corr_mask[bands_fit][~bandfit_nan][wvl550nm_ind:], 2))
+        replace_array = fit_2nd(alb_wvl[bands_fit][bandfit_nan])
+        alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
+        alb_corr_fit_replace[bandfit_nan] = copy.deepcopy(replace_array)
+        alb_corr_fit[bands_fit] = copy.deepcopy(alb_corr_fit_replace)
+        
+        # plt.close('all')
+        # fig, ax = plt.subplots(figsize=(9, 5))
+        # ax.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
+        # ax.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
+        # ax.plot(alb_wvl[bands_fit][bandfit_nan], replace_array, 'x', color='m', label='Fitted Points')
+        # ax.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
+        # ax.set_xlabel('Wavelength (nm)')
+        # ax.set_ylabel('Albedo')
+        # ax.legend()
+        # plt.show()
+        
+    
+    
+    for bands_fit in [
+                    #   band_1_fit, 
+                      band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
         
         # if np.isnan(alb_corr_mask[bands_fit]).any():
             # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
@@ -338,8 +402,8 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     
     # plt.close('all')
-    # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
-    # plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo')
+    # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo', linewidth=3)
+    # plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo', linewidth=1.5)
     # plt.xlabel('Wavelength (nm)')
     # plt.ylabel('Albedo')
     # plt.legend()

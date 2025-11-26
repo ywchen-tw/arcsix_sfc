@@ -477,22 +477,22 @@ def combined_atm_corr():
     print("leg_contidions_all_summer length:", len(leg_contidions_all_summer))
     print("dates_summer length:", len(dates_summer))
 
-    fdn_all_spring_nan = np.isnan(fdn_all_spring)
-    alb_iter1_all_spring[fdn_all_spring_nan] = np.nan
-    alb_iter2_all_spring[fdn_all_spring_nan] = np.nan
-    fup_gt_fdn_all_spring = np.nansum(fup_all_spring > fdn_all_spring, axis=1)
-    fup_gt_fdn_all_mask_spring = fup_gt_fdn_all_spring/fdn_all_spring.shape[1] > 0.1
-    alb_iter1_all_spring[fup_gt_fdn_all_mask_spring] = np.nan
-    alb_iter2_all_spring[fup_gt_fdn_all_mask_spring] = np.nan
+    # fdn_all_spring_nan = np.isnan(fdn_all_spring)
+    # alb_iter1_all_spring[fdn_all_spring_nan] = np.nan
+    # alb_iter2_all_spring[fdn_all_spring_nan] = np.nan
+    # fup_gt_fdn_all_spring = np.nansum(fup_all_spring > fdn_all_spring, axis=1)
+    # fup_gt_fdn_all_mask_spring = fup_gt_fdn_all_spring/fdn_all_spring.shape[1] > 0.1
+    # alb_iter1_all_spring[fup_gt_fdn_all_mask_spring] = np.nan
+    # alb_iter2_all_spring[fup_gt_fdn_all_mask_spring] = np.nan
     
     
-    fdn_all_summer_nan = np.isnan(fdn_all_summer)
-    alb_iter1_all_summer[fdn_all_summer_nan] = np.nan
-    alb_iter2_all_summer[fdn_all_summer_nan] = np.nan
-    fup_gt_fdn_all_summer = np.nansum(fup_all_summer > fdn_all_summer, axis=1)
-    fup_gt_fdn_all_mask_summer = fup_gt_fdn_all_summer/fdn_all_summer.shape[1] > 0.1
-    alb_iter1_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
-    alb_iter2_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
+    # fdn_all_summer_nan = np.isnan(fdn_all_summer)
+    # alb_iter1_all_summer[fdn_all_summer_nan] = np.nan
+    # alb_iter2_all_summer[fdn_all_summer_nan] = np.nan
+    # fup_gt_fdn_all_summer = np.nansum(fup_all_summer > fdn_all_summer, axis=1)
+    # fup_gt_fdn_all_mask_summer = fup_gt_fdn_all_summer/fdn_all_summer.shape[1] > 0.1
+    # alb_iter1_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
+    # alb_iter2_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
     
     
     lon_avg_all = np.concatenate((lon_avg_spring, lon_avg_summer))
