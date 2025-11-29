@@ -365,6 +365,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             lon_all = []
             lat_all = []
             alt_all = []
+            kt19_sfc_T_all = []
             icing_all = []
             icing_pre_all = []
             fdn_up_ratio_all = []
@@ -431,6 +432,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         alt_all.extend(cld_leg['alt'])
         fdn_all.extend(cld_leg['ssfr_zen'])
         fup_all.extend(cld_leg['ssfr_nad'])
+        kt19_sfc_T_all.extend(cld_leg['kt19_sfc_T'])
         toa_expand_all.extend(cld_leg['ssfr_toa'])
         correction_factor_all.extend(corr_factor * np.ones_like(cld_leg['ssfr_zen']))
         fdn_up_ratio_all.extend(cld_leg['ssfr_nad']/cld_leg['ssfr_zen'])#*corr_factor)
@@ -543,6 +545,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     correction_factor_all = np.array(correction_factor_all)
     icing_all = np.array(icing_all)
     icing_pre_all = np.array(icing_pre_all)
+    kt19_sfc_T_all = np.array(kt19_sfc_T_all)
 
     # print("lon avg all mean:", lon_avg_all.mean())
     # print("lat avg all mean:", lat_avg_all.mean())
@@ -900,6 +903,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         'lon_all': lon_all,
         'lat_all': lat_all,
         'alt_all': alt_all,
+        'kt19_sfc_T_all': kt19_sfc_T_all,
         'fdn_all': fdn_all,
         'fup_all': fup_all,
         'toa_expand_all': toa_expand_all,
@@ -920,7 +924,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         modis_bands_nm = None
         modis_alb_legs = None
         
-    output_dir = f'{_fdir_general_}/sfc_alb_combined'
+    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
     os.makedirs(output_dir, exist_ok=True)
     with open(f'{_fdir_general_}/{output_dir}/sfc_alb_update_{date_s}_{case_tag}_time_{tmhr_ranges_select[0][0]:.3f}_{tmhr_ranges_select[-1][-1]:.3f}.pkl', 'wb') as f:
         pickle.dump(alb_update_dict, f)
@@ -993,6 +997,8 @@ if __name__ == '__main__':
                     simulation_interval=0.5,
                     clear_sky=False,
                     )
+    
+
 
 
     # done

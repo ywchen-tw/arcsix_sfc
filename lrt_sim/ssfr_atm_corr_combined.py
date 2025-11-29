@@ -246,7 +246,7 @@ def combined_atm_corr():
 
     output_dir = f'{_fdir_general_}/sfc_alb_combined'
     # glob all sfc alb files
-    sfc_alb_files = sorted(glob.glob(f'{output_dir}/sfc_alb_*.pkl'))
+    sfc_alb_files = sorted(glob.glob(f'{output_dir}/sfc_alb_update_*.pkl'))
     print(f"Found {len(sfc_alb_files)} surface albedo files for combination.")
     
     # read each file and combine data into a larger dictionary
@@ -256,10 +256,16 @@ def combined_atm_corr():
     leg_contidions_all_spring = []
     leg_contidions_summer = []
     leg_contidions_all_summer = []
+    time_spring_all = []
+    time_summer_all = []
     dates_spring = []
     dates_summer = []
     dates_spring_all = []
     dates_summer_all = []
+    case_tags_spring = []
+    case_tags_summer = []
+    case_tags_spring_all = []
+    case_tags_summer_all = []
     for sfc_alb_file in sfc_alb_files:
         print(f"Processing surface albedo file: {sfc_alb_file}")
         with open(sfc_alb_file, 'rb') as f:
@@ -271,7 +277,9 @@ def combined_atm_corr():
         date_s = parts[0]
         case_tag = '_'.join(parts[1:]) if len(parts) > 1 else 'default'
         condition = 'cloudy'
-        if 'clear' in case_tag.lower():
+        if 'spiral' in case_tag.lower():
+            condition = 'spiral'
+        elif 'clear' in case_tag.lower():
             condition = 'clear'
             
         # extract data
@@ -392,6 +400,9 @@ def combined_atm_corr():
             leg_contidions_all_spring.extend([condition]*len(sfc_alb_data['lon_all']))
             dates_spring.extend([int(date_s)]*len(sfc_alb_data['lon_avg']))
             dates_spring_all.extend([int(date_s)]*len(sfc_alb_data['lon_all']))
+            time_spring_all.extend(sfc_alb_data['time_all'])
+            case_tags_spring.extend([case_tag]*len(sfc_alb_data['lon_avg']))
+            case_tags_spring_all.extend([case_tag]*len(sfc_alb_data['lon_all']))
             
         else:
             if init_summer:
@@ -462,6 +473,9 @@ def combined_atm_corr():
             leg_contidions_all_summer.extend([condition]*len(sfc_alb_data['lon_all']))
             dates_summer.extend([int(date_s)]*len(sfc_alb_data['lon_avg']))
             dates_summer_all.extend([int(date_s)]*len(sfc_alb_data['lon_all']))
+            time_summer_all.extend(sfc_alb_data['time_all'])
+            case_tags_summer.extend([case_tag]*len(sfc_alb_data['lon_avg']))
+            case_tags_summer_all.extend([case_tag]*len(sfc_alb_data['lon_all']))
             
         
     print(f"Combined total of {len(lon_avg_spring)} spring flight legs and {len(lon_all_spring)} total points.")
@@ -503,14 +517,82 @@ def combined_atm_corr():
     alt_all = np.concatenate((alt_all_spring, alt_all_summer))
     broadband_alb_iter2_all = np.concatenate((broadband_alb_iter2_all_spring, broadband_alb_iter2_all_summer))
     
+    leg_contidions_all_summer = np.array(leg_contidions_all_summer)
+    leg_contidions_all_spring = np.array(leg_contidions_all_spring)
+    leg_contidions_all = np.concatenate((leg_contidions_all_spring, leg_contidions_all_summer))
     
+    time_spring_all = np.array(time_spring_all)
+    time_summer_all = np.array(time_summer_all)
+    time_all = np.concatenate((time_spring_all, time_summer_all))
+    
+    dates_spring_all = np.array(dates_spring_all)
+    dates_summer_all = np.array(dates_summer_all)
+    dates_all = np.concatenate((dates_spring_all, dates_summer_all))
+
+    
+    output_all_dict = {
+        'wvl_spring': wvl_spring,
+        'wvl_summer': wvl_summer,
+        'time_spring_all': time_spring_all,
+        'lon_all_spring': lon_all_spring,
+        'lat_all_spring': lat_all_spring,
+        'alt_all_spring': alt_all_spring,
+        'dates_spring_all': dates_spring_all,
+        'leg_contidions_all_spring': leg_contidions_all_spring,
+        'case_tags_spring': case_tags_spring,
+        'case_tags_spring_all': case_tags_spring_all,
+        'fdn_all_spring': fdn_all_spring,
+        'fup_all_spring': fup_all_spring,
+        'toa_expand_all_spring': toa_expand_all_spring,
+        'icing_all_spring': icing_all_spring,
+        'icing_pre_all_spring': icing_pre_all_spring,
+        'alb_iter1_all_spring': alb_iter1_all_spring,
+        'alb_iter2_all_spring': alb_iter2_all_spring,
+        'broadband_alb_iter1_all_spring': broadband_alb_iter1_all_spring,
+        'broadband_alb_iter2_all_spring': broadband_alb_iter2_all_spring,
+        'broadband_alb_iter1_all_filter_spring': broadband_alb_iter1_all_filter_spring,
+        'broadband_alb_iter2_all_filter_spring': broadband_alb_iter2_all_filter_spring,
+        'time_summer_all': time_summer_all,
+        'lon_all_summer': lon_all_summer,
+        'lat_all_summer': lat_all_summer,
+        'alt_all_summer': alt_all_summer,
+        'dates_summer_all': dates_summer_all,
+        'leg_contidions_all_summer': leg_contidions_all_summer,
+        'case_tags_summer': case_tags_summer,
+        'case_tags_summer_all': case_tags_summer_all,
+        'fdn_all_summer': fdn_all_summer,
+        'fup_all_summer': fup_all_summer,
+        'toa_expand_all_summer': toa_expand_all_summer,
+        'icing_all_summer': icing_all_summer,
+        'icing_pre_all_summer': icing_pre_all_summer,
+        'alb_iter1_all_summer': alb_iter1_all_summer,
+        'alb_iter2_all_summer': alb_iter2_all_summer,
+        'broadband_alb_iter1_all_summer': broadband_alb_iter1_all_summer,
+        'broadband_alb_iter2_all_summer': broadband_alb_iter2_all_summer,
+        'broadband_alb_iter1_all_filter_summer': broadband_alb_iter1_all_filter_summer,
+        'broadband_alb_iter2_all_filter_summer': broadband_alb_iter2_all_filter_summer,
+    }
+    
+    combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
+    with open(combined_output_file, 'wb') as f:
+        pickle.dump(output_all_dict, f)
+    print(f"Combined surface albedo data saved to {combined_output_file}")
+
     
     fig_dir = f'fig/sfc_alb_corr_lonlat'
     os.makedirs(fig_dir, exist_ok=True)
     date_all = []
     date_alb = []
     date_alb_std = []
+    date_clear_all = []
+    date_alb_clear = []
+    date_alb_clear_std = []
+    date_cloudy_all = []
+    date_alb_cloudy = []
+    date_alb_cloudy_std = []
     date_alb_wvl = []
+    date_alb_clear_wvl = []
+    date_alb_cloudy_wvl = []
     for date in sorted((set(dates_spring_all))):
         date_mask = np.array([d == date for d in dates_spring_all])
         alt_mask = alt_all_spring <= 1.6  # only include low altitude legs
@@ -526,6 +608,23 @@ def combined_atm_corr():
         date_alb_std.append(date_alb_std_)
         date_alb_wvl.append(wvl_spring)
         
+        clear_mask = date_mask & (leg_contidions_all_spring == 'clear')
+        if np.any(clear_mask):
+            date_clear_all.append(str(date)[4:])
+            date_alb_avg_clear = np.nanmean(alb_iter2_all_spring[clear_mask], axis=0)
+            date_alb_clear.append(date_alb_avg_clear)
+            date_alb_clear_std_ = np.nanstd(alb_iter2_all_spring[clear_mask], axis=0)
+            date_alb_clear_std.append(date_alb_clear_std_)
+            date_alb_clear_wvl.append(wvl_spring)
+        cloudy_mask = date_mask & (leg_contidions_all_spring == 'cloudy')
+        if np.any(cloudy_mask):
+            date_cloudy_all.append(str(date)[4:])
+            date_alb_avg_cloudy = np.nanmean(alb_iter2_all_spring[cloudy_mask], axis=0)
+            date_alb_cloudy.append(date_alb_avg_cloudy)
+            date_alb_cloudy_std_ = np.nanstd(alb_iter2_all_spring[cloudy_mask], axis=0)
+            date_alb_cloudy_std.append(date_alb_cloudy_std_)
+            date_alb_cloudy_wvl.append(wvl_spring)
+        
     for date in sorted(set(dates_summer_all)):
         date_mask = np.array([d == date for d in dates_summer_all])
         alt_mask = alt_all_summer <= 1.6  # only include low altitude legs
@@ -540,6 +639,23 @@ def combined_atm_corr():
         date_alb.append(date_alb_avg)
         date_alb_std.append(date_alb_std_)
         date_alb_wvl.append(wvl_summer)
+        
+        clear_mask = date_mask & (leg_contidions_all_summer == 'clear')
+        if np.any(clear_mask):
+            date_clear_all.append(str(date)[4:])
+            date_alb_avg_clear = np.nanmean(alb_iter2_all_summer[clear_mask], axis=0)
+            date_alb_clear.append(date_alb_avg_clear)
+            date_alb_clear_std_ = np.nanstd(alb_iter2_all_summer[clear_mask], axis=0)
+            date_alb_clear_std.append(date_alb_clear_std_)
+            date_alb_clear_wvl.append(wvl_summer)
+        cloudy_mask = date_mask & (leg_contidions_all_summer == 'cloudy')
+        if np.any(cloudy_mask):
+            date_cloudy_all.append(str(date)[4:])
+            date_alb_avg_cloudy = np.nanmean(alb_iter2_all_summer[cloudy_mask], axis=0)
+            date_alb_cloudy.append(date_alb_avg_cloudy)
+            date_alb_cloudy_std_ = np.nanstd(alb_iter2_all_summer[cloudy_mask], axis=0)
+            date_alb_cloudy_std.append(date_alb_cloudy_std_)
+            date_alb_cloudy_wvl.append(wvl_summer)
     
     print("date_all length:", len(date_all))
     print("date_alb length:", len(date_alb))
@@ -549,8 +665,12 @@ def combined_atm_corr():
     # colormap normalized to number of dates
     # colormap normalized to number of dates
     n_dates = len(date_all)
+    n_dates_clear = len(date_clear_all)
+    n_dates_cloudy = len(date_cloudy_all)
     if n_dates == 0:
         color_series = []
+        color_series_clear = []
+        color_series_cloudy = []
     else:
         cmap_name = 'jet'
         cmap = plt.cm.get_cmap(cmap_name)
@@ -558,6 +678,8 @@ def combined_atm_corr():
             color_series = [cmap(0.5)]
         else:
             color_series = [cmap(i / (n_dates - 1)) for i in range(n_dates)]
+            color_series_clear = [cmap(i / (n_dates_clear - 1)) for i in range(len(date_clear_all))]
+            color_series_cloudy = [cmap(i / (n_dates_cloudy - 1)) for i in range(len(date_cloudy_all))]
 
     # optional ScalarMappable if you want to add a colorbar later
     norm = mpl.colors.Normalize(vmin=0, vmax=max(1, n_dates - 1))
@@ -581,7 +703,7 @@ def combined_atm_corr():
     ax.set_xlim(350, 2000)
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_albedo_all_flights.png', bbox_inches='tight', dpi=150)
-    plt.show()
+    # plt.show()
     plt.close(fig)
     
     fig, ax = plt.subplots(figsize=(9, 5))
@@ -601,9 +723,45 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_partial.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_clear_all)):
+        if date_clear_all[i] not in ['0808', '0809']:
+            ax.plot(date_alb_clear_wvl[i], date_alb_clear[i], label=f'{date_clear_all[i]}', color=color_series_clear[i])
+            ax.fill_between(date_alb_clear_wvl[i], date_alb_clear[i]-date_alb_clear_std[i], date_alb_clear[i]+date_alb_clear_std[i], color=color_series_clear[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Clear Sky Surface Albedo (atm corr + fit)\nexclude 0808, 0809', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_clear_partial.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_cloudy_all)):
+        if date_cloudy_all[i] not in ['0808', '0809']:
+            ax.plot(date_alb_cloudy_wvl[i], date_alb_cloudy[i], label=f'{date_cloudy_all[i]}', color=color_series_cloudy[i])
+            ax.fill_between(date_alb_cloudy_wvl[i], date_alb_cloudy[i]-date_alb_cloudy_std[i], date_alb_cloudy[i]+date_alb_cloudy_std[i], color=color_series_cloudy[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Below Cloud Surface Albedo (atm corr + fit)\nexclude 0808, 0809', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_cloudy_partial.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
 
     
-    # sys.exit()
+    sys.exit()
     
     
     for date in sorted((set(dates_spring_all))):

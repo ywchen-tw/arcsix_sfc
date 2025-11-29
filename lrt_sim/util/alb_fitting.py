@@ -148,6 +148,7 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
     
     best_fit_params = None
     best_fit_spectrum = None
+    ori_model_spectrum = None
     min_rmse = np.inf
     
     obs_wvl_nanmask = np.isfinite(obs_albedo)
@@ -169,6 +170,7 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
         
         interpolated_model_albedo = np.interp(obs_wvl, model_wvl, model_albedo)
         
+        
         # The gaps (0.9-1.1, 1.3-1.5) are automatically
         # and correctly ignored in the next step.
         
@@ -181,10 +183,12 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
             best_fit_params = key
             # best_fit_spectrum = model_run # Store the whole run
             best_fit_spectrum = interpolated_model_albedo # Store the interpolation
+            ori_model_spectrum = model_albedo.copy()
         
     # plt.close('all')
     # plt.plot(obs_wvl, best_fit_spectrum, '-', color='r', label='Best Fit Model')
     # plt.plot(obs_wvl, obs_albedo, '-', color='k', label='Observed')
+    # plt.plot(model_wvl, ori_model_spectrum, '--', color='gray', label='Original Best Fit Model Spectrum')
     # plt.xlabel('Wavelength (nm)')
     # plt.ylabel('Albedo')
     # plt.legend()
@@ -192,7 +196,7 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
     # plt.show()
     
         
-    return best_fit_params, best_fit_spectrum, min_rmse
+    return best_fit_params, best_fit_spectrum, min_rmse, model_wvl, ori_model_spectrum
 
 def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
     # snicar_albedo_list = []
@@ -209,7 +213,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
           
     alb_corr_mask = alb_corr.copy()
     alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask, alt=alt, h2o_6_end=h2o_6_end)
-    best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
+    best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
         model_library=snicar_data,
         obs_wvl=alb_wvl,
         obs_albedo=alb_corr_mask
@@ -220,11 +224,13 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_corr_best_fit[mask_bands] = best_fit_spectrum[mask_bands]
     
     # plt.close('all')
+    # plt.figure(figsize=(8, 5))
     # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo')
     # plt.plot(alb_wvl, alb_corr_mask, '-', color='g', label='Masked Corrected Albedo')
     # plt.plot(alb_wvl, best_fit_spectrum, '-', color='r', label='Best Fitted Albedo')
     # plt.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-
+    # plt.xlim(350, 2000)
+    # plt.ylim(-0.05, 1.05)
     # plt.xlabel('Wavelength (nm)')
     # plt.ylabel('Albedo')
     # plt.legend()
@@ -257,7 +263,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
                       ]:
         
         # if np.isnan(alb_corr_mask[bands_fit]).any():
-            # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
+            # best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
             #     model_library=snicar_data,
             #     obs_wvl=alb_wvl[bands_fit],
             #     obs_albedo=alb_corr_mask[bands_fit]
@@ -307,7 +313,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
                       band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
         
         # if np.isnan(alb_corr_mask[bands_fit]).any():
-            # best_fit_key, best_fit_spectrum, min_rmse = find_best_fit(
+            # best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
             #     model_library=snicar_data,
             #     obs_wvl=alb_wvl[bands_fit],
             #     obs_albedo=alb_corr_mask[bands_fit]
@@ -402,13 +408,33 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     
     # plt.close('all')
+    # plt.figure(figsize=(8, 5))
     # plt.plot(alb_wvl, alb_corr, '-', color='k', label='Corrected Albedo', linewidth=3)
     # plt.plot(alb_wvl, alb_corr_fit, '-', color='r', label='Fitted Albedo', linewidth=1.5)
     # plt.xlabel('Wavelength (nm)')
     # plt.ylabel('Albedo')
+    # plt.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
     # plt.legend()
+    # plt.xlim(350, 2000)
+    # plt.ylim(-0.05, 1.05)
     # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
     # plt.show()
+    # sys.exit()
+    
+    # fit and smoothing the shortwave part
+    short_wvl_end = 550
+    short_wvl_sel = alb_wvl <= short_wvl_end
+    short_wvl = alb_wvl[short_wvl_sel]
+    short_wvl_alb = alb_corr_fit[short_wvl_sel]
+    
+    fit_2nd = np.poly1d(np.polyfit(short_wvl, short_wvl_alb, 2))
+    replace_wvl_end = 450
+    replace_wvl = alb_wvl[alb_wvl < replace_wvl_end]
+    replace_array = fit_2nd(replace_wvl)
+    alb_corr_fit[alb_wvl < replace_wvl_end] = replace_array.copy()
+    
+    alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
+    
     
     # smooth with window size of 5
     alb_corr_fit_smooth = alb_corr_fit.copy()
@@ -424,6 +450,96 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     # print("alb_corr_fit_smooth shape:", alb_corr_fit_smooth.shape)
     
     return alb_corr_fit_smooth
+
+def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
+    # Extend albedo spectrum to 2.5 um with constant albedo at the last wavelength
+    ext_wvl_start = 295
+    ext_wvl_end = 4005
+    ext_wvl = np.arange(ext_wvl_start, ext_wvl_end+1, 1)
+    ext_alb = np.ones_like(ext_wvl) * alb_corr_fitted[-1]
+    
+    alb_wvl_ext = np.concatenate((ext_wvl[ext_wvl < alb_wvl[0]], alb_wvl, ext_wvl[ext_wvl > alb_wvl[-1]]))
+    alb_corr_fitted_ext = np.concatenate((ext_alb[ext_wvl < alb_wvl[0]], alb_corr_fitted, ext_alb[ext_wvl > alb_wvl[-1]]))
+    
+    # snicar_albedo_list = []
+    if clear_sky:
+        snicar_filename = 'snicar_model_results_direct.pkl'
+    else:
+        snicar_filename = 'snicar_model_results_diffuse.pkl'
+    with open(snicar_filename, 'rb') as f:
+        snicar_data = pickle.load(f)
+        
+    short_wvl_start, short_wvl_end = 355, 550
+    long_wvl_start, long_wvl_end = 1500, 2000
+    
+    # fit on long wavelength side
+    long_wvl_sel = (alb_wvl >= long_wvl_start) & (alb_wvl <= long_wvl_end)
+    long_wvl = alb_wvl[long_wvl_sel]
+    long_wvl_alb = alb_corr_fitted[long_wvl_sel]
+    best_fit_key, best_fit_spectrum, min_rmse, ori_spec_wvl, ori_spec_alb = find_best_fit(
+        model_library=snicar_data,
+        obs_wvl=long_wvl,
+        obs_albedo=long_wvl_alb
+    )
+    
+    interp_ori_spec_alb = np.interp(alb_wvl_ext, ori_spec_wvl, ori_spec_alb)
+    
+    long_fit_alb_max = np.nanmax(best_fit_spectrum)
+    long_fit_alb_max_wvl = long_wvl[np.argmax(best_fit_spectrum)]
+    long_fit_alb_r = best_fit_spectrum[-1]
+    
+    long_wvl_alb_max = long_wvl_alb[np.argmax(long_wvl_alb)]
+    long_wvl_alb_r = long_wvl_alb[-1]
+    
+    scale = (long_wvl_alb_max - long_wvl_alb_r) / (long_fit_alb_max - long_fit_alb_r)
+    scale = np.abs(scale)
+    interp_ori_spec_alb = long_wvl_alb_r + (interp_ori_spec_alb - long_fit_alb_r) * scale
+    
+    
+    
+  
+    
+    # plt.close('all')
+    # plt.figure(figsize=(8, 5))
+    # plt.plot(alb_wvl, alb_corr_fitted, '-', color='gray', label='Corrected Albedo', linewidth=1)
+    # plt.plot(long_wvl, long_wvl_alb, '-', color='k', label='Corrected Albedo', linewidth=3)
+    # plt.plot(alb_wvl_ext[alb_wvl_ext>long_wvl_start], interp_ori_spec_alb[alb_wvl_ext>long_wvl_start], '-', color='r', label='Best Fitted Albedo', linewidth=1.5)
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Albedo')
+    # plt.legend()
+    # plt.title(f'SNICAR Best Fit Model: {best_fit_key}, RMSE: {min_rmse:.4f}')
+    # plt.show()
+    
+    alb_corr_fitted_ext_long = np.copy(alb_corr_fitted_ext)
+    long_ext_sel = (alb_wvl_ext > long_wvl_end)
+    alb_corr_fitted_ext_long[long_ext_sel] = interp_ori_spec_alb[long_ext_sel]
+    alb_corr_fitted_ext[long_ext_sel] = alb_corr_fitted_ext_long[long_ext_sel].copy()
+    
+    
+    # fit on short wavelength side
+    short_wvl_sel = (alb_wvl >= short_wvl_start) & (alb_wvl <= short_wvl_end)
+    short_wvl = alb_wvl[short_wvl_sel]
+    short_wvl_alb = alb_corr_fitted[short_wvl_sel]
+    
+
+    fit_2nd = np.poly1d(np.polyfit(short_wvl, short_wvl_alb, 2))
+    ext_array = fit_2nd(alb_wvl_ext[alb_wvl_ext < short_wvl_start])
+    alb_corr_fitted_ext[alb_wvl_ext < short_wvl_start] = ext_array.copy()
+    
+    # plt.close('all')
+    # plt.figure(figsize=(8, 5))
+    # plt.plot(alb_wvl, alb_corr_fitted, '-', color='gray', label='Corrected Albedo', linewidth=1)
+    # plt.plot(short_wvl, short_wvl_alb, '-', color='k', label='Corrected Albedo', linewidth=3)
+    # plt.plot(alb_wvl_ext[alb_wvl_ext < short_wvl_start], ext_array, '-', color='r', label='Best Fitted Albedo', linewidth=1.5)
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Albedo')
+    # plt.legend()
+    # plt.title(f'Short Wavelength Side Fitting')
+    # plt.show()
+    
+    
+    return alb_wvl_ext, alb_corr_fitted_ext
+
 
 if __name__ == '__main__':
 

@@ -468,13 +468,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     data_ssfr = load_h5(config.ssfr(date_s))
     data_hsr1 = load_h5(config.hsr1(date_s))
     
-    if date_s != '20240603':
-        # MARLI netCDF
-        with Dataset(str(config.marli(date_s))) as ds:
-            data_marli = {var: ds.variables[var][:] for var in ("time","Alt","H","T","LSR","WVMR")}
-    else:
-        data_marli = {'time': np.array([]), 'Alt': np.array([]), 'H': np.array([]), 'T': np.array([]), 'LSR': np.array([]), 'WVMR': np.array([])}
-    
+ 
     log.info("ssfr filename:", config.ssfr(date_s))
     
     # plot ssfr time series for checking sable legs selection
@@ -484,9 +478,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     t_hsk = np.array(data_hsk["tmhr"])
     leg_masks = [(t_hsk>=lo)&(t_hsk<=hi) for lo,hi in tmhr_ranges_select]
     
-    t_ssfr = data_ssfr['time']/3600.0  # convert to hours
-    t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
-    t_marli = data_marli['time'] # in hours
 
     
     # atmospheric profile setting
@@ -583,157 +574,19 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                         header=('# SSFR version solar flux with slit function convolution\n'
                                 '# wavelength (nm)      flux (mW/m^2/nm)\n'))
             
-    # Solar spectrum interpolation function
-    flux_solar_interp = solar_interpolation_func(solar_flux_file='arcsix_ssfr_solar_flux_slit.dat', date=date)
 
     # read satellite granule
     #/----------------------------------------------------------------------------\#
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
     os.makedirs(fdir_cld_obs_info, exist_ok=True)
-    fname_cld_obs_info = '%s/%s_cld_obs_info_%s_%s_%s_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag)
-    if iter==0:      
-        
-        # Loop legs: load raw NC, apply cloud logic, interpolate, plot
-        for i, mask in enumerate(leg_masks):
-            
-            # find index arrays in one go
-            times_leg = t_hsk[mask]
-            print(f"Leg {i+1}: time range {times_leg.min()}-{times_leg.max()}h")
-            
-            sel_ssfr, sel_hsr1 = (
-                nearest_indices(t_hsk, mask, arr)
-                for arr in (t_ssfr, t_hsr1)
-            )
-            
-            if len(t_marli) > 0:
-                sel_marli = nearest_indices(t_hsk, mask, t_marli)
-            
+    fname_cld_obs_info = '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, time_start, time_end)
 
-            # assemble a small dict for this leg
-            leg = {
-                "time":    times_leg,
-                "alt":     data_hsk["alt"][mask] / 1000.0,
-                "heading": data_hsk["ang_hed"][mask],
-                "hsr1_tot": data_hsr1["f_dn_tot"][sel_hsr1],
-                "hsr1_dif": data_hsr1["f_dn_dif"][sel_hsr1],
-                "hsr1_wvl": data_hsr1["wvl_dn_tot"],
-                "lon":     data_hsk["lon"][mask],
-                "lat":     data_hsk["lat"][mask],
-                "sza":     data_hsk["sza"][mask],
-                "saa":     data_hsk["saa"][mask],
-            }
-
-            if len(data_marli['time']) > 0:
-                marli_wvmr = data_marli["WVMR"][sel_marli, :]
-                marli_wvmr[marli_wvmr == 9999] = np.nan
-                marli_wvmr[marli_wvmr > 50] = np.nan  # filter out extremely high values
-                marli_wvmr[marli_wvmr < 0] = 0
-                marli_h = data_marli["H"][...]
-                marli_mask = np.any(np.isfinite(marli_wvmr), axis=0)
-                marli_wvmr = marli_wvmr[:, marli_mask]
-                marli_h = marli_h[marli_mask]
-                marli_wvmr_mean = np.nanmean(marli_wvmr, axis=0)
-                
-                leg.update({
-                    "marli_h": marli_h,
-                    "marli_wvmr": marli_wvmr_mean,
-                })
-            else:
-                leg.update({
-                    "marli_h": None,
-                    "marli_wvmr": None,
-                })
-
-                
-            if clear_sky:
-                leg.update({
-                    "cot": np.full_like(leg['lon'], np.nan),
-                    "cer": np.full_like(leg['lon'], np.nan),
-                    "cwp": np.full_like(leg['lon'], np.nan),
-                    "cth": np.full_like(leg['lon'], np.nan),
-                    "cgt": np.full_like(leg['lon'], np.nan),
-                    "cbh": np.full_like(leg['lon'], np.nan),
-                })
-            elif not clear_sky and manual_cloud:
-                leg.update({
-                    "cot": np.full_like(leg['lon'], manual_cloud_cot),
-                    "cer": np.full_like(leg['lon'], manual_cloud_cer),
-                    "cwp": np.full_like(leg['lon'], manual_cloud_cwp),
-                    "cth": np.full_like(leg['lon'], manual_cloud_cth),
-                    "cgt": np.full_like(leg['lon'], manual_cloud_cth-manual_cloud_cbh),
-                    "cbh": np.full_like(leg['lon'], manual_cloud_cbh),
-                })
-            else:
-                raise NotImplementedError("Automatic cloud retrieval not implemented yet")
-            
-            sza_hsk = data_hsk['sza'][mask]
-
-            ssfr_zen_flux = data_ssfr['f_dn'][sel_ssfr, :]
-            ssfr_nad_flux = data_ssfr['f_up'][sel_ssfr, :]
-            ssfr_zen_toa = flux_solar_interp(data_ssfr['wvl_dn']) * np.cos(np.deg2rad(sza_hsk))[:, np.newaxis]  # W/m^2/nm
-            ssfr_zen_wvl = data_ssfr['wvl_dn']
-            ssfr_nad_wvl = data_ssfr['wvl_up']
-            
-            ssfr_nad_flux_interp = ssfr_zen_flux.copy()
-            for j in range(ssfr_nad_flux.shape[0]):
-                f_nad_flux_interp = interp1d(ssfr_nad_wvl, ssfr_nad_flux[j, :], axis=0, bounds_error=False, fill_value='extrapolate')
-                ssfr_nad_flux_interp[j, :] = f_nad_flux_interp(ssfr_zen_wvl)
-        
-            pitch_roll_mask = np.sqrt(data_hsk["ang_pit"][mask]**2 + data_hsk["ang_rol"][mask]**2) < 3.0
-            ssfr_zen_flux[~pitch_roll_mask, :] = np.nan
-            ssfr_nad_flux_interp[~pitch_roll_mask, :] = np.nan
-            ssfr_zen_toa[~pitch_roll_mask, :] = np.nan
-            
-            # hsr1_530nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 530.0))
-            # hsr1_570nm_ind = np.argmin(np.abs(leg['hsr1_wvl'] - 570.0))
-            # hsr1_diff_ratio = data_hsr1["f_dn_dif"][sel_hsr1]/data_hsr1["f_dn_tot"][sel_hsr1]
-            # hsr1_diff_ratio_530_570_mean = np.nanmean(hsr1_diff_ratio[:, hsr1_530nm_ind:hsr1_570nm_ind+1], axis=1)
-            # hsr1_530_570_thresh = 0.18
-            # cloud_mask_hsr1 = hsr1_diff_ratio_530_570_mean > hsr1_530_570_thresh
-            # ssfr_zen_flux[cloud_mask_hsr1, :] = np.nan
-            # ssfr_nad_flux_interp[cloud_mask_hsr1, :] = np.nan
-            
-            icing = (data_ssfr['flag'] & ssfr_flags.camera_icing) != 0
-            icing_pre = (data_ssfr['flag'] & ssfr_flags.camera_icing_pre) != 0
-            pitch_roll_exceed = (data_ssfr['flag'] & ssfr_flags.pitcth_roll_exceed_threshold) != 0
-            alp_ang_pit_rol_issue = (data_ssfr['flag'] & ssfr_flags.alp_ang_pit_rol_issue) != 0
-            
-            alp_ang_pit_rol_issue_tmhr = alp_ang_pit_rol_issue[sel_ssfr]
-            ssfr_zen_flux[alp_ang_pit_rol_issue_tmhr] = np.nan
-            ssfr_nad_flux_interp[alp_ang_pit_rol_issue_tmhr] = np.nan
-            
-            
-            leg['ssfr_zen'] = ssfr_zen_flux
-            leg['ssfr_nad'] = ssfr_nad_flux_interp
-            leg['ssfr_zen_wvl'] = ssfr_zen_wvl
-            leg['ssfr_nad_wvl'] = ssfr_zen_wvl
-            leg['ssfr_toa'] = ssfr_zen_toa
-            
-            leg['ssfr_icing'] = icing
-            leg['ssfr_icing_pre'] = icing_pre
-            
-
-            vars()["cld_leg_%d" % i] = leg
-            
-            time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
-        
-            # save the cloud observation information to a pickle file
-            fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, time_start, time_end)
-            with open(fname_pkl, 'wb') as f:
-                pickle.dump(vars()["cld_leg_%d" % i], f, protocol=pickle.HIGHEST_PROTOCOL)
-
-            del leg  # free memory
-            del sel_ssfr, sel_hsr1
-            gc.collect()
-        
-    else:
-        print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
-        for i in range(len(tmhr_ranges_select)):
-            time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
-            fname_pkl = '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, time_start, time_end)
-            with open(fname_pkl, 'rb') as f:
-                vars()[f"cld_leg_{i}"] = pickle.load(f)  
-                
+    print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
+    for i in range(len(tmhr_ranges_select)):
+        time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
+        with open(fname_cld_obs_info, 'rb') as f:
+            vars()[f"cld_leg_{i}"] = pickle.load(f)  
+     
     # return None 
     
     

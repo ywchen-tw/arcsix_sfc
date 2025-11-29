@@ -911,7 +911,9 @@ class FlightConfig:
     def marli(self, date_s):   
         root = self.root_mac if sys.platform=="darwin" else self.root_linux
         return f"{root}/marli/ARCSIX-MARLi_P3B_{date_s}_R0.cdf"
-    def kt19(self, fname):    return Path(fname)
+    def kt19(self, date_s):    
+        root = self.root_mac if sys.platform=="darwin" else self.root_linux
+        return f"{root}/kt19/ARCSIX-MetNav-KT19-10Hz_P3B_{date_s}_R0.ict"
     def sat_nc(self, date_s, raw):  # choose root by platform
         root = self.root_mac if sys.platform=="darwin" else self.root_linux
         return f"{root}/sat-data/{date_s}/{raw}"
