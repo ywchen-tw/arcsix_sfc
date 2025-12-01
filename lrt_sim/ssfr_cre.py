@@ -458,10 +458,6 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # write out the convolved solar flux
     #/----------------------------------------------------------------------------\#
     # Kurudz solar spectrum has a resolution of 0.5 nm
-    wvl_solar_vis = np.arange(300, 950.1, 1.0)
-    wvl_solar_nir = np.arange(951, 2500.1, 1.0)
-    wvl_solar_coarse = np.concatenate([wvl_solar_vis, wvl_solar_nir])
-    effective_wvl = wvl_solar_coarse[np.logical_and(wvl_solar_coarse >= xx_wvl_grid.min(), wvl_solar_coarse <= xx_wvl_grid.max())]
     if 1:
         # use Kurudz solar spectrum
         # df_solor = pd.read_csv('kurudz_0.1nm.dat', sep='\s+', header=None)
