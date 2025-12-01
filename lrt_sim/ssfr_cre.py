@@ -660,9 +660,11 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         z_list = atm_z_grid
         atm_z_grid_str = ' '.join(['%.3f' % z for z in atm_z_grid])
 
+        if platform.system() == 'Darwin':
+            cwp_list = [0, 5, 10, 30, 50, 100, 200]  # g/m^2
+        elif platform.system() == 'Linux':
+            cwp_list = [0, 2.5, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200]  # g/m^2
         
-        # cwp_list = [0, 2.5, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200]  # g/m^2
-        cwp_list = [0, 5, 10, 30, 50, 100, 200]  # g/m^2
         cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
         cwp_list = np.array(sorted(set(cwp_list)))/1000  # convert to kg/m^2
         rho_liquid_water = 1000  # kg/m^3
