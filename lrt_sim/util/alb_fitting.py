@@ -453,8 +453,8 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
 
 def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     # Extend albedo spectrum to 2.5 um with constant albedo at the last wavelength
-    ext_wvl_start = 295
-    ext_wvl_end = 4005
+    ext_wvl_start = 280
+    ext_wvl_end = 4020
     ext_wvl = np.arange(ext_wvl_start, ext_wvl_end+1, 1)
     ext_alb = np.ones_like(ext_wvl) * alb_corr_fitted[-1]
     

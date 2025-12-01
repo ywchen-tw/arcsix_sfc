@@ -157,7 +157,9 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
                                 alt_avg, data_dropsonde,
                                 cld_leg, levels=None,
                                 mod_extent=[-60.0, -80.0, 82.4, 84.6],
-                                zpt_filedir='./data/atmospheric_profiles'
+                                zpt_filedir='./data/atmospheric_profiles',
+                                sfc_T=None,
+                                sfc_h_to_zero=True,
                                 ):
     
     from er3t.util.modis import get_filename_tag
@@ -211,7 +213,7 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
     status, ws10m = er3t.pre.atm.create_modis_dropsonde_atm(o2mix=0.20935, output_dir=zpt_filedir, output=zpt_filename, 
                                             fname_mod07=modis_07_file, dropsonde_df=data_dropsonde,
                                             levels=levels,
-                                            extent=mod_extent, new_h_edge=None,sfc_T_set=None, sfc_h_to_zero=True,)
+                                            extent=mod_extent, new_h_edge=None,sfc_T_set=sfc_T, sfc_h_to_zero=sfc_h_to_zero,)
     
     fname_insitu = f'{fdir_data}/zpt/{date_s}/{date_s}_gases_profiles.csv'
     if not os.path.exists(fname_insitu):
