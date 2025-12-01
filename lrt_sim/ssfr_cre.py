@@ -428,26 +428,19 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     
 
     xx = np.linspace(-12, 12, 241)
-    yy_gaussian_vis = gaussian(xx, 0, 3.8251)
-    yy_gaussian_nir = gaussian(xx, 0, 4.5046)
+
     
     import platform
     # run lower resolution on Mac for testing, higher resolution on Linux cluster
     if platform.system() == 'Darwin':
-        xx_wvl_grid_sw = np.arange(300, 4000.1, 100.0)
-        xx_wvl_grid_lw = np.arange(4000, 100000.1, 1000.0)
+        xx_wvl_grid_sw = np.arange(300, 4000.1, 300.0)
+        xx_wvl_grid_lw = np.arange(4000, 100000.1, 4000.0)
     elif platform.system() == 'Linux':
         xx_wvl_grid_sw = np.arange(300, 4000.1, 1.0)
         xx_wvl_grid_lw = np.arange(4000, 100000.1, 10.0)
         
 
-    if not os.path.exists('wvl_grid_test_cre_sw.dat') or not os.path.exists('wvl_grid_test_cre_lw.dat'):
-        write_2col_file('vis_0.1nm_update.dat', xx, yy_gaussian_vis,
-                        header=('# SSFR Silicon slit function\n'
-                                '# wavelength (nm)      relative intensity\n'))
-        write_2col_file('nir_0.1nm_update.dat', xx, yy_gaussian_nir,
-                        header=('# SSFR InGaAs slit function\n'
-                                '# wavelength (nm)      relative intensity\n'))
+    if 1:#not os.path.exists('wvl_grid_test_cre_sw.dat') or not os.path.exists('wvl_grid_test_cre_lw.dat'):
         write_2col_file('wvl_grid_test_cre_sw.dat', xx_wvl_grid_sw, np.zeros_like(xx_wvl_grid_sw),
                         header=('# SSFR Wavelength grid test file\n'
                                 '# wavelength (nm)\n'))

@@ -1101,6 +1101,10 @@ def combined_atm_corr():
     alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
     broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
+    # read cam_ice_fraction_20240801_134836_140900.nc
+    with Dataset(f'cam_ice_fraction_20240801_134836_140900.nc', 'r') as nc:
+        cam_time = nc.variables['tmhr'][:]  
+        cam_ice_fraction = nc.variables['ice_fraction'][:]  # shape (time, lat, lon)
     
     time_mask = (time_selected_all >= 13.84) & (time_selected_all <= 14.12)
     time_selected_all = time_selected_all[time_mask]
@@ -1115,17 +1119,33 @@ def combined_atm_corr():
     alb_selected_all_std = np.nanstd(alb_selected_all, axis=0)
     alt_selected_all_avg = np.nanmean(alt_selected_all)
     
+    cam_time_mask = (cam_time >= 13.84) & (cam_time <= 14.12)
+    cam_time = cam_time[cam_time_mask]
+    cam_ice_fraction = cam_ice_fraction[cam_time_mask]
     
-    alb_ext_wvl, alb_ext = alb_extention(alb_wvl, alb_selected_all_avg, clear_sky=True)
-    plt.close('all')
-    plt.plot(alb_wvl, alb_selected_all_avg, label=f'Alt: {alt_selected_all_avg:.1f}km')
-    plt.plot(alb_ext_wvl, alb_ext, label='Extended')
-    plt.xlabel('Wavelength (nm)')
-    plt.ylabel('Surface Albedo')
-    plt.title('Surface Albedo Extension Check, Aug 1st')
-    plt.legend()
-    plt.show()
-    sys.exit()    
+    broadband_alb_cam_time = np.zeros_like(cam_time)
+    broadband_alb_cam_time[:] = np.nan
+    alb_cam_time = np.zeros((len(cam_time), alb_selected_all.shape[1]))
+    alb_cam_time[:] = np.nan
+    for i, t in enumerate(cam_time):
+        time_diff = np.abs(time_selected_all - t)
+        if np.min(time_diff) <= 1/60/60:  # within 1s 
+            closest_idx = np.argmin(time_diff)
+            broadband_alb_cam_time[i] = broadband_alb_selected_all[closest_idx]
+            alb_cam_time[i, :] = alb_selected_all[closest_idx, :]
+    
+    
+    
+    # alb_ext_wvl, alb_ext = alb_extention(alb_wvl, alb_selected_all_avg, clear_sky=True)
+    # plt.close('all')
+    # plt.plot(alb_wvl, alb_selected_all_avg, label=f'Alt: {alt_selected_all_avg:.1f}km')
+    # plt.plot(alb_ext_wvl, alb_ext, label='Extended')
+    # plt.xlabel('Wavelength (nm)')
+    # plt.ylabel('Surface Albedo')
+    # plt.title('Surface Albedo Extension Check, Aug 1st')
+    # plt.legend()
+    # plt.show()
+    # sys.exit()    
     
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.plot(alb_wvl, alb_selected_all_avg, label=f'Alt: {alt_selected_all_avg:.1f}km', color='b')
@@ -1179,12 +1199,17 @@ def combined_atm_corr():
     plt.close(fig)
     
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.scatter(time_selected_all, broadband_alb_selected_all, label=f'Alt: {alt_selected_all_avg:.1f}km', c='b', s=10)
+    ax2 = ax.twinx()
+    l1 = ax.scatter(time_selected_all, broadband_alb_selected_all, label=f'Alt: {alt_selected_all_avg:.1f}km', c='b', s=10)
     # for band in gas_bands:
     #     ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    l2 = ax2.scatter(cam_time, cam_ice_fraction, label='CAM Ice Fraction', c='r', s=5)
     ax.set_xlabel('Time (UTC)', fontsize=14)
     ax.set_ylabel('Broadband Albedo', fontsize=14)
-    ax.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.set_ylabel('CAM Ice Fraction', fontsize=14)
+    lns = [l1, l2]
+    labs = [l.get_label() for l in lns]
+    ax.legend(lns, labs, fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax.tick_params(labelsize=12)
     # ax.set_ylim(-0.05, 1.05)
     ax.set_title('Surface Albedo (atm corr + fit), Aug 1st', fontsize=13)
@@ -1193,7 +1218,72 @@ def combined_atm_corr():
     fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_broadband_time.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(cam_ice_fraction, broadband_alb_cam_time, s=10, c='k')
+    ax.set_xlabel('CAM Ice Fraction', fontsize=14)
+    ax.set_ylabel('Broadband Albedo', fontsize=14)
+    ax.tick_params(labelsize=12)
+    ax.set_title('Surface Albedo vs CAM Ice Fraction, Aug 1st', fontsize=13)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_broadband_icefraction.png', bbox_inches='tight', dpi=150)
+    plt.close(fig) 
+    
+    wvl_450nm_idx = np.argmin(np.abs(alb_wvl - 450))
+    wvl_860nm_idx = np.argmin(np.abs(alb_wvl - 860))
+    wvl_1200nm_idx = np.argmin(np.abs(alb_wvl - 1200))
+    wvl_1600nm_idx = np.argmin(np.abs(alb_wvl - 1600))
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(cam_ice_fraction, alb_cam_time[:, wvl_450nm_idx], s=10, c='b', label='450nm')
+    ax.scatter(cam_ice_fraction, alb_cam_time[:, wvl_860nm_idx], s=10, c='g', label='860nm')
+    ax.scatter(cam_ice_fraction, alb_cam_time[:, wvl_1200nm_idx], s=10, c='r', label='1200nm')
+    ax.scatter(cam_ice_fraction, alb_cam_time[:, wvl_1600nm_idx], s=10, c='m', label='1600nm')
+    ax.set_xlabel('CAM Ice Fraction', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10)
+    ax.tick_params(labelsize=12)
+    ax.set_title('Surface Albedo at Different Wavelengths vs CAM Ice Fraction, Aug 1st', fontsize=13)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_wvl_icefraction.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    wvl_slope = np.zeros_like(alb_wvl)
+    wvl_slope[:] = np.nan
+    wvl_r2 = np.zeros_like(alb_wvl)
+    wvl_r2[:] = np.nan
+    from scipy.stats import linregress
+    from mpl_toolkits.axes_grid1 import make_axes_locatable    
 
+    
+    for i in range(len(alb_wvl)):
+        # Perform linear regression
+        mask = np.isfinite(alb_cam_time[:, i]) & np.isfinite(cam_ice_fraction)
+        slope, intercept, r_value, p_value, std_err = linregress(cam_ice_fraction[mask], alb_cam_time[:, i][mask])
+        wvl_r2[i] = r_value**2
+        wvl_slope[i] = slope
+        # print(f'Wavelength: {alb_wvl[i]:.1f} nm, Slope: {slope:.4f}, R²: {r_value**2:.4f}')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax2 = ax.twinx()
+    c1 = ax.scatter(alb_wvl, wvl_slope, c=wvl_r2, s=10, cmap='jet', vmin=0, vmax=1)
+    ax2.plot(alb_wvl, alb_selected_all_avg, color='k', alpha=0.5)
+    
+    # Create an AxesDivider for ax1
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.3) # Create a new axes for the colorbar
+    # cbar = fig.colorbar(c1, ax=ax, pad=0.55, orientation='horizontal')
+    # cbar.set_label('R²', fontsize=12)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Slope', fontsize=14)
+    ax2.set_ylabel('Avg Surface Albedo', fontsize=14)
+    ax2.legend(['Avg Surface Albedo'], fontsize=10)
+    ax.set_xlim(350, 2000)
+    ax.tick_params(labelsize=12)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_title('Correlation between Surface Albedo and CAM Ice Fraction vs Wavelength, Aug 1st', fontsize=13)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_wvl_icefraction_correlation.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
     
     ### Plot flight tracks
     
