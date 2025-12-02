@@ -297,7 +297,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         cld_marli = {'marli_h': None,
                      'marli_wvmr': None}
     else:
-        marli_h_set_sorted = np.sort(set(marli_all_h))
+        marli_h_set_sorted = np.sort(list(set(marli_all_h)))
         marli_wvmr_avg = []
         for h in marli_h_set_sorted:
             marli_wvmr_avg.append(np.nanmean(marli_all_wvmr[marli_all_h == h]))
@@ -349,18 +349,22 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
     F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
     cot_cre = cot_list
-    cwp_cre = cwp_list
+    cwp_cre = np.array(cwp_list) * 1000
     F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
     
     print("cwp_cre:", cwp_cre)
     print("F_sfc_sw_cre:", F_sfc_sw_cre)
     print("F_sfc_lw_cre:", F_sfc_lw_cre)
     
+    select = np.array([cwp%2.5==0 for cwp in cwp_cre])
+    case_sel = ~select
+    
     plt.close('all')
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(cwp_cre, F_sfc_sw_cre, '-o', label='SW CRE')
-    ax.plot(cwp_cre, F_sfc_lw_cre, '-o', label='LW CRE')
-    ax.plot(cwp_cre, F_sfc_net_cre, '-o', label='Net CRE')
+    ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
+    ax.plot(cwp_cre[select], F_sfc_lw_cre[select], '-', label='LW CRE')
+    ax.plot(cwp_cre[select], F_sfc_net_cre[select], '-', label='Net CRE')
+    ax.scatter(cwp_cre[case_sel], F_sfc_net_cre[case_sel], c='C0', marker='o', s=50, label='Flight case')
     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
     ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
     ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
@@ -456,27 +460,25 @@ if __name__ == '__main__':
     
     
     # done   
-    # # for iter in range(3):
-    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
-    # #                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-    # #                                         ],
-    # #                     case_tag='cloudy_atm_corr',
-    # #                     config=config,
-    # #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-    # #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    # #                                            np.arange(5.0, 10.1, 2.5),
-    # #                                            np.array([15, 20, 30., 40., 45.]))),
-    # #                     simulation_interval=0.5,
-    # #                     clear_sky=False,
-    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    # #                     manual_cloud=True,
-    # #                     manual_cloud_cer=6.7,
-    # #                     manual_cloud_cwp=26.96,
-    # #                     manual_cloud_cth=0.43,
-    # #                     manual_cloud_cbh=0.15,
-    # #                     manual_cloud_cot=6.02,
-    # #                     iter=iter,
-    # #                     )
+    cre_sim_plot(date=datetime.datetime(2024, 6, 7),
+                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+                                        ],
+                    case_tag='cloudy_atm_corr',
+                    config=config,
+                    levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                            np.arange(5.0, 10.1, 2.5),
+                                            np.array([15, 20, 30., 40., 45.]))),
+                    simulation_interval=0.5,
+                    clear_sky=False,
+                    overwrite_lrt=atm_corr_overwrite_lrt,
+                    manual_cloud=True,
+                    manual_cloud_cer=6.7,
+                    manual_cloud_cwp=26.96,
+                    manual_cloud_cth=0.43,
+                    manual_cloud_cbh=0.15,
+                    manual_cloud_cot=6.02,
+                    )
     
     
     # done
