@@ -192,6 +192,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                      manual_cloud_cth=0.945,
                      manual_cloud_cbh=0.344,
                      manual_cloud_cot=6.26,
+                     manual_alb='default.dat',
                     ):
     
     log = logging.getLogger("lrt")
@@ -313,8 +314,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
         fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
 
-    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw.csv'
-    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw.csv'
+
+    if manual_cloud is None:
+        output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw.csv'
+        output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw.csv'
+    else:
+        output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_alb-manual-{manual_alb.replace(".dat", "")}.csv'
+        output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_alb-manual-{manual_alb.replace(".dat", "")}.csv'
 
     os.makedirs(fdir_tmp, exist_ok=True)
     os.makedirs(fdir, exist_ok=True)
@@ -371,7 +377,10 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
     ax.legend(fontsize=12)
     fig.tight_layout()
-    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
+    if manual_alb is not None:
+        fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}_alb-manual-{manual_alb.replace(".dat", "")}.png', dpi=300)
+    else:
+        fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
     
     
     
@@ -413,25 +422,25 @@ if __name__ == '__main__':
     
 
 
-    cre_sim_plot(date=datetime.datetime(2024, 6, 3),
-                    tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
-                                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
-                                            np.arange(5.0, 10.1, 2.5),
-                                            np.array([15, 20, 30., 40., 45.]))),
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    overwrite_lrt=atm_corr_overwrite_lrt,
-                    manual_cloud=True,
-                    manual_cloud_cer=13.0 ,
-                    manual_cloud_cwp=77.82,
-                    manual_cloud_cth=1.93,
-                    manual_cloud_cbh=1.41,
-                    manual_cloud_cot=21.27,
-                    )
+    # cre_sim_plot(date=datetime.datetime(2024, 6, 3),
+    #                 tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
+    #                                         np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_cloud_cer=13.0 ,
+    #                 manual_cloud_cwp=77.82,
+    #                 manual_cloud_cth=1.93,
+    #                 manual_cloud_cbh=1.41,
+    #                 manual_cloud_cot=21.27,
+    #                 )
 
 
     # for iter in range(3):
@@ -460,6 +469,26 @@ if __name__ == '__main__':
     
     
     # done   
+    # cre_sim_plot(date=datetime.datetime(2024, 6, 7),
+    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_cloud_cer=6.7,
+    #                 manual_cloud_cwp=26.96,
+    #                 manual_cloud_cth=0.43,
+    #                 manual_cloud_cbh=0.15,
+    #                 manual_cloud_cot=6.02,
+    #                 )
+    
     cre_sim_plot(date=datetime.datetime(2024, 6, 7),
                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
                                         ],
@@ -474,10 +503,11 @@ if __name__ == '__main__':
                     overwrite_lrt=atm_corr_overwrite_lrt,
                     manual_cloud=True,
                     manual_cloud_cer=6.7,
-                    manual_cloud_cwp=26.96,
+                    manual_cloud_cwp=26.96/1000,
                     manual_cloud_cth=0.43,
                     manual_cloud_cbh=0.15,
                     manual_cloud_cot=6.02,
+                    manual_alb='sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
                     )
     
     
