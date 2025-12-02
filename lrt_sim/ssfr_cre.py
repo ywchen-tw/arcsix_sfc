@@ -393,8 +393,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         log.info(f"Using dropsonde file: {dropsonde_file}")
         head, data_dropsonde = read_ict_dropsonde(dropsonde_file, encoding='utf-8', na_values=[-9999999, -777, -888])
 
-    del dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, dropsonde_tmhr_array, dropsonde_idx
-    gc.collect()
+        del dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, dropsonde_tmhr_array, dropsonde_idx
+        gc.collect()
 
     zpt_filedir = f'{_fdir_general_}/zpt/{date_s}'
     os.makedirs(zpt_filedir, exist_ok=True)
