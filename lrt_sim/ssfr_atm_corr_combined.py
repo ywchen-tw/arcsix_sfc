@@ -244,7 +244,7 @@ def ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, wvl, up_dn_ratio, color_se
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
 
-    output_dir = f'{_fdir_general_}/sfc_alb_combined'
+    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
     # glob all sfc alb files
     sfc_alb_files = sorted(glob.glob(f'{output_dir}/sfc_alb_update_*.pkl'))
     print(f"Found {len(sfc_alb_files)} surface albedo files for combination.")

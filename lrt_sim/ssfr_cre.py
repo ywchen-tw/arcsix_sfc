@@ -794,37 +794,66 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         # # Run RT
         print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
         # #/----------------------------------------------------------------------------\#
-        import platform
-        if platform.system() == 'Darwin':
-            ##### run several libratran calculations in parallel
-            if len(inits_rad) > 0:
-                print('Running libratran calculations ...')
-                # check available CPU cores
-                NCPU = os.cpu_count()
-                import platform
-                if platform.system() == 'Darwin':
-                    NCPU -= 2
-                er3t.rtm.lrt.lrt_run_mp(inits_rad, Ncpu=NCPU)        
-                for i in range(len(inits_rad)):
-                    data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                    
-                    flux_down_results.append(np.squeeze(data.f_down))
-                    flux_down_dir_results.append(np.squeeze(data.f_down_direct))
-                    flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
-                    flux_up_results.append(np.squeeze(data.f_up))
-        ##### run several libratran calculations one by one
+        # check output file size
+        output_file_check = f'{fdir_tmp}/output_0000_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km.txt'
+        if os.path.exists(output_file_check) and (os.path.getsize(output_file_check) > 100):
+            import platform
+            if platform.system() == 'Darwin':
+                ##### run several libratran calculations in parallel
+                if len(inits_rad) > 0:
+                    print('Loading libratran calculations ...')    
+                    for i in range(len(inits_rad)):
+                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                        
+                        flux_down_results.append(np.squeeze(data.f_down))
+                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                        flux_up_results.append(np.squeeze(data.f_up))
+            ##### run several libratran calculations one by one
+            
+            elif platform.system() == 'Linux':
+                if len(inits_rad) > 0:
+                    print('Loading libratran calculations ...')
+                    for i in range(len(inits_rad)):
+                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                        
+                        flux_down_results.append(np.squeeze(data.f_down))
+                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                        flux_up_results.append(np.squeeze(data.f_up))
         
-        elif platform.system() == 'Linux':
-            if len(inits_rad) > 0:
-                print('Running libratran calculations ...')
-                for i in range(len(inits_rad)):
-                    er3t.rtm.lrt.lrt_run(inits_rad[i])
-                    data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                    
-                    flux_down_results.append(np.squeeze(data.f_down))
-                    flux_down_dir_results.append(np.squeeze(data.f_down_direct))
-                    flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
-                    flux_up_results.append(np.squeeze(data.f_up))
+        else:
+            import platform
+            if platform.system() == 'Darwin':
+                ##### run several libratran calculations in parallel
+                if len(inits_rad) > 0:
+                    print('Running libratran calculations ...')
+                    # check available CPU cores
+                    NCPU = os.cpu_count()
+                    import platform
+                    if platform.system() == 'Darwin':
+                        NCPU -= 2
+                    er3t.rtm.lrt.lrt_run_mp(inits_rad, Ncpu=NCPU)        
+                    for i in range(len(inits_rad)):
+                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                        
+                        flux_down_results.append(np.squeeze(data.f_down))
+                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                        flux_up_results.append(np.squeeze(data.f_up))
+            ##### run several libratran calculations one by one
+            
+            elif platform.system() == 'Linux':
+                if len(inits_rad) > 0:
+                    print('Running libratran calculations ...')
+                    for i in range(len(inits_rad)):
+                        er3t.rtm.lrt.lrt_run(inits_rad[i])
+                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                        
+                        flux_down_results.append(np.squeeze(data.f_down))
+                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                        flux_up_results.append(np.squeeze(data.f_up))
         # #\----------------------------------------------------------------------------/#
         ###### delete input, output, cld txt files
         # for prefix in ['input', 'output', 'cld']:
@@ -841,12 +870,12 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
 
         
         # simulated fluxes at p3 altitude            
-        Fup_p3 = flux_up_results[:, :, 1]
-        Fdn_p3 = flux_down_results[:, :, 1]
+        Fup_p3 = flux_up_results[:, 1]
+        Fdn_p3 = flux_down_results[:, 1]
         
         # simulated fluxes at sfc
-        Fup_sfc = flux_up_results[:, :, 0]
-        Fdn_sfc = flux_down_results[:, :, 0]
+        Fup_sfc = flux_up_results[:, 0]
+        Fdn_sfc = flux_down_results[:, 0]
         
 
         
