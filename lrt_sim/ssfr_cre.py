@@ -809,7 +809,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 print('Running libratran calculations ...')
                 if run:
                     # check available CPU cores
-                    NCPU = os.cpu_count() -= 2
+                    NCPU = np.max([os.cpu_count() - 2, 1])
                     er3t.rtm.lrt.lrt_run_mp(inits_rad, Ncpu=NCPU) 
                 for i in range(len(inits_rad)):
                     data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
