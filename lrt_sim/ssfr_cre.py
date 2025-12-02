@@ -434,10 +434,10 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # run lower resolution on Mac for testing, higher resolution on Linux cluster
     if platform.system() == 'Darwin':
         xx_wvl_grid_sw = np.arange(300, 4000.1, 300.0)
-        xx_wvl_grid_lw = np.arange(4000, 100000.1, 4000.0)
+        xx_wvl_grid_lw = np.arange(5000, 100000.1, 5000.0)
     elif platform.system() == 'Linux':
         xx_wvl_grid_sw = np.arange(300, 4000.1, 1.0)
-        xx_wvl_grid_lw = np.arange(4000, 100000.1, 10.0)
+        xx_wvl_grid_lw = np.arange(5000, 100000.1, 10.0)
         
 
     if 1:#not os.path.exists('wvl_grid_test_cre_sw.dat') or not os.path.exists('wvl_grid_test_cre_lw.dat'):
@@ -717,8 +717,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                                     'albedo_add': '0',
                                     'atm_z_grid': atm_z_grid_str,
                                     'mol_file': f'CH4 {ch4_file}',
-                                    'wavelength_grid_file': 'wvl_grid_test_cre_lw.dat',
-                                    # 'wavelength_add' : '4000 100000',
+                                    # 'wavelength_grid_file': 'wvl_grid_test_cre_lw.dat',
+                                    'wavelength_add' : '4000 100000',
                                     'output_process': 'integrate',
                                     }
                 Nx_effective = 1 # integrate over all wavelengths
