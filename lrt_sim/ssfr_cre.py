@@ -370,35 +370,13 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 t_start = t_end
         tmhr_ranges_select = tmhr_ranges_select_new
 
-    # 1) Load all instrument & satellite metadata
-    data_hsk  = load_h5(config.hsk(date_s))
-    data_ssfr = load_h5(config.ssfr(date_s))
-    data_hsr1 = load_h5(config.hsr1(date_s))
-    
-    if date_s != '20240603':
-        # MARLI netCDF
-        with Dataset(str(config.marli(date_s))) as ds:
-            data_marli = {var: ds.variables[var][:] for var in ("time","Alt","H","T","LSR","WVMR")}
-    else:
-        data_marli = {'time': np.array([]), 'Alt': np.array([]), 'H': np.array([]), 'T': np.array([]), 'LSR': np.array([]), 'WVMR': np.array([])}
-    
+
     log.info("ssfr filename:", config.ssfr(date_s))
     
-    # plot ssfr time series for checking sable legs selection
-    ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0)
 
-    # Build leg masks
-    t_hsk = np.array(data_hsk["tmhr"])
-    leg_masks = [(t_hsk>=lo)&(t_hsk<=hi) for lo,hi in tmhr_ranges_select]
-    
-    t_ssfr = data_ssfr['time']/3600.0  # convert to hours
-    t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
-    t_marli = data_marli['time'] # in hours
-
-    
     # atmospheric profile setting
     #/----------------------------------------------------------------------------\#
-    dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, dropsonde_lon_list, dropsonde_lat_list = dropsonde_time_loc_list(dir_dropsonde=f'{_fdir_general_}/dropsonde')
+    dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, _, _ = dropsonde_time_loc_list(dir_dropsonde=f'{_fdir_general_}/dropsonde')
     
     date_select = dropsonde_date_list == date.date()
     if np.sum(date_select) == 0:
@@ -415,6 +393,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         log.info(f"Using dropsonde file: {dropsonde_file}")
         head, data_dropsonde = read_ict_dropsonde(dropsonde_file, encoding='utf-8', na_values=[-9999999, -777, -888])
 
+    del dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, dropsonde_tmhr_array, dropsonde_idx
+    gc.collect()
 
     zpt_filedir = f'{_fdir_general_}/zpt/{date_s}'
     os.makedirs(zpt_filedir, exist_ok=True)
@@ -426,9 +406,6 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                                         np.arange(5.0, 10.1, 2.5),
                                         np.array([15, 20, 30., 40., 50.])))
     
-
-    xx = np.linspace(-12, 12, 241)
-
     
     import platform
     # run lower resolution on Mac for testing, higher resolution on Linux cluster
@@ -469,14 +446,15 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         wvl_solar = wvl_solar_interp[mask]
         flux_solar = flux_solar_interp[mask]
         
-        assert (xx[1]-xx[0]) - (wvl_solar[1]-wvl_solar[0]) <1e-3
-
         
         write_2col_file('arcsix_ssfr_solar_flux_raw_cre.dat', wvl_solar, flux_solar,
                         header=('# SSFR version solar flux without slit function convolution\n'
                                 '# wavelength (nm)      flux (mW/m^2/nm)\n'))
 
-
+    del xx_wvl_grid_sw, xx_wvl_grid_lw
+    del df_solor, wvl_solar_interp, flux_solar_interp, f_interp
+    gc.collect()
+    
     # read satellite granule
     #/----------------------------------------------------------------------------\#
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
@@ -553,12 +531,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     saa_avg = np.round(np.nanmean(saa_all), 2)
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
-        
-    # atm profile searching setting
-    boundary_from_center = 0.25 # degree
-    mod_lon = np.array([lon_avg-boundary_from_center, lon_avg+boundary_from_center])
-    mod_lat = np.array([lat_avg-boundary_from_center, lat_avg+boundary_from_center])
-    mod_extent = [mod_lon[0], mod_lon[1], mod_lat[0], mod_lat[1]]
+
     
     if marli_all_h.size == 0:
         cld_marli = {'marli_h': None,
@@ -655,7 +628,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             cwp_list = [0, 2.5, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200]  # g/m^2
         
         cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
-        cwp_list = np.array(sorted(set(cwp_list)))/1000  # convert to kg/m^2
+        cwp_list = np.array(cwp_list)/1000  # convert to kg/m^2
         rho_liquid_water = 1000  # kg/m^3
         cot_list = 3/(2 * manual_cloud_cer * 1e-6 * rho_liquid_water) * cwp_list  # from cwp to cot
         
@@ -916,26 +889,26 @@ if __name__ == '__main__':
     
 
 
-    cre_sim(date=datetime.datetime(2024, 6, 3),
-                    tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
-                                        ],
-                    case_tag='cloudy_atm_corr_1',
-                    config=config,
-                    levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
-                                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
-                                            np.arange(5.0, 10.1, 2.5),
-                                            np.array([15, 20, 30., 40., 45.]))),
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    overwrite_lrt=atm_corr_overwrite_lrt,
-                    manual_cloud=True,
-                    manual_cloud_cer=13.0,
-                    manual_cloud_cwp=77.82/1000,
-                    manual_cloud_cth=1.93,
-                    manual_cloud_cbh=1.41,
-                    manual_cloud_cot=21.27,
-                    lw=lw,
-                    )
+    # cre_sim(date=datetime.datetime(2024, 6, 3),
+    #                 tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr_1',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
+    #                                         np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_cloud_cer=13.0,
+    #                 manual_cloud_cwp=77.82/1000,
+    #                 manual_cloud_cth=1.93,
+    #                 manual_cloud_cbh=1.41,
+    #                 manual_cloud_cot=21.27,
+    #                 lw=lw,
+    #                 )
 
 
     # for iter in range(3):
@@ -960,31 +933,28 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
         
-    
-    
-    
-    # done   
-    # # for iter in range(3):
-    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
-    # #                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-    # #                                         ],
-    # #                     case_tag='cloudy_atm_corr',
-    # #                     config=config,
-    # #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-    # #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    # #                                            np.arange(5.0, 10.1, 2.5),
-    # #                                            np.array([15, 20, 30., 40., 45.]))),
-    # #                     simulation_interval=0.5,
-    # #                     clear_sky=False,
-    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    # #                     manual_cloud=True,
-    # #                     manual_cloud_cer=6.7,
-    # #                     manual_cloud_cwp=26.96,
-    # #                     manual_cloud_cth=0.43,
-    # #                     manual_cloud_cbh=0.15,
-    # #                     manual_cloud_cot=6.02,
-    # #                     iter=iter,
-    # #                     )
+
+
+    cre_sim(date=datetime.datetime(2024, 6, 7),
+                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+                                        ],
+                    case_tag='cloudy_atm_corr',
+                    config=config,
+                    levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                            np.arange(5.0, 10.1, 2.5),
+                                            np.array([15, 20, 30., 40., 45.]))),
+                    simulation_interval=0.5,
+                    clear_sky=False,
+                    overwrite_lrt=atm_corr_overwrite_lrt,
+                    manual_cloud=True,
+                    manual_cloud_cer=6.7,
+                    manual_cloud_cwp=26.96/1000,
+                    manual_cloud_cth=0.43,
+                    manual_cloud_cbh=0.15,
+                    manual_cloud_cot=6.02,
+                    lw=lw,
+                    )
     
     
     # done

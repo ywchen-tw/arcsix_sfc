@@ -327,15 +327,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     with open(output_csv_name_lw, 'r') as f:
         df_lw = pd.read_csv(f)
     
-    cot_list = df_sw['cot'].values[:-1]
-    cwp_list = df_sw['cwp'].values[:-1]
-    cer_list = df_sw['cer'].values[:-1]
-    cth_list = df_sw['cth'].values[:-1]
-    cbh_list = df_sw['cbh'].values[:-1]
-    Fup_sfc_sw = df_sw['Fup_sfc'].values[:-1]
-    Fdn_sfc_sw = df_sw['Fdn_sfc'].values[:-1]
-    Fup_sfc_lw = df_lw['Fup_sfc'].values[:-1]
-    Fdn_sfc_lw = df_lw['Fdn_sfc'].values[:-1]
+    cot_list = df_sw['cot'].values
+    cwp_list = df_sw['cwp'].values
+    cer_list = df_sw['cer'].values
+    cth_list = df_sw['cth'].values
+    cbh_list = df_sw['cbh'].values
+    Fup_sfc_sw = df_sw['Fup_sfc'].values
+    Fdn_sfc_sw = df_sw['Fdn_sfc'].values
+    Fup_sfc_lw = df_lw['Fup_sfc'].values
+    Fdn_sfc_lw = df_lw['Fdn_sfc'].values
     
     Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
     Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
@@ -346,10 +346,10 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     F_sfc_lw = Fdn_sfc_lw - Fup_sfc_lw
     F_sfc_sw_clear = F_sfc_sw[cot0_ind]
     F_sfc_lw_clear = F_sfc_lw[cot0_ind]
-    F_sfc_sw_cre = F_sfc_sw[~cot0_ind] - F_sfc_sw_clear
-    F_sfc_lw_cre = F_sfc_lw[~cot0_ind] - F_sfc_lw_clear
-    cot_cre = cot_list[~cot0_ind]
-    cwp_cre = cwp_list[~cot0_ind]
+    F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
+    F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
+    cot_cre = cot_list
+    cwp_cre = cwp_list
     F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
     
     print("cwp_cre:", cwp_cre)
@@ -364,6 +364,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
     ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
     ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
+    ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
     ax.legend(fontsize=12)
     fig.tight_layout()
     fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
