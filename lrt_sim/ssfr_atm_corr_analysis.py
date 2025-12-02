@@ -1627,7 +1627,7 @@ def combined_atm_corr():
     alb_selected_all_std = np.nanstd(alb_selected_all, axis=0)
     alt_selected_all_avg = np.nanmean(alt_selected_all)
     
-    cam_time2 = cam_time2 + 0/60/60 
+    cam_time2 = cam_time2 + 0.1/60/60 
     cam_time_mask2= (cam_time2 >= 15.244) & (cam_time2 <= 16.635)
     cam_time2 = cam_time2[cam_time_mask2]
     cam_ice_fraction2 = cam_ice_fraction2[cam_time_mask2]
@@ -1809,6 +1809,21 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_albedo_0802_clear_2_wvl_icefraction_correlation.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    
+    
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(cam_ice_fraction, broadband_alb_cam_time, s=10, c='k', label='0801 13.84-14.12')
+    ax.scatter(cam_ice_fraction1, broadband_alb_cam_time1, s=10, c='b', label='0802 14.56-15.10')
+    ax.scatter(cam_ice_fraction2, broadband_alb_cam_time2, s=10, c='r', label='0802 15.24-16.63')
+    ax.set_xlabel('CAM Ice Fraction', fontsize=14)
+    ax.set_ylabel('Broadband Albedo', fontsize=14)
+    ax.tick_params(labelsize=12)
+    ax.legend(fontsize=10)
+    ax.set_title('Surface Albedo vs CAM Ice Fraction, Aug 2nd', fontsize=13)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_0802_broadband_icefraction.png', bbox_inches='tight', dpi=150)
+    plt.close(fig) 
     
     
     sys.exit()

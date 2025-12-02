@@ -882,7 +882,6 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         mode = 'sw' if not lw else 'lw'
         print(f"Saving simulated fluxes to {output_csv_name} in {mode} mode")
         output_dict = {
-            'wvl': alb_wvl,
             'cot': cot_list,
             'cwp': cwp_list,
             'cer': [manual_cloud_cer]*len(cot_list),
