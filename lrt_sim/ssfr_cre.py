@@ -703,8 +703,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': alb_fname,
                                     'mol_file': 'CH4 %s' % ch4_file,
-                                    'wavelength_grid_file': 'wvl_grid_test_cre_sw.dat',
-                                    # 'wavelength_add' : '300 4000',
+                                    # 'wavelength_grid_file': 'wvl_grid_test_cre_sw.dat',
+                                    'wavelength_add' : '300 4000',
                                     'atm_z_grid': atm_z_grid_str,
                                     'output_process': 'integrate',
                                     }
@@ -912,7 +912,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------------------
 
     atm_corr_overwrite_lrt = True
-    lw = True  # shortwave
+    lw = False  # shortwave
     
 
 
