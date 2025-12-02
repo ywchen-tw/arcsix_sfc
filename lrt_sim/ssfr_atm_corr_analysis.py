@@ -1402,7 +1402,7 @@ def combined_atm_corr():
     alt_selected_all_avg = np.nanmean(alt_selected_all)
     
     
-    cam_time3 = cam_time3 - 0.750/60/60  # convert from hours since 00:00 to UTC time in hours 
+    cam_time3 = cam_time3 - 0/60/60  # convert from hours since 00:00 to UTC time in hours 
     cam_time_mask3 = (cam_time3 >= 14.739) & (cam_time3 <= 15.053)
     cam_time3 = cam_time3[cam_time_mask3]
     cam_ice_fraction3 = cam_ice_fraction3[cam_time_mask3]
@@ -1418,7 +1418,9 @@ def combined_atm_corr():
             broadband_alb_cam_time3[i] = broadband_alb_selected_all[closest_idx]
             alb_cam_time3[i, :] = alb_selected_all[closest_idx, :]
     
-    
+    print("cam_time3 min, max:", np.min(cam_time3), np.max(cam_time3))
+    print(broadband_alb_cam_time3)
+    sys.exit()
     
     # alb_ext_wvl, alb_ext = alb_extention(alb_wvl, alb_selected_all_avg, clear_sky=True)
     # plt.close('all')
