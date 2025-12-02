@@ -337,6 +337,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     Fup_sfc_lw = df_lw['Fup_sfc'].values[:-1]
     Fdn_sfc_lw = df_lw['Fdn_sfc'].values[:-1]
     
+    Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
+    Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
+    
     cot0_ind = cot_list == 0.0
     
     F_sfc_sw = Fdn_sfc_sw - Fup_sfc_sw
@@ -355,9 +358,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     plt.close('all')
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(cwp_cre, F_sfc_sw_cre, 'o', label='SW CRE')
-    ax.plot(cwp_cre, F_sfc_lw_cre, 'o', label='LW CRE')
-    ax.plot(cwp_cre, F_sfc_net_cre, 'o', label='Net CRE')
+    ax.plot(cwp_cre, F_sfc_sw_cre, '-o', label='SW CRE')
+    ax.plot(cwp_cre, F_sfc_lw_cre, '-o', label='LW CRE')
+    ax.plot(cwp_cre, F_sfc_net_cre, '-o', label='Net CRE')
     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
     ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
     ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)

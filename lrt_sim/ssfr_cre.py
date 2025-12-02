@@ -433,10 +433,10 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     import platform
     # run lower resolution on Mac for testing, higher resolution on Linux cluster
     if platform.system() == 'Darwin':
-        xx_wvl_grid_sw = np.arange(300, 4000.1, 300.0)
+        xx_wvl_grid_sw = np.arange(300, 4000.1, 600.0)
         xx_wvl_grid_lw = np.arange(5000, 100000.1, 5000.0)
     elif platform.system() == 'Linux':
-        xx_wvl_grid_sw = np.arange(300, 4000.1, 1.0)
+        xx_wvl_grid_sw = np.arange(300, 4000.1, 2.5)
         xx_wvl_grid_lw = np.arange(5000, 100000.1, 10.0)
         
 
@@ -703,8 +703,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': alb_fname,
                                     'mol_file': 'CH4 %s' % ch4_file,
-                                    # 'wavelength_grid_file': 'wvl_grid_test_cre_sw.dat',
-                                    'wavelength_add' : '300 4000',
+                                    'wavelength_grid_file': 'wvl_grid_test_cre_sw.dat',
+                                    # 'wavelength_add' : '300 4000',
                                     'atm_z_grid': atm_z_grid_str,
                                     'output_process': 'integrate',
                                     }
