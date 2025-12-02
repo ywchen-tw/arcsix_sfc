@@ -537,14 +537,14 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         cld_marli = {'marli_h': None,
                      'marli_wvmr': None}
     else:
-        marli_h_set_sorted = np.sort(set(marli_all_h))
+        marli_h_set_sorted = np.sort(list(set(marli_all_h)))
         marli_wvmr_avg = []
         for h in marli_h_set_sorted:
             marli_wvmr_avg.append(np.nanmean(marli_all_wvmr[marli_all_h == h]))
         marli_wvmr_avg = np.array(marli_wvmr_avg)
         cld_marli = {'marli_h': marli_h_set_sorted,
                     'marli_wvmr': marli_wvmr_avg}
-        
+           
         
     if clear_sky:
         fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_clear'

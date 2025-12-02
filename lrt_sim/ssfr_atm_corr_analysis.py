@@ -1402,6 +1402,7 @@ def combined_atm_corr():
     alt_selected_all_avg = np.nanmean(alt_selected_all)
     
     
+    
     cam_time3 = cam_time3 - 0/60/60  # convert from hours since 00:00 to UTC time in hours 
     cam_time_mask3 = (cam_time3 >= 14.739) & (cam_time3 <= 15.053)
     cam_time3 = cam_time3[cam_time_mask3]
@@ -1411,16 +1412,13 @@ def combined_atm_corr():
     broadband_alb_cam_time3[:] = np.nan
     alb_cam_time3 = np.zeros((len(cam_time3), alb_selected_all.shape[1]))
     alb_cam_time3[:] = np.nan
-    for i, t in enumerate(cam_time):
+    for i, t in enumerate(cam_time3):
         time_diff = np.abs(time_selected_all - t)
-        if np.min(time_diff) <= 1/60/60:  # within 1s 
+        if np.min(time_diff) <= 1./60/60:  # within 1s 
             closest_idx = np.argmin(time_diff)
             broadband_alb_cam_time3[i] = broadband_alb_selected_all[closest_idx]
             alb_cam_time3[i, :] = alb_selected_all[closest_idx, :]
-    
-    print("cam_time3 min, max:", np.min(cam_time3), np.max(cam_time3))
-    print(broadband_alb_cam_time3)
-    sys.exit()
+
     
     # alb_ext_wvl, alb_ext = alb_extention(alb_wvl, alb_selected_all_avg, clear_sky=True)
     # plt.close('all')
@@ -2097,10 +2095,11 @@ def combined_atm_corr():
     
     
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.scatter(cam_ice_fraction, broadband_alb_cam_time, s=10, c='k', label='0801 13.84-14.12')
-    ax.scatter(cam_ice_fraction3, broadband_alb_cam_time3, s=10, c='g', label='0801 14.76-15.23')
-    ax.scatter(cam_ice_fraction1, broadband_alb_cam_time1, s=10, c='b', label='0802 14.56-15.10')
-    ax.scatter(cam_ice_fraction2, broadband_alb_cam_time2, s=10, c='r', label='0802 15.24-16.63')
+    alpha = 0.7
+    ax.scatter(cam_ice_fraction, broadband_alb_cam_time, s=10, c='k', label='0801 13.84-14.12 (0.1km)', alpha=alpha, zorder=3)
+    ax.scatter(cam_ice_fraction3, broadband_alb_cam_time3, s=10, c='g', label='0801 14.76-15.23 (0.6km)', alpha=alpha, zorder=2)
+    ax.scatter(cam_ice_fraction1, broadband_alb_cam_time1, s=10, c='b', label='0802 14.56-15.10 (0.1km)', alpha=alpha, zorder=1)
+    ax.scatter(cam_ice_fraction2, broadband_alb_cam_time2, s=10, c='r', label='0802 15.24-16.63 (1.0km)', alpha=alpha, zorder=0)
     ax.set_xlabel('CAM Ice Fraction', fontsize=14)
     ax.set_ylabel('Broadband Albedo', fontsize=14)
     ax.tick_params(labelsize=12)
