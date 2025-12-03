@@ -901,7 +901,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------------------
 
     atm_corr_overwrite_lrt = True
-    lw = False  # shortwave
+    lw = True  # shortwave
     
 
 
@@ -1144,7 +1144,55 @@ if __name__ == '__main__':
     # #                     iter=iter,
     # #                     )
         
+    # cre_sim(date=datetime.datetime(2024, 8, 1),
+    #                 tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean
+    #                                     ],
+    #                 case_tag='clear_atm_corr',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 lw=lw,
+    #                 )
 
+
+
+    # cre_sim(date=datetime.datetime(2024, 8, 1),
+    #                 tmhr_ranges_select=[
+    #                                     [14.739, 15.053], # 550m
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 lw=lw,
+    #                 )
+    
+
+
+
+    # cre_sim(date=datetime.datetime(2024, 8, 2),
+    #                 tmhr_ranges_select=[
+    #                                     [14.557, 15.100], # 100m
+    #                                     ],
+    #                 case_tag='clear_atm_corr_1',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 lw=lw,
+    #                 )
+
+
+
+    # cre_sim(date=datetime.datetime(2024, 8, 2),
+    #                 tmhr_ranges_select=[
+    #                                     [15.244, 16.635], # 1km
+    #                                     ],
+    #                 case_tag='clear_atm_corr_2',
+    #                 config=config,
+    #                 simulation_interval=0.5,
+    #                 clear_sky=True,
+    #                 lw=lw,
+    #                 )
 
     # cre_sim(date=datetime.datetime(2024, 8, 7),
     #                 tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
