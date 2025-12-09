@@ -77,7 +77,7 @@ import pandas as pd
 import xarray as xr
 from collections import defaultdict
 import gc
-from pyproj import Transformer
+from pyproj import Transformer, CRS
 from util import *
 # mpl.use('Agg')
 
@@ -125,38 +125,7 @@ _tmhr_range_ = {
         '20240521': [14.80, 17.50],
         }
 
-# dates for ARCSIX-1
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates1_ = [
-        datetime.datetime(2024, 5, 28),
-        datetime.datetime(2024, 5, 30),
-        datetime.datetime(2024, 5, 31),
-        datetime.datetime(2024, 6,  3),
-        datetime.datetime(2024, 6,  5),
-        datetime.datetime(2024, 6,  6),
-        datetime.datetime(2024, 6,  7),
-        datetime.datetime(2024, 6, 10),
-        datetime.datetime(2024, 6, 11),
-        datetime.datetime(2024, 6, 13),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
 
-# dates for ARCSIX-2
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates2_ = [
-        datetime.datetime(2024, 7, 25),
-        datetime.datetime(2024, 7, 29),
-        datetime.datetime(2024, 7, 30),
-        datetime.datetime(2024, 8,  1),
-        datetime.datetime(2024, 8,  2),
-        datetime.datetime(2024, 8,  7),
-        datetime.datetime(2024, 8,  8),
-        datetime.datetime(2024, 8,  9),
-        datetime.datetime(2024, 8,  15),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-_dates_ = _dates1_
 
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -175,71 +144,7 @@ gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h
                 (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (h2o_8_start, h2o_8_end),
                 (final_start, final_end)]
 
- 
-def ssfr_alb_plot(date_s, tmhr_ranges_select, wvl, alb, color_series, 
-                   alt_avg_all,
-                   modis_bands_nm, modis_alb_legs, modis_alb_file,
-                   case_tag,
-                   ylabel='SSFR upward/downward ratio',
-                   title='SSFR measurement',
-                   suptitle='SSFR upward/downward ratio Comparison',
-                   file_description='', 
-                   lon_avg_all=None,
-                   lat_avg_all=None,
-                   aviris_file=None,
-                   aviris_closest=False,
-                   aviris_reflectance_wvl=None,
-                   aviris_reflectance_spectrum=None,
-                   aviris_reflectance_spectrum_unc=None
-                   ):
-    plt.close('all')
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    if aviris_file is not None:
-        aviris_label = 'AVIRIS Reflectance' if ((aviris_file is not None) and (aviris_closest)) else 'All AVIRIS mean'
-        ax.scatter(aviris_reflectance_wvl, aviris_reflectance_spectrum, s=5, c='m', label=aviris_label, alpha=0.7) if ((aviris_file is not None)) else None
-        ax.fill_between(aviris_reflectance_wvl, aviris_reflectance_spectrum-aviris_reflectance_spectrum_unc, aviris_reflectance_spectrum+aviris_reflectance_spectrum_unc, color='m', alpha=0.3) if aviris_file is not None else None
-        if modis_alb_file is not None:
-            ax.scatter(modis_bands_nm, modis_alb_legs, s=50, c='g', marker='*', label='MODIS Albedo', edgecolors='k')
 
-    for i in range(len(tmhr_ranges_select)):
-        if lon_avg_all is not None and lat_avg_all is not None:
-            ax.plot(wvl, alb[i, :], '-', color=color_series[i], label='Z=%.2fkm, lon:%.2f, lat: %.2f' % (alt_avg_all[i], lon_avg_all[i], lat_avg_all[i]))
-        else:
-            ax.plot(wvl, alb[i, :], '-', color=color_series[i], label='Z=%.2fkm' % (alt_avg_all[i]))
-        if aviris_file is None and modis_alb_file is not None:
-            ax.scatter(modis_bands_nm, modis_alb_legs[i], s=50, color=color_series[i], marker='*', edgecolors='k')
-    for band in gas_bands:
-        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
-    
-    ax.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax.set_ylabel(ylabel, fontsize=14)
-    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-    # plt.grid(True)
-    ax.tick_params(labelsize=12)
-    ax.set_ylim(-0.05, 1.05)
-    ax.set_title(title, fontsize=13)
-    fig.suptitle(suptitle, fontsize=16, y=0.98)
-    fig.tight_layout()
-    fig.savefig('fig/%s/%s_%s_%s_comparison.png' % (date_s, date_s, case_tag, file_description), bbox_inches='tight', dpi=150)
-
- 
-
-def ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, wvl, up_dn_ratio, color_series, alt_avg_all, case_tag,
-                          albedo_used='albedo used: SSFR upward/downward ratio',
-                          file_suffix=''):
-    plt.close('all')
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    for i in range(len(tmhr_ranges_select)):
-        ax.plot(wvl, up_dn_ratio[i, :], '-', color=color_series[i], label='Z=%.2fkm' % (alt_avg_all[i]))
-    ax.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax.set_ylabel('SSFR upward/downward ratio', fontsize=14)
-    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax.tick_params(labelsize=12)
-    ax.set_ylim(-0.05, 1.05)
-    ax.set_title(albedo_used, fontsize=13)
-    fig.suptitle(f'P3 level upward/downward ratio Comparison {date_s}', fontsize=16, y=0.98)
-    fig.tight_layout()
-    fig.savefig('fig/%s/%s_%s_ssfr_up_dn_ratio_comparison%s.png' % (date_s, date_s, case_tag, file_suffix), bbox_inches='tight', dpi=150)
 
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
@@ -508,6 +413,9 @@ def combined_atm_corr():
     # alb_iter1_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
     # alb_iter2_all_summer[fup_gt_fdn_all_mask_summer] = np.nan
     
+    broadband_alb_iter2_all_spring = np.trapz(alb_iter2_all_spring*toa_expand_all_spring, wvl_spring, axis=1) / np.trapz(toa_expand_all_spring, wvl_spring, axis=1)
+    broadband_alb_iter2_all_summer = np.trapz(alb_iter2_all_summer*toa_expand_all_summer, wvl_summer, axis=1) / np.trapz(toa_expand_all_summer, wvl_summer, axis=1)
+        
     
     lon_avg_all = np.concatenate((lon_avg_spring, lon_avg_summer))
     lat_avg_all = np.concatenate((lat_avg_spring, lat_avg_summer))
@@ -528,8 +436,294 @@ def combined_atm_corr():
     dates_spring_all = np.array(dates_spring_all)
     dates_summer_all = np.array(dates_summer_all)
     dates_all = np.concatenate((dates_spring_all, dates_summer_all))
-
     
+    # load ice fraction data
+    file = f'{_fdir_general_}/ice_frac/ice_frac_all.pkl'
+    with open(file, 'rb') as f:
+        ice_frac_data = pickle.load(f)
+    ice_frac_date = ice_frac_data['date']
+    ice_frac_time = ice_frac_data['time']
+    ice_frac_values = ice_frac_data['ice_frac']
+    
+    ice_frac_time_offset = {
+        '20240528': 0,
+        '20240530': 0,
+        '20240531': 0,
+        '20240603': -0.50/3600,
+        '20240605': -0.80/3600,
+        '20240606': -0.75/3600,
+        '20240607': 0.35/3600,
+        '20240610': 0,
+        '20240611': -0.15/3600,
+        '20240613': 0.55/3600,
+        '20240725': 0.30/3600,
+        '20240729': -0.95/3600,
+        '20240730': 1.0/3600,
+        '20240801': -0.50/3600,
+        '20240802': -0.15/3600,
+        '20240807': -0.70/3600,
+        '20240808': -0.25/3600,
+        '20240809': -0.05/3600,
+        '20240815': -0.85/3600,
+    }
+    
+    ice_frac_all_spring = np.zeros_like(time_spring_all)
+    ice_frac_all_summer = np.zeros_like(time_summer_all)
+    ice_frac_all_spring[:] = np.nan
+    ice_frac_all_summer[:] = np.nan
+    for date_s in sorted(set(dates_spring_all)):
+        date_mask = dates_spring_all == date_s
+        time_dates = time_spring_all[date_mask]
+        t_offset = ice_frac_time_offset.get(str(date_s), 0)
+        ice_frac_all_date = ice_frac_values[ice_frac_date == int(date_s)]
+        ice_frac_time_date = ice_frac_time[ice_frac_date == int(date_s)]
+        ice_frac_time_date += t_offset
+        ice_frac_all_spring_tmp = np.zeros_like(time_dates)
+        ice_frac_all_spring_tmp[:] = np.nan
+        for i, t in enumerate(time_dates):
+            # find closest time in ice_frac_time
+            time_diff = np.abs(ice_frac_time_date - t)
+            if i % 1000 == 0:
+                print(f"  time index {i}, t: {t}, time_diff min: {np.min(time_diff)}")
+            if np.min(time_diff) <= 1./60/60:  # within 1s 
+                closest_index = np.argmin(time_diff)
+                ice_frac_all_spring_tmp[i] = ice_frac_all_date[closest_index].copy()
+        ice_frac_all_spring[date_mask] = ice_frac_all_spring_tmp.copy()
+       
+
+                
+    for date_s in sorted(set(dates_summer_all)):
+        date_mask = dates_summer_all == date_s
+        time_dates = time_summer_all[date_mask]
+        t_offset = ice_frac_time_offset.get(str(date_s), 0)
+        ice_frac_all_date = ice_frac_values[ice_frac_date == int(date_s)]
+        ice_frac_time_date = ice_frac_time[ice_frac_date == int(date_s)]
+        ice_frac_time_date += t_offset
+        ice_frac_all_summer_tmp = np.zeros_like(time_dates)
+        ice_frac_all_summer_tmp[:] = np.nan
+        for i, t in enumerate(time_dates):
+            # find closest time in ice_frac_time
+            time_diff = np.abs(ice_frac_time_date - t)
+            if i % 1000 == 0:
+                print(f"  time index {i}, t: {t}, time_diff min: {np.min(time_diff)}")
+            if np.min(time_diff) <= 1./60/60:  # within 1s 
+                closest_index = np.argmin(time_diff)
+                ice_frac_all_summer_tmp[i] = ice_frac_all_date[closest_index].copy()
+        ice_frac_all_summer[date_mask] = ice_frac_all_summer_tmp.copy()
+
+    myi_age_ratio_spring_all = np.zeros_like(lon_all_spring)
+    myi_age_ratio_spring_all[:] = np.nan
+    myi_age_ratio_summer_all = np.zeros_like(lon_all_summer)
+    myi_age_ratio_summer_all[:] = np.nan
+    fyi_age_ratio_spring_all = np.zeros_like(lon_all_spring)
+    fyi_age_ratio_spring_all[:] = np.nan
+    fyi_age_ratio_summer_all = np.zeros_like(lon_all_summer)
+    fyi_age_ratio_summer_all[:] = np.nan
+    yi_age_ratio_spring_all = np.zeros_like(lon_all_spring)
+    yi_age_ratio_spring_all[:] = np.nan
+    yi_age_ratio_summer_all = np.zeros_like(lon_all_summer)
+    yi_age_ratio_summer_all[:] = np.nan
+    ice_ratio_spring_all = np.zeros_like(lon_all_spring)
+    ice_ratio_spring_all[:] = np.nan
+    ice_ratio_summer_all = np.zeros_like(lon_all_summer)
+    ice_ratio_summer_all[:] = np.nan
+    ow_ratio_spring_all = np.zeros_like(lon_all_spring)
+    ow_ratio_spring_all[:] = np.nan
+    ow_ratio_summer_all = np.zeros_like(lon_all_summer)
+    ow_ratio_summer_all[:] = np.nan
+    ice_age_spring_all = np.zeros_like(lon_all_spring)
+    ice_age_spring_all[:] = np.nan
+    ice_age_summer_all = np.zeros_like(lon_all_summer)
+    ice_age_summer_all[:] = np.nan
+    
+    # iceage_nh_12.5km_20240101_20250923_ql.nc
+    with Dataset(f'{_fdir_general_}/ice_age/iceage_nh_12.5km_20240101_20250923_ql.nc', 'r') as nc:
+        nsidc_lon = nc.variables['longitude'][:]
+        nsidc_lat = nc.variables['latitude'][:]
+        time_nc = nc.variables['time'][:] # days since 1970-01-01
+        nsidc_ice_age = nc.variables['age_of_sea_ice'][:]  # time, lat, lon
+    time_nc_dates = np.array([datetime.datetime(1970,1,1) + datetime.timedelta(days=t) for t in time_nc])
+    time_nc_dates_str = np.array([t.strftime('%Y%m%d') for t in time_nc_dates])
+    nsidc_ice_age = np.array(nsidc_ice_age, dtype=np.float32)
+    
+    
+    for date_s in sorted(set(dates_spring_all)):
+        print(f"Processing ice age data for date: {date_s}")
+        print(f"Ice age data file: {_fdir_general_}/ice_age/ECICE-IcetypesUncorrected-{date_s}.nc")
+        # ECICE-IcetypesUncorrected-20240528.nc
+        with Dataset(f'{_fdir_general_}/ice_age/ECICE-IcetypesUncorrected-{date_s}.nc', 'r') as nc:
+            lon = nc.variables['LON'][:]
+            lat = nc.variables['LAT'][:]
+            myi_age_ratio_nc = nc.variables['MYI'][:]
+            fyi_age_ratio_nc = nc.variables['FYI'][:]
+            yi_age_ratio_nc = nc.variables['YI'][:]
+            ice_ratio_nc = nc.variables['TOTAL_ICE'][:]
+            open_water_nc = nc.variables['OW'][:]
+        
+        lon = lon.flatten()
+        lat = lat.flatten()
+        myi_age_ratio_nc = myi_age_ratio_nc.flatten()
+        fyi_age_ratio_nc = fyi_age_ratio_nc.flatten()
+        yi_age_ratio_nc = yi_age_ratio_nc.flatten()
+        ice_ratio_nc = ice_ratio_nc.flatten()
+        open_water_nc = open_water_nc.flatten()
+            
+        date_mask = dates_spring_all == date_s
+        if date_mask.sum() > 0:
+        
+            myi_age_ratio_mesh = griddata(
+                        (lon, lat), myi_age_ratio_nc,
+                        (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                        method='nearest'
+                    )
+            myi_age_ratio_spring_all[date_mask] = myi_age_ratio_mesh.copy()
+            fyi_age_ratio_mesh = griddata(
+                        (lon, lat), fyi_age_ratio_nc,
+                        (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                        method='nearest'
+                    )
+            fyi_age_ratio_spring_all[date_mask] = fyi_age_ratio_mesh.copy()
+            yi_age_ratio_mesh = griddata(
+                        (lon, lat), yi_age_ratio_nc,
+                        (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                        method='nearest'
+                    )
+            yi_age_ratio_spring_all[date_mask] = yi_age_ratio_mesh.copy()
+            ice_ratio_mesh = griddata(
+                        (lon, lat), ice_ratio_nc,
+                        (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                        method='nearest'
+                    )
+            ice_ratio_spring_all[date_mask] = ice_ratio_mesh.copy()
+            ow_ratio_mesh = griddata(
+                        (lon, lat), open_water_nc,
+                        (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                        method='nearest'
+                    )
+            ow_ratio_spring_all[date_mask] = ow_ratio_mesh.copy()
+            # for i in range(len(lon_all_spring[date_mask])):
+                # # find closest lon/lat
+                # lon_diff = np.abs(lon - lon_all_spring[date_mask][i])
+                # lat_diff = np.abs(lat - lat_all_spring[date_mask][i])
+                # # convert diff to km
+                # lon_diff_km = lon_diff * 111.32 * np.cos(np.deg2rad(lat_all_spring[i]))
+                # lat_diff_km = lat_diff * 110.57
+                # dist_km = np.sqrt(lon_diff_km**2 + lat_diff_km**2)
+                # # find closest point
+                # closest_index = np.argmin(dist_km)
+                # myi_age_ratio_spring_all[date_mask][i] = myi_age_ratio_nc[closest_index].copy()
+                # fyi_age_ratio_spring_all[date_mask][i] = fyi_age_ratio_nc[closest_index].copy()
+                # yi_age_ratio_spring_all[date_mask][i] = yi_age_ratio_nc[closest_index].copy()
+                # ice_ratio_spring_all[date_mask][i] = ice_ratio_nc[closest_index].copy()
+                # ow_ratio_spring_all[date_mask][i] = open_water_nc[closest_index].copy()
+                
+        date_s_dt = datetime.datetime.strptime(str(date_s), '%Y%m%d')
+        # find closest date in time_nc_dates
+        time_diff = np.abs(np.array([(t - date_s_dt).days for t in time_nc_dates]))
+        closest_index = np.argmin(time_diff)
+        print(f"  Closest date in ice age data: {time_nc_dates[closest_index]}, index: {closest_index}, time diff: {time_diff[closest_index]} days")
+        
+        nsidc_lon_f = nsidc_lon.flatten()
+        nsidc_lat_f = nsidc_lat.flatten()
+        ice_age_nc = nsidc_ice_age[closest_index, :, :].flatten()
+        ice_age_nc[ice_age_nc == 20] = np.nan  # land
+        ice_age_nc[ice_age_nc == 21] = np.nan  # near coast
+        
+        ice_age_mesh = griddata(
+                    (nsidc_lon_f, nsidc_lat_f), ice_age_nc,
+                    (lon_all_spring[date_mask], lat_all_spring[date_mask]),
+                    method='nearest'
+                )
+        ice_age_spring_all[date_mask] = ice_age_mesh.copy()
+            
+    for date_s in sorted(set(dates_summer_all)):
+        print(f"Processing ice age data for date: {date_s}")
+        print(f"Ice age data file: {_fdir_general_}/ice_age/ECICE-IcetypesUncorrected-{date_s}.nc")
+        # ECICE-IcetypesUncorrected-20240528.nc
+        with Dataset(f'{_fdir_general_}/ice_age/ECICE-IcetypesUncorrected-{date_s}.nc', 'r') as nc:
+            lon = nc.variables['LON'][:]
+            lat = nc.variables['LAT'][:]
+            myi_age_ratio_nc = nc.variables['MYI'][:]
+            fyi_age_ratio_nc = nc.variables['FYI'][:]
+            yi_age_ratio_nc = nc.variables['YI'][:]
+            ice_ratio_nc = nc.variables['TOTAL_ICE'][:]
+            open_water_nc = nc.variables['OW'][:]
+        
+        lon = lon.flatten()
+        lat = lat.flatten()
+        myi_age_ratio_nc = myi_age_ratio_nc.flatten()
+        fyi_age_ratio_nc = fyi_age_ratio_nc.flatten()
+        yi_age_ratio_nc = yi_age_ratio_nc.flatten()
+        ice_ratio_nc = ice_ratio_nc.flatten()
+        open_water_nc = open_water_nc.flatten()
+        
+        date_mask = dates_summer_all == date_s
+        if date_mask.sum() > 0:
+            
+            myi_age_ratio_mesh = griddata(
+                        (lon, lat), myi_age_ratio_nc,
+                        (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                        method='nearest'
+                    )
+            myi_age_ratio_summer_all[date_mask] = myi_age_ratio_mesh.copy()
+            fyi_age_ratio_mesh = griddata(
+                        (lon, lat), fyi_age_ratio_nc,
+                        (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                        method='nearest'
+                    )
+            fyi_age_ratio_summer_all[date_mask] = fyi_age_ratio_mesh.copy()
+            yi_age_ratio_mesh = griddata(
+                        (lon, lat), yi_age_ratio_nc,
+                        (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                        method='nearest'
+                    )
+            yi_age_ratio_summer_all[date_mask] = yi_age_ratio_mesh.copy()
+            ice_ratio_mesh = griddata(
+                        (lon, lat), ice_ratio_nc,
+                        (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                        method='nearest'
+                    )
+            ice_ratio_summer_all[date_mask] = ice_ratio_mesh.copy()
+            ow_ratio_mesh = griddata(
+                        (lon, lat), open_water_nc,
+                        (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                        method='nearest'
+                    )
+            ow_ratio_summer_all[date_mask] = ow_ratio_mesh.copy()
+            # for i in range(len(lon_all_summer[date_mask])):
+                
+            #     # find closest lon/lat
+            #     lon_diff = np.abs(lon - lon_all_summer[date_mask][i])
+            #     lat_diff = np.abs(lat - lat_all_summer[date_mask][i])
+            #     # convert diff to km
+            #     lon_diff_km = lon_diff * 111.32 * np.cos(np.deg2rad(lat_all_summer[i]))
+            #     lat_diff_km = lat_diff * 110.57
+            #     dist_km = np.sqrt(lon_diff_km**2 + lat_diff_km**2)
+            #     # find closest point
+            #     closest_index = np.argmin(dist_km)
+            #     myi_age_ratio_summer_all[date_mask][i] = myi_age_ratio_nc[closest_index].copy()
+            #     fyi_age_ratio_summer_all[date_mask][i] = fyi_age_ratio_nc[closest_index].copy()
+            #     yi_age_ratio_summer_all[date_mask][i] = yi_age_ratio_nc[closest_index].copy()
+            #     ice_ratio_summer_all[date_mask][i] = ice_ratio_nc[closest_index].copy()
+            #     ow_ratio_summer_all[date_mask][i] = open_water_nc[closest_index].copy()
+        date_s_dt = datetime.datetime.strptime(str(date_s), '%Y%m%d')
+        # find closest date in time_nc_dates
+        time_diff = np.abs(np.array([(t - date_s_dt).days for t in time_nc_dates]))
+        closest_index = np.argmin(time_diff)
+        print(f"  Closest date in ice age data: {time_nc_dates[closest_index]}, index: {closest_index}, time diff: {time_diff[closest_index]} days")
+        nsidc_lon_f = nsidc_lon.flatten()
+        nsidc_lat_f = nsidc_lat.flatten()
+        ice_age_nc = nsidc_ice_age[closest_index, :, :].flatten()
+        ice_age_nc[ice_age_nc == 20] = np.nan  # land
+        ice_age_nc[ice_age_nc == 21] = np.nan  # near coast
+        
+        ice_age_mesh = griddata(
+                    (nsidc_lon_f, nsidc_lat_f), ice_age_nc,
+                    (lon_all_summer[date_mask], lat_all_summer[date_mask]),
+                    method='nearest'
+                )
+        ice_age_summer_all[date_mask] = ice_age_mesh.copy()
+                
     output_all_dict = {
         'wvl_spring': wvl_spring,
         'wvl_summer': wvl_summer,
@@ -552,6 +746,16 @@ def combined_atm_corr():
         'broadband_alb_iter2_all_spring': broadband_alb_iter2_all_spring,
         'broadband_alb_iter1_all_filter_spring': broadband_alb_iter1_all_filter_spring,
         'broadband_alb_iter2_all_filter_spring': broadband_alb_iter2_all_filter_spring,
+        'ice_frac_all_spring': ice_frac_all_spring,
+        'myi_ratio_spring_all': myi_age_ratio_spring_all,
+        'fyi_ratio_spring_all': fyi_age_ratio_spring_all,
+        'yi_ratio_spring_all': yi_age_ratio_spring_all,
+        'ice_ratio_spring_all': ice_ratio_spring_all,
+        'ow_ratio_spring_all': ow_ratio_spring_all,
+        'ice_age_spring_all': ice_age_spring_all,
+        
+        
+        
         'time_summer_all': time_summer_all,
         'lon_all_summer': lon_all_summer,
         'lat_all_summer': lat_all_summer,
@@ -571,6 +775,13 @@ def combined_atm_corr():
         'broadband_alb_iter2_all_summer': broadband_alb_iter2_all_summer,
         'broadband_alb_iter1_all_filter_summer': broadband_alb_iter1_all_filter_summer,
         'broadband_alb_iter2_all_filter_summer': broadband_alb_iter2_all_filter_summer,
+        'ice_frac_all_summer': ice_frac_all_summer,
+        'myi_ratio_summer_all': myi_age_ratio_summer_all,
+        'fyi_ratio_summer_all': fyi_age_ratio_summer_all,
+        'yi_ratio_summer_all': yi_age_ratio_summer_all,
+        'ice_ratio_summer_all': ice_ratio_summer_all,
+        'ow_ratio_summer_all': ow_ratio_summer_all,
+        'ice_age_summer_all': ice_age_summer_all,
     }
     
     combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
@@ -584,12 +795,26 @@ def combined_atm_corr():
     date_all = []
     date_alb = []
     date_alb_std = []
+    date_broadband_alb = []
+    date_broadband_alb_std = []
+    date_ice_frac = []
+    date_ice_frac_std = []
+    date_myi_ratio = []
+    date_myi_ratio_std = []
+    date_ice_age_avg = []
+    date_ice_age_std = []
     date_clear_all = []
     date_alb_clear = []
     date_alb_clear_std = []
+    date_ice_frac_clear = []
+    date_ice_frac_clear_std = []
+    date_myi_ratio_clear = []
     date_cloudy_all = []
     date_alb_cloudy = []
     date_alb_cloudy_std = []
+    date_ice_frac_cloudy = []
+    date_ice_frac_cloudy_std = []
+    date_myi_ratio_cloudy = []
     date_alb_wvl = []
     date_alb_clear_wvl = []
     date_alb_cloudy_wvl = []
@@ -608,6 +833,26 @@ def combined_atm_corr():
         date_alb_std.append(date_alb_std_)
         date_alb_wvl.append(wvl_spring)
         
+        date_broadband_alb_avg = np.nanmean(broadband_alb_iter2_all_spring[date_mask])
+        date_broadband_alb_std_ = np.nanstd(broadband_alb_iter2_all_spring[date_mask])
+        date_broadband_alb.append(date_broadband_alb_avg)
+        date_broadband_alb_std.append(date_broadband_alb_std_)
+        
+        date_ice_frac_avg = np.nanmean(ice_frac_all_spring[date_mask])
+        date_ice_frac_std_ = np.nanstd(ice_frac_all_spring[date_mask])
+        date_ice_frac.append(date_ice_frac_avg)
+        date_ice_frac_std.append(date_ice_frac_std_)
+        
+        date_myi_ratio_avg = np.nanmean(myi_age_ratio_spring_all[date_mask]/ice_ratio_spring_all[date_mask])
+        date_myi_ratio.append(date_myi_ratio_avg)
+        date_myi_ratio_std_ = np.nanstd(myi_age_ratio_spring_all[date_mask]/ice_ratio_spring_all[date_mask])
+        date_myi_ratio_std.append(date_myi_ratio_std_)
+        
+        date_ice_age_avg_ = np.nanmean(ice_age_spring_all[date_mask])
+        date_ice_age_std_ = np.nanstd(ice_age_spring_all[date_mask])
+        date_ice_age_avg.append(date_ice_age_avg_)
+        date_ice_age_std.append(date_ice_age_std_)
+        
         clear_mask = date_mask & (leg_contidions_all_spring == 'clear')
         if np.any(clear_mask):
             date_clear_all.append(str(date)[4:])
@@ -616,6 +861,14 @@ def combined_atm_corr():
             date_alb_clear_std_ = np.nanstd(alb_iter2_all_spring[clear_mask], axis=0)
             date_alb_clear_std.append(date_alb_clear_std_)
             date_alb_clear_wvl.append(wvl_spring)
+            
+            date_ice_frac_avg_clear = np.nanmean(ice_frac_all_spring[clear_mask])
+            date_ice_frac_std_clear_ = np.nanstd(ice_frac_all_spring[clear_mask])
+            date_ice_frac_clear.append(date_ice_frac_avg_clear)
+            date_ice_frac_clear_std.append(date_ice_frac_std_clear_)
+            
+            date_myi_ratio_avg_clear = np.nanmean(myi_age_ratio_spring_all[clear_mask]/ice_ratio_spring_all[clear_mask])
+            date_myi_ratio_clear.append(date_myi_ratio_avg_clear)
         cloudy_mask = date_mask & (leg_contidions_all_spring == 'cloudy')
         if np.any(cloudy_mask):
             date_cloudy_all.append(str(date)[4:])
@@ -624,6 +877,14 @@ def combined_atm_corr():
             date_alb_cloudy_std_ = np.nanstd(alb_iter2_all_spring[cloudy_mask], axis=0)
             date_alb_cloudy_std.append(date_alb_cloudy_std_)
             date_alb_cloudy_wvl.append(wvl_spring)
+            
+            date_ice_frac_avg_cloudy = np.nanmean(ice_frac_all_spring[cloudy_mask])
+            date_ice_frac_std_cloudy_ = np.nanstd(ice_frac_all_spring[cloudy_mask])
+            date_ice_frac_cloudy.append(date_ice_frac_avg_cloudy)
+            date_ice_frac_cloudy_std.append(date_ice_frac_std_cloudy_)
+            
+            date_myi_ratio_avg_cloudy = np.nanmean(myi_age_ratio_spring_all[cloudy_mask]/ice_ratio_spring_all[cloudy_mask])
+            date_myi_ratio_cloudy.append(date_myi_ratio_avg_cloudy)
         
     for date in sorted(set(dates_summer_all)):
         date_mask = np.array([d == date for d in dates_summer_all])
@@ -640,6 +901,26 @@ def combined_atm_corr():
         date_alb_std.append(date_alb_std_)
         date_alb_wvl.append(wvl_summer)
         
+        date_broadband_alb_avg = np.nanmean(broadband_alb_iter2_all_summer[date_mask])
+        date_broadband_alb_std_ = np.nanstd(broadband_alb_iter2_all_summer[date_mask])
+        date_broadband_alb.append(date_broadband_alb_avg)
+        date_broadband_alb_std.append(date_broadband_alb_std_)
+        
+        date_ice_frac_avg = np.nanmean(ice_frac_all_summer[date_mask])
+        date_ice_frac_std_ = np.nanstd(ice_frac_all_summer[date_mask])
+        date_ice_frac.append(date_ice_frac_avg)
+        date_ice_frac_std.append(date_ice_frac_std_)
+        
+        date_myi_ratio_avg = np.nanmean(myi_age_ratio_summer_all[date_mask]/ice_ratio_summer_all[date_mask])
+        date_myi_ratio.append(date_myi_ratio_avg)
+        date_myi_ratio_std_ = np.nanstd(myi_age_ratio_summer_all[date_mask]/ice_ratio_summer_all[date_mask])
+        date_myi_ratio_std.append(date_myi_ratio_std_)
+        
+        date_ice_age_avg_ = np.nanmean(ice_age_summer_all[date_mask])
+        date_ice_age_std_ = np.nanstd(ice_age_summer_all[date_mask])
+        date_ice_age_avg.append(date_ice_age_avg_)
+        date_ice_age_std.append(date_ice_age_std_)
+        
         clear_mask = date_mask & (leg_contidions_all_summer == 'clear')
         if np.any(clear_mask):
             date_clear_all.append(str(date)[4:])
@@ -648,6 +929,15 @@ def combined_atm_corr():
             date_alb_clear_std_ = np.nanstd(alb_iter2_all_summer[clear_mask], axis=0)
             date_alb_clear_std.append(date_alb_clear_std_)
             date_alb_clear_wvl.append(wvl_summer)
+            
+            date_ice_frac_avg_clear = np.nanmean(ice_frac_all_summer[clear_mask])
+            date_ice_frac_std_clear_ = np.nanstd(ice_frac_all_summer[clear_mask])
+            date_ice_frac_clear.append(date_ice_frac_avg_clear)
+            date_ice_frac_clear_std.append(date_ice_frac_std_clear_)
+            
+            date_myi_ratio_avg_clear = np.nanmean(myi_age_ratio_summer_all[clear_mask]/ice_ratio_summer_all[clear_mask])
+            date_myi_ratio_clear.append(date_myi_ratio_avg_clear)
+            
         cloudy_mask = date_mask & (leg_contidions_all_summer == 'cloudy')
         if np.any(cloudy_mask):
             date_cloudy_all.append(str(date)[4:])
@@ -656,6 +946,14 @@ def combined_atm_corr():
             date_alb_cloudy_std_ = np.nanstd(alb_iter2_all_summer[cloudy_mask], axis=0)
             date_alb_cloudy_std.append(date_alb_cloudy_std_)
             date_alb_cloudy_wvl.append(wvl_summer)
+            
+            date_ice_frac_avg_cloudy = np.nanmean(ice_frac_all_summer[cloudy_mask])
+            date_ice_frac_std_cloudy_ = np.nanstd(ice_frac_all_summer[cloudy_mask])
+            date_ice_frac_cloudy.append(date_ice_frac_avg_cloudy)
+            date_ice_frac_cloudy_std.append(date_ice_frac_std_cloudy_)
+            
+            date_myi_ratio_avg_cloudy = np.nanmean(myi_age_ratio_summer_all[cloudy_mask]/ice_ratio_summer_all[cloudy_mask])
+            date_myi_ratio_cloudy.append(date_myi_ratio_avg_cloudy)
     
     print("date_all length:", len(date_all))
     print("date_alb length:", len(date_alb))
@@ -690,7 +988,7 @@ def combined_atm_corr():
     
     fig, ax = plt.subplots(figsize=(9, 5))
     for i in range(len(date_all)):
-        ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}', color=color_series[i])
+        ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, ice fraction={date_ice_frac[i]:.3f}+/-{date_ice_frac_std[i]:.3f}', color=color_series[i])
         ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
     for band in gas_bands:
         ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -709,7 +1007,7 @@ def combined_atm_corr():
     fig, ax = plt.subplots(figsize=(9, 5))
     for i in range(len(date_all)):
         if date_all[i] not in ['0808', '0809']:
-            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}', color=color_series[i])
+            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, ice fraction={date_ice_frac[i]:.3f}+/-{date_ice_frac_std[i]:.3f}', color=color_series[i])
             ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
     for band in gas_bands:
         ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -727,7 +1025,7 @@ def combined_atm_corr():
     fig, ax = plt.subplots(figsize=(9, 5))
     for i in range(len(date_clear_all)):
         if date_clear_all[i] not in ['0808', '0809']:
-            ax.plot(date_alb_clear_wvl[i], date_alb_clear[i], label=f'{date_clear_all[i]}', color=color_series_clear[i])
+            ax.plot(date_alb_clear_wvl[i], date_alb_clear[i], label=f'{date_clear_all[i]}, ice fraction={date_ice_frac_clear[i]:.3f}+/-{date_ice_frac_clear_std[i]:.3f}', color=color_series_clear[i])
             ax.fill_between(date_alb_clear_wvl[i], date_alb_clear[i]-date_alb_clear_std[i], date_alb_clear[i]+date_alb_clear_std[i], color=color_series_clear[i], alpha=0.1)
     for band in gas_bands:
         ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -745,7 +1043,7 @@ def combined_atm_corr():
     fig, ax = plt.subplots(figsize=(9, 5))
     for i in range(len(date_cloudy_all)):
         if date_cloudy_all[i] not in ['0808', '0809']:
-            ax.plot(date_alb_cloudy_wvl[i], date_alb_cloudy[i], label=f'{date_cloudy_all[i]}', color=color_series_cloudy[i])
+            ax.plot(date_alb_cloudy_wvl[i], date_alb_cloudy[i], label=f'{date_cloudy_all[i]}, ice fraction={date_ice_frac_cloudy[i]:.3f}+/-{date_ice_frac_cloudy_std[i]:.3f}', color=color_series_cloudy[i])
             ax.fill_between(date_alb_cloudy_wvl[i], date_alb_cloudy[i]-date_alb_cloudy_std[i], date_alb_cloudy[i]+date_alb_cloudy_std[i], color=color_series_cloudy[i], alpha=0.1)
     for band in gas_bands:
         ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -759,11 +1057,64 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_cloudy_partial.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_all)):
+        ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, MYI={date_myi_ratio[i]*100:.1f}%', color=color_series[i])
+        ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Surface Albedo (atm corr + fit)', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_myi.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_all)):
+        if date_all[i] not in ['0808', '0809']:
+            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, MYI={date_myi_ratio[i]*100:.1f}%', color=color_series[i])
+            ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Surface Albedo (atm corr + fit)\nexclude 0808, 0809', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_partial_myi.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
 
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_all)):
+        if date_all[i] not in ['0808', '0809']:
+            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, Ice Age={date_ice_age_avg[i]:.1f} y', color=color_series[i])
+            ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Surface Albedo (atm corr + fit)\nexclude 0808, 0809', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_partial_ice_age.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
     
-    sys.exit()
     
+    # sys.exit()
     
+    """
     for date in sorted((set(dates_spring_all))):
         date_mask = np.array([d == date for d in dates_spring_all])
         # set projection to polar (North Polar Stereographic) and plot lon/lat in that projection
@@ -875,8 +1226,9 @@ def combined_atm_corr():
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/arcsix_broadband_albedo_vs_longitude_polar_projection_summer_30s_{str(date)}.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
+    #"""
     
-    # set projection to polar (North Polar Stereographic) and plot lon/lat in that projection
+    """# set projection to polar (North Polar Stereographic) and plot lon/lat in that projection
     plt.close('all')
     central_lon = float(np.nanmean(lon_avg_all)) if len(lon_avg_all) > 0 else 0.0
     proj = ccrs.NorthPolarStereo(central_longitude=central_lon)
@@ -983,8 +1335,10 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_broadband_albedo_vs_longitude_polar_projection_summer_30s.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    #"""
     
     
+    """ 
     # set projection to polar (North Polar Stereographic) and plot lon/lat in that projection
     plt.close('all')
     central_lon = float(np.nanmean(lon_avg_all)) if len(lon_avg_all) > 0 else 0.0
@@ -1092,6 +1446,315 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_broadband_albedo_vs_longitude_polar_projection_summer.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    #"""
+    
+    SF_into = {
+        '0528': 'SF#01',
+        '0530': 'SF#02',
+        '0531': 'SF#03',
+        '0603': 'SF#04',
+        '0605': 'SF#05',
+        '0606': 'SF#06',
+        '0607': 'SF#07',
+        '0610': 'SF#08',
+        '0611': 'SF#09',
+        '0613': 'SF#10',
+        '0725': 'SF#11',
+        '0729': 'SF#12',
+        '0730': 'SF#13',
+        '0801': 'SF#14',
+        '0802': 'SF#15',
+        '0807': 'SF#16',
+        '0808': 'SF#17',
+        '0809': 'SF#18',
+        '0815': 'SF#19',
+    }
+    
+    # glob file like NSIDC-0803_SEAICE_AMSR2_N_20240528_v2.0.nc
+    patern = 'NSIDC-0803_SEAICE_AMSR2_N_2024*.nc'
+    amsr2_data_dir = '../data/ice_conc/'
+    amsr2_files = sorted(glob.glob(os.path.join(amsr2_data_dir, patern)))
+    amsr2_dates = [os.path.basename(f).split('_')[4][0:8] for f in amsr2_files]
+    amsr2_dates_int = np.array([int(d[4:8]) for d in amsr2_dates])
+    
+    ice_conc_all = None
+    for fn in amsr2_files:
+        with Dataset(fn, 'r') as ds:
+            x = ds.variables['x'][:]
+            y = ds.variables['y'][:]
+            
+            # choose variable name (e.g. 'ICECON')
+            v = ds.variables['ICECON']
+            print("var dims:", v.dimensions, "shape:", v.shape)
+            # if variable has a time dim, pick first time index
+            if 'time' in v.dimensions:
+                # build index tuple: time=0, all y, all x
+                idx = [0 if d == 'time' else slice(None) for d in v.dimensions]
+                arr = v[tuple(idx)]
+            else:
+                arr = v[:]   # entire array
+            
+            arr = np.array(arr, dtype=np.float32)
+            print("original arr min/max:", np.nanmin(arr), np.nanmax(arr))
+            
+            # mask fill values
+            fill = getattr(v, '_FillValue', None) or getattr(v, 'missing_value', None)
+            print("fill value:", fill)
+            if fill is not None:
+                arr = np.ma.masked_equal(arr, fill)
+
+            arr[arr > 250] = np.nan  # set fill value to nan
+            
+            print("arr min/max after fill mask:", np.nanmin(arr), np.nanmax(arr))
+            
+            # # apply scale and offset if present
+            # scale = getattr(v, 'scale_factor', 1.0)
+            # offset = getattr(v, 'add_offset', 0.0)
+            # print("scale_factor:", scale, "add_offset:", offset)
+            # arr = arr.astype(float) * scale + offset
+            
+            # print("scaled arr min/max:", np.nanmin(arr), np.nanmax(arr))
+
+            
+                
+            ice_conc = arr.copy()
+
+            print("Data subset shape:", ice_conc.shape)
+            
+            if 'crs' in ds.variables:
+                crs_var = ds.variables['crs']
+                # try crs_wkt or spatial_ref or proj4 text
+                wkt = getattr(crs_var, 'crs_wkt', None) or getattr(crs_var, 'spatial_ref', None)
+                proj4 = getattr(crs_var, 'proj4', None) or getattr(crs_var, 'proj4text', None)
+                if wkt:
+                    src_crs = CRS.from_wkt(wkt)
+                elif proj4:
+                    src_crs = CRS.from_string(proj4)
+                else:
+                    # try EPSG attribute
+                    epsg = getattr(crs_var, 'epsg', None)
+                    src_crs = CRS.from_epsg(int(epsg)) if epsg else None
+            else:
+                src_crs = None
+
+            # fallback guess if not present (your file likely has crs)
+            if src_crs is None:
+                src_crs = CRS.from_epsg(3411)  # North polar stereographic (example)
+            
+        
+        # ice_conc[ice_conc > 250] = np.nan  # set fill value to nan
+        print("ice_conc min/max:", np.nanmin(ice_conc), np.nanmax(ice_conc))
+        ice_conc_scale = ice_conc*100  # scale factor
+        # ds = xr.open_dataset(fn, decode_coords="all", mask_and_scale=False)
+
+        # # pick variable and coords
+        # var = 'ICECON' if 'ICECON' in ds.data_vars else list(ds.data_vars.keys())[0]
+        # coord_x = 'x'
+        # coord_y = 'y'
+        # x = ds[coord_x].values
+        # y = ds[coord_y].values
+        # da = ds[var] # y, x
+        # sel = {d: 0 for d in da.dims if d not in (coord_x, coord_y)}
+        # da2 = da.isel(**sel) if sel else da
+        # da2[da2 == 255] = np.nan  # set fill value to nan
+        # data = da2.values*0.004
+
+        # Build mesh and get CRS from crs variable (preferred)
+        xx, yy = np.meshgrid(x, y)
+        
+        # crs_attrs = ds['crs'].attrs
+        # # prefer explicit epsg if present, else wkt or proj4
+        # if 'epsg' in crs_attrs:
+        #     try:
+        #         src_crs = CRS.from_user_input(int(crs_attrs['epsg']))
+        #     except Exception:
+        #         pass
+        # if src_crs is None:
+        #     # try WKT
+        #     for key in ('crs_wkt', 'spatial_ref', 'spref', 'proj4', 'proj4text', 'proj4string'):
+        #         if key in crs_attrs and crs_attrs[key]:
+        #             try:
+        #                 src_crs = CRS.from_user_input(crs_attrs[key])
+        #                 break
+        #             except Exception:
+        #                 pass
+        
+
+        # transform to lon/lat
+        transformer = Transformer.from_crs(src_crs, CRS.from_epsg(4326), always_xy=True)
+        lon_flat, lat_flat = transformer.transform(xx.ravel(), yy.ravel())
+        lon = np.array(lon_flat).reshape(xx.shape)
+        lat = np.array(lat_flat).reshape(xx.shape)
+        print("lon/lat shape:", lon.shape, lat.shape)
+        print("ice_conc_scale shape:", ice_conc_scale.shape)
+        print("ice_conc_scale min/max before flatten:", np.nanmin(ice_conc_scale), np.nanmax(ice_conc_scale))
+        # if ice_conc_all is None:
+        #     plt.close('all')
+        #     fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': ccrs.NorthPolarStereo()})
+        #     ax.coastlines(resolution='110m', linewidth=0.8)
+        #     ax.add_feature(cartopy.feature.LAND, facecolor="#8e8e8e", zorder=0)
+        #     ax.add_feature(cartopy.feature.OCEAN, facecolor="#8e8e8e", zorder=0)
+        #     plt.pcolormesh(lon, lat, ice_conc_scale, cmap='Blues_r', vmin=0, vmax=100, transform=ccrs.PlateCarree())
+        #     plt.colorbar(label='Ice Concentration (%)')
+        #     lon_min, lon_max = np.nanmin(lon_all), np.nanmax(lon_all)
+        #     lat_min, lat_max = np.nanmin(lat_all), np.nanmax(lat_all)
+        #     pad_lon = max(1, (lon_max - lon_min) * 0.05)
+        #     pad_lat = max(1, (lat_max - lat_min) * 0.05)
+        #     ax.set_extent([lon_min - pad_lon, lon_max + pad_lon, lat_min - pad_lat, lat_max + pad_lat], crs=ccrs.PlateCarree())
+        #     plt.title(f'Ice Concentration from AMSR2 on {os.path.basename(fn).split("_")[4]}')
+        #     plt.xlabel('Longitude')
+        #     plt.ylabel('Latitude')
+        #     plt.show()
+        #     # sys.exit()
+        
+        
+        if ice_conc_all is None:
+            # ice_conc_all = ice_conc_scale.copy().T # x, y
+            ice_conc_all = np.array(ice_conc_scale.copy(), dtype=np.float32)
+        else:
+            ice_conc_all = np.dstack((ice_conc_all, ice_conc_scale.copy())) # x, y, time
+            
+    
+        
+        del ice_conc_scale, ds, xx, yy, lon_flat, lat_flat, transformer
+    
+
+    # ice_conc_all *= 100.0  # convert to percentage
+    ice_conc_spring_avg = np.nanmean(ice_conc_all[:, :, amsr2_dates_int <= 630], axis=2)
+    ice_conc_summer_avg = np.nanmean(ice_conc_all[:, :, amsr2_dates_int >= 701], axis=2)
+    ice_conc_spring_std = np.nanstd(ice_conc_all[:, :, amsr2_dates_int <= 630], axis=2)
+    ice_conc_summer_std = np.nanstd(ice_conc_all[:, :, amsr2_dates_int >= 701], axis=2)
+    
+
+    
+    plt.close('all')
+    central_lon = float(np.nanmean(lon_avg_all)) if len(lon_avg_all) > 0 else 0.0
+    proj = ccrs.NorthPolarStereo(central_longitude=central_lon)
+    
+
+
+    # Create the plot
+    # fig, axd = plt.subplot_mosaic(mosaic, figsize=(18, 9), per_subplot_kw=kw, gridspec_kw={'width_ratios': [4, 3], 'wspace': 0.1})
+    # ax11 = axd['map_top']
+    # ax12 = axd['std_top']
+    # ax21 = axd['map_bot']
+    # ax22 = axd['std_bot']
+    
+    fig = plt.figure(figsize=(18, 9))
+    gs = gridspec.GridSpec(2, 2, width_ratios=[3, 2], wspace=0.1 , hspace=0.3)
+    ax11 = fig.add_subplot(gs[0,0], projection=proj)  # map_top
+    ax12 = fig.add_subplot(gs[0,1])                   # std_top (regular axes)
+    ax21 = fig.add_subplot(gs[1,0], projection=proj)  # map_bot
+    ax22 = fig.add_subplot(gs[1,1])                   # std_bot
+    
+    # add coastlines and land features for context
+    for ax1 in [ax11, ax21]:
+        # add coastlines and land features for context
+        ax1.coastlines(resolution='50m', linewidth=0.8)
+        ax1.add_feature(cartopy.feature.LAND, facecolor="#8e8e8e", zorder=0)
+        ax1.add_feature(cartopy.feature.OCEAN, facecolor="#8e8e8e", zorder=0)
+
+        # gridlines with labels (only lon/lat labels make sense in PlateCarree transform)
+        gl = ax1.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.6, linestyle='--')
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xlabel_style = {'size': 10}
+        gl.ylabel_style = {'size': 10}
+        
+    # plot ice concentration maps
+    im11 = ax11.pcolormesh(lon, lat, ice_conc_spring_avg, cmap='Blues_r', vmin=0, vmax=100,
+                        transform=ccrs.PlateCarree(), zorder=1)
+    cbar11_2 = fig.colorbar(im11, ax=ax11, orientation='vertical', pad=0.01, shrink=0.9)
+    cbar11_2.set_label('Ice Concentration (%)', fontsize=10)
+    im21 = ax21.pcolormesh(lon, lat, ice_conc_summer_avg, cmap='Blues_r', vmin=0, vmax=100,
+                        transform=ccrs.PlateCarree(), zorder=1)
+    cbar21_2 = fig.colorbar(im21, ax=ax21, orientation='vertical', pad=0.01, shrink=0.9)
+    cbar21_2.set_label('Ice Concentration (%)', fontsize=10)
+      
+    # scatter the flight-leg centers (and all points) using PlateCarree transform
+    # color by broadband surface albedo from iteration 2 if available
+    mask = ~np.isnan(broadband_alb_iter2_all_spring) #and broadband_alb_iter2_all_spring > 0
+    sc11 = ax11.scatter(lon_all_spring[mask], lat_all_spring[mask], s=5, c=broadband_alb_iter2_all_spring[mask], cmap='jet',
+                    transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=0.9)
+    cbar11 = fig.colorbar(sc11, ax=ax11, orientation='vertical', pad=0.05, shrink=0.9)
+    cbar11.set_label('Broadband Albedo', fontsize=10)
+
+    # # also plot all sampled points along legs (optional, lighter marker)
+    # if 'lon_all_spring' in locals() and 'lat_all_spring' in locals() and len(lon_all) > 0:
+    #     ax21.scatter(lon_all_spring, lat_all_spring, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
+        
+    # scatter the flight-leg centers (and all points) using PlateCarree transform
+    # color by broadband surface albedo from iteration 2 if available
+    mask = ~np.isnan(broadband_alb_iter2_all_summer) #  and broadband_alb_iter2_all_summer > 0
+    sc21 = ax21.scatter(lon_all_summer[mask], lat_all_summer[mask], s=5, c=broadband_alb_iter2_all_summer[mask], cmap='jet',
+                    transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=0.9)
+    cbar21 = fig.colorbar(sc21, ax=ax21, orientation='vertical', pad=0.05 , shrink=0.9)
+    cbar21.set_label('Broadband Albedo', fontsize=10)
+
+    # # also plot all sampled points along legs (optional, lighter marker)
+    # if 'lon_all_summer' in locals() and 'lat_all_summer' in locals() and len(lon_all) > 0:
+    #     ax21.scatter(lon_all_summer, lat_all_summer, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
+    
+    lon_min, lon_max = np.nanmin(lon_all), np.nanmax(lon_all)
+    lat_min, lat_max = np.nanmin(lat_all), np.nanmax(lat_all)
+    for ax in [ax11, ax21]:
+        # expand a bit
+        pad_lon = max(0.2, (lon_max - lon_min) * 0.05)
+        pad_lat = max(0.2, (lat_max - lat_min) * 0.05)
+        ax.set_extent([lon_min - pad_lon, lon_max + pad_lon, lat_min - pad_lat, lat_max + pad_lat], crs=ccrs.PlateCarree())
+        ax.tick_params('both', labelsize=10)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        
+    ax11.set_title(f'SF#01-10 (May 28 - June 13)', fontsize=12)
+    ax21.set_title(f'SF#11-19 (July 25 - Aug 15)', fontsize=12)
+        
+    n_dates = len(date_all)
+    if n_dates == 0:
+        color_series = []
+    else:
+        cmap_name = 'jet'
+        cmap = plt.cm.get_cmap(cmap_name)
+        if n_dates == 1:
+            color_series = [cmap(0.5)]
+        else:
+            color_series = [cmap(i / (n_dates - 1)) for i in range(n_dates)]
+
+    # optional ScalarMappable if you want to add a colorbar later
+    norm = mpl.colors.Normalize(vmin=0, vmax=max(1, n_dates - 1))
+    sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array([])
+    
+    for i in range(len(date_all)):
+        ax12.plot(date_alb_wvl[i], date_alb[i], label=f'{SF_into[date_all[i]]} ({date_all[i]})', color=color_series[i])
+        ax12.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
+    for band in gas_bands:
+        ax12.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax12.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax12.set_ylabel('Surface Albedo', fontsize=14)
+    ax12.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.05, -0.1))
+    ax12.tick_params(labelsize=12)
+    ax12.set_ylim(-0.05, 1.05)
+    ax12.set_xlim(350, 2000)
+    
+    ax22.errorbar(date_ice_frac, date_broadband_alb,
+                  xerr=date_ice_frac_std,
+                  yerr=date_broadband_alb_std, fmt='o', color='black', ecolor='lightgray', 
+                  markersize=3, markerfacecolor='none',
+                  elinewidth=1.5, capsize=1.5, zorder=2)
+    ax22.scatter(date_ice_frac, date_broadband_alb, s=50, c=color_series, zorder=3)
+    ax22.set_xlabel('Sea Ice Fraction', fontsize=14)
+    ax22.set_ylabel('Broadband Albedo', fontsize=14)
+    ax22.tick_params(labelsize=12)
+    ax22.set_xlim(0.1, 1.10)
+    ax22.set_ylim(0.1, 0.9)
+    for ax, cap in zip([ax11, ax12, ax21, ax22], ['(a)', '(b)', '(c)', '(d)']):
+        ax.text(0.0, 1.01, cap, transform=ax.transAxes, fontsize=14,
+                verticalalignment='bottom', horizontalalignment='left')
+    fig.savefig(f'{fig_dir}/arcsix_broadband_albedo_vs_longitude_polar_projection_spring_summer_combined.png', bbox_inches='tight', dpi=300)
+    plt.close(fig)
+    
+    
 
 if __name__ == '__main__':
 

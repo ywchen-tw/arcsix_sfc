@@ -80,8 +80,11 @@ import gc
 from pyproj import Transformer
 # mpl.use('Agg')
 
+from matplotlib import rcParams
 
-import er3t
+rcParams['font.sans-serif'] = "Arial"
+rcParams['font.family'] = "sans-serif" # Ensure sans-serif is used as the default family
+
 
 # from util.util import *
 # from util.arcsix_atm import prepare_atmospheric_profile
@@ -187,12 +190,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                      clear_sky=True,
                      overwrite_lrt=True,
                      manual_cloud=False,
-                     manual_cloud_cer=14.4,
-                     manual_cloud_cwp=0.06013,
-                     manual_cloud_cth=0.945,
-                     manual_cloud_cbh=0.344,
-                     manual_cloud_cot=6.26,
-                     manual_alb='default.dat',
+                     manual_alb=None,
                     ):
     
     log = logging.getLogger("lrt")
@@ -292,19 +290,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-   
-    
-    if marli_all_h.size == 0:
-        cld_marli = {'marli_h': None,
-                     'marli_wvmr': None}
-    else:
-        marli_h_set_sorted = np.sort(list(set(marli_all_h)))
-        marli_wvmr_avg = []
-        for h in marli_h_set_sorted:
-            marli_wvmr_avg.append(np.nanmean(marli_all_wvmr[marli_all_h == h]))
-        marli_wvmr_avg = np.array(marli_wvmr_avg)
-        cld_marli = {'marli_h': marli_h_set_sorted,
-                    'marli_wvmr': marli_wvmr_avg}
+
         
         
     if clear_sky:
@@ -313,80 +299,201 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     else:
         fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
         fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
+    fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
 
-
-    if manual_cloud is None:
-        output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw.csv'
-        output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw.csv'
+    if manual_alb is None:
+        manual_alb = [None]
+    elif isinstance(manual_alb, str):
+        manual_alb = [manual_alb]
     else:
-        output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_alb-manual-{manual_alb.replace(".dat", "")}.csv'
-        output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_alb-manual-{manual_alb.replace(".dat", "")}.csv'
-
-    os.makedirs(fdir_tmp, exist_ok=True)
-    os.makedirs(fdir, exist_ok=True)
-    
-
-    # read csv and extract simulated fluxes
-    with open(output_csv_name_sw, 'r') as f:
-        df_sw = pd.read_csv(f)
+        assert isinstance(manual_alb, list) #"manual_alb should be None, str, or list of str"
         
-    with open(output_csv_name_lw, 'r') as f:
-        df_lw = pd.read_csv(f)
+    cot_list_all = []
+    cwp_list_all = []
+    cer_list_all = []
+    cth_list_all = []
+    cbh_list_all = []
+    Fup_sfc_sw_all = []
+    Fdn_sfc_sw_all = []
+    F_sfc_sw_cre_all = []
+    F_sfc_lw_cre_all = []
+    F_sfc_net_cre_all = []
     
-    cot_list = df_sw['cot'].values
-    cwp_list = df_sw['cwp'].values
-    cer_list = df_sw['cer'].values
-    cth_list = df_sw['cth'].values
-    cbh_list = df_sw['cbh'].values
-    Fup_sfc_sw = df_sw['Fup_sfc'].values
-    Fdn_sfc_sw = df_sw['Fdn_sfc'].values
-    Fup_sfc_lw = df_lw['Fup_sfc'].values
-    Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+    cot_real_list_all = []
+    cwp_real_list_all = []
+    cer_real_list_all = []
+    cth_real_list_all = []
+    cbh_real_list_all = []
+    Fup_real_sfc_sw_all = []
+    Fdn_real_sfc_sw_all = []
+    F_sfc_sw_cre_real_all = []
+    F_sfc_lw_cre_real_all = []
+    F_sfc_net_cre_real_all = []
     
-    Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
-    Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
+    alb_wvl_all = []
+    alb_all = []
+    broadband_alb_all = []
+    broadband_alb_ori_all = []
     
-    cot0_ind = cot_list == 0.0
+    # use CU solar spectrum
+    df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
+    wvl_solar = np.array(df_solor.iloc[:, 0])
+    flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
     
-    F_sfc_sw = Fdn_sfc_sw - Fup_sfc_sw
-    F_sfc_lw = Fdn_sfc_lw - Fup_sfc_lw
-    F_sfc_sw_clear = F_sfc_sw[cot0_ind]
-    F_sfc_lw_clear = F_sfc_lw[cot0_ind]
-    F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
-    F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
-    cot_cre = cot_list
-    cwp_cre = np.array(cwp_list) * 1000
-    F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
+    # interpolate to 1 nm grid
+    f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
     
-    print("cwp_cre:", cwp_cre)
-    print("F_sfc_sw_cre:", F_sfc_sw_cre)
-    print("F_sfc_lw_cre:", F_sfc_lw_cre)
     
-    select = np.array([cwp%2.5==0 for cwp in cwp_cre])
-    case_sel = ~select
+    for i in range(len(manual_alb)):
+        manual_alb_i = manual_alb[i]
+        if manual_alb_i is None:
+            output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw.csv'
+            output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw.csv'
+        else:
+            output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
+            output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
+
+        os.makedirs(fdir_tmp, exist_ok=True)
+        os.makedirs(fdir, exist_ok=True)
+        
+
+        # read csv and extract simulated fluxes
+        with open(output_csv_name_sw, 'r') as f:
+            df_sw = pd.read_csv(f)
+            
+        with open(output_csv_name_lw, 'r') as f:
+            df_lw = pd.read_csv(f)
+        
+        cot_list = df_sw['cot'].values
+        cwp_list = df_sw['cwp'].values
+        cer_list = df_sw['cer'].values
+        cth_list = df_sw['cth'].values
+        cbh_list = df_sw['cbh'].values
+        Fup_sfc_sw = df_sw['Fup_sfc'].values
+        Fdn_sfc_sw = df_sw['Fdn_sfc'].values
+        Fup_sfc_lw = df_lw['Fup_sfc'].values
+        Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+        
+        Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
+        Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
+        
+        cot0_ind = cot_list == 0.0
+        
+        F_sfc_sw = Fdn_sfc_sw - Fup_sfc_sw
+        F_sfc_lw = Fdn_sfc_lw - Fup_sfc_lw
+        F_sfc_sw_clear = F_sfc_sw[cot0_ind]
+        F_sfc_lw_clear = F_sfc_lw[cot0_ind]
+        F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
+        F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
+        cot_cre = cot_list
+        cwp_cre = np.array(cwp_list) * 1000
+        F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
+        
+        print("cwp_cre:", cwp_cre)
+        print("F_sfc_sw_cre:", F_sfc_sw_cre)
+        print("F_sfc_lw_cre:", F_sfc_lw_cre)
+        
+        select = np.array([cwp%2.5==0 for cwp in cwp_cre])
+        case_sel = ~select
+        
+        plt.close('all')
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
+        ax.plot(cwp_cre[select], F_sfc_lw_cre[select], '-', label='LW CRE')
+        ax.plot(cwp_cre[select], F_sfc_net_cre[select], '-', label='Net CRE')
+        ax.scatter(cwp_cre[case_sel], F_sfc_net_cre[case_sel], c='C0', marker='o', s=50, label='Flight case')
+        ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+        ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
+        ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
+        ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
+        ax.legend(fontsize=12)
+        fig.tight_layout()
+        if manual_alb_i is not None:
+            fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}_alb-manual-{manual_alb_i.replace(".dat", "")}.png', dpi=300)
+        else:
+            fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
+    
+        plt.close(fig)
+        
+        cot_list_all.append(cot_list[select])
+        cwp_list_all.append(cwp_cre[select])
+        cer_list_all.append(cer_list[select])
+        cth_list_all.append(cth_list[select])
+        cbh_list_all.append(cbh_list[select])
+        Fup_sfc_sw_all.append(Fup_sfc_sw[select])
+        Fdn_sfc_sw_all.append(Fdn_sfc_sw[select])
+        F_sfc_sw_cre_all.append(F_sfc_sw_cre[select])
+        F_sfc_lw_cre_all.append(F_sfc_lw_cre[select])
+        F_sfc_net_cre_all.append(F_sfc_net_cre[select])
+        
+        cot_real_list_all.append(cot_list[case_sel])
+        cwp_real_list_all.append(cwp_cre[case_sel])
+        cer_real_list_all.append(cer_list[case_sel])
+        cth_real_list_all.append(cth_list[case_sel])
+        cbh_real_list_all.append(cbh_list[case_sel])
+        Fup_real_sfc_sw_all.append(Fup_sfc_sw[case_sel])
+        Fdn_real_sfc_sw_all.append(Fdn_sfc_sw[case_sel])
+        F_sfc_sw_cre_real_all.append(F_sfc_sw_cre[case_sel])
+        F_sfc_lw_cre_real_all.append(F_sfc_lw_cre[case_sel])
+        F_sfc_net_cre_real_all.append(F_sfc_net_cre[case_sel])
+        
+        if manual_alb_i is None:
+            f_alb = f'{fdir_alb}/sfc_alb_{date_s}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.dat'
+        else:
+            f_alb = f'{fdir_alb}/{manual_alb_i}'
+        alb_data = np.loadtxt(f_alb)
+        ext_wvl = alb_data[:, 0]
+        ext_alb = alb_data[:, 1]
+        
+        alb_wvl_all.append(ext_wvl)
+        alb_all.append(ext_alb)
+        
+        flux_solar_interp = f_interp(ext_wvl)
+        broadband_alb = np.trapz(ext_alb * flux_solar_interp, ext_wvl) / np.trapz(flux_solar_interp, ext_wvl)
+        # broadband_alb = np.sum(ext_alb * flux_solar_interp) / np.sum(flux_solar_interp)
+        broadband_alb_all.append(broadband_alb)
+        
+        flux_solar_interp_ori = f_interp(alb_wvl)
+        alb_ori = ext_alb[np.logical_and(ext_wvl >=alb_wvl[0], ext_wvl <= alb_wvl[-1])]
+        broadband_alb_ori = np.trapz(alb_ori * flux_solar_interp_ori, alb_wvl) / np.trapz(flux_solar_interp_ori, alb_wvl)
+        # broadband_alb_ori = np.sum(alb_ori * flux_solar_interp_ori) / np.sum(flux_solar_interp_ori)
+        broadband_alb_ori_all.append(broadband_alb_ori)
+    
+    # Create a ScalarMappable
+    color_series = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',]
+    
+    
+    
     
     plt.close('all')
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
-    ax.plot(cwp_cre[select], F_sfc_lw_cre[select], '-', label='LW CRE')
-    ax.plot(cwp_cre[select], F_sfc_net_cre[select], '-', label='Net CRE')
-    ax.scatter(cwp_cre[case_sel], F_sfc_net_cre[case_sel], c='C0', marker='o', s=50, label='Flight case')
-    ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-    ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
-    ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
-    ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
-    ax.legend(fontsize=12)
-    fig.tight_layout()
-    if manual_alb is not None:
-        fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}_alb-manual-{manual_alb.replace(".dat", "")}.png', dpi=300)
-    else:
-        fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'hspace': 0.3})
+    for i in range(len(manual_alb)):
+        ax1.plot(cwp_list_all[i], F_sfc_sw_cre_all[i], '--', color=color_series[i], alpha=0.5)
+        ax1.plot(cwp_list_all[i], F_sfc_lw_cre_all[i], '-.', color=color_series[i], alpha=0.5)
+        ax1.plot(cwp_list_all[i], F_sfc_net_cre_all[i], '-', color=color_series[i], label=f'Albedo-{i+1}')
+        ax1.scatter(cwp_real_list_all[i], F_sfc_net_cre_real_all[i], color=color_series[i], marker='o', s=50, edgecolors='k')
+        
+        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
     
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
     
-    
+    ax2.legend(fontsize=12,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.hlines(0, xmin=0, xmax=np.max(cwp_list_all), colors='gray', linestyles='dashed')
+    ax1.set_xlim(0, np.max(cwp_list_all))
+    ax2.set_xlim(300, 4000)
+    ax2.set_ylim(-0.05, 1.05)
+    ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
+    for ax, subcase in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_all.png', dpi=300, bbox_inches='tight')
     
 
-    print("Finished libratran calculations.")  
+ 
     #\----------------------------------------------------------------------------/#
 
     return
@@ -469,48 +576,6 @@ if __name__ == '__main__':
     
     
     # done   
-    # cre_sim_plot(date=datetime.datetime(2024, 6, 7),
-    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-    #                                     ],
-    #                 case_tag='cloudy_atm_corr',
-    #                 config=config,
-    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                         np.arange(5.0, 10.1, 2.5),
-    #                                         np.array([15, 20, 30., 40., 45.]))),
-    #                 simulation_interval=0.5,
-    #                 clear_sky=False,
-    #                 overwrite_lrt=atm_corr_overwrite_lrt,
-    #                 manual_cloud=True,
-    #                 manual_cloud_cer=6.7,
-    #                 manual_cloud_cwp=26.96,
-    #                 manual_cloud_cth=0.43,
-    #                 manual_cloud_cbh=0.15,
-    #                 manual_cloud_cot=6.02,
-    #                 )
-    
-    # cre_sim_plot(date=datetime.datetime(2024, 6, 7),
-    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-    #                                     ],
-    #                 case_tag='cloudy_atm_corr',
-    #                 config=config,
-    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                         np.arange(5.0, 10.1, 2.5),
-    #                                         np.array([15, 20, 30., 40., 45.]))),
-    #                 simulation_interval=0.5,
-    #                 clear_sky=False,
-    #                 overwrite_lrt=atm_corr_overwrite_lrt,
-    #                 manual_cloud=True,
-    #                 manual_cloud_cer=6.7,
-    #                 manual_cloud_cwp=26.96/1000,
-    #                 manual_cloud_cth=0.43,
-    #                 manual_cloud_cbh=0.15,
-    #                 manual_cloud_cot=6.02,
-    #                 manual_alb='sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
-    #                 )
-    
-    
     cre_sim_plot(date=datetime.datetime(2024, 6, 7),
                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
                                         ],
@@ -524,14 +589,20 @@ if __name__ == '__main__':
                     clear_sky=False,
                     overwrite_lrt=atm_corr_overwrite_lrt,
                     manual_cloud=True,
-                    manual_cloud_cer=6.7,
-                    manual_cloud_cwp=26.96/1000,
-                    manual_cloud_cth=0.43,
-                    manual_cloud_cbh=0.15,
-                    manual_cloud_cot=6.02,
-                    manual_alb='sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+                    manual_alb=[
+                                'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+                                None,
+                                'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+                                'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+                                ]
                     )
     
+
+    
+    
+
+    
+
     
     # done
     # # for iter in range(3):

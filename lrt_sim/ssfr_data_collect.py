@@ -120,91 +120,6 @@ elif platform.system() == 'Linux':
     _fdir_tmp_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/tmp"
 _fdir_tmp_graph_ = 'tmp-graph_flt-vid'
 
-_title_extra_ = 'ARCSIX RF#1'
-
-_tmhr_range_ = {
-        '20240517': [19.20, 23.00],
-        '20240521': [14.80, 17.50],
-        }
-
-# dates for ARCSIX-1
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates1_ = [
-        datetime.datetime(2024, 5, 28),
-        datetime.datetime(2024, 5, 30),
-        datetime.datetime(2024, 5, 31),
-        datetime.datetime(2024, 6,  3),
-        datetime.datetime(2024, 6,  5),
-        datetime.datetime(2024, 6,  6),
-        datetime.datetime(2024, 6,  7),
-        datetime.datetime(2024, 6, 10),
-        datetime.datetime(2024, 6, 11),
-        datetime.datetime(2024, 6, 13),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-# dates for ARCSIX-2
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates2_ = [
-        datetime.datetime(2024, 7, 25),
-        datetime.datetime(2024, 7, 29),
-        datetime.datetime(2024, 7, 30),
-        datetime.datetime(2024, 8,  1),
-        datetime.datetime(2024, 8,  2),
-        datetime.datetime(2024, 8,  7),
-        datetime.datetime(2024, 8,  8),
-        datetime.datetime(2024, 8,  9),
-        datetime.datetime(2024, 8,  15),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-_dates_ = _dates1_
-
-
-o2a_1_start, o2a_1_end = 748, 780
-h2o_1_start, h2o_1_end = 672, 706
-h2o_2_start, h2o_2_end = 705, 746
-h2o_3_start, h2o_3_end = 884, 996
-h2o_4_start, h2o_4_end = 1084, 1175
-h2o_5_start, h2o_5_end = 1230, 1286
-h2o_6_start, h2o_6_end = 1290, 1509
-h2o_7_start, h2o_7_end = 1748, 2050
-h2o_8_start, h2o_8_end = 801, 843
-final_start, final_end = 2110, 2200
-
-gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h2o_2_end),
-                (h2o_3_start, h2o_3_end), (h2o_4_start, h2o_4_end), (h2o_5_start, h2o_5_end),
-                (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (h2o_8_start, h2o_8_end),
-                (final_start, final_end)]
-
-
-def fit_1d_poly(x, y, order=1, dx=None, x0=None):
-    """
-    Fit 1D polynomial to data
-    Input:
-        x: 1D array of x values
-        y: 1D array of y values
-        order: order of polynomial
-    Output:
-        poly1d object
-    """
-    mask = ~np.isnan(x) & ~np.isnan(y)    
-    # fit polynomial
-    coeffs = np.polyfit(x[mask], y[mask], order)
-    
-    if x0 is None:
-        x0 = np.nanmean(x[mask][:2])
-    y0 = np.nanmean(y[mask][:2])
-    x1 = np.nanmean(x[mask][-2:])
-    y1 = np.nanmean(y[mask][-2:])
-    if dx is None:
-        dx = x1 - x0
-    slope = (y1 - y0) / dx
-    intercept = y0 - slope * x0
-    coeffs = [slope, intercept]
-    
-    p = np.poly1d(coeffs)
-    return p
 
 
 from enum import IntFlag, auto
@@ -317,14 +232,6 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_pitch_roll_heading_550nm_time_%.2f-%.2f.png' % (date_s, date_s, case_tag, time_start, time_end), bbox_inches='tight', dpi=150)
 
-def solar_interpolation_func(solar_flux_file, date):
-    """Solar spectrum interpolation function"""
-    from scipy.interpolate import interp1d
-    f_solar = pd.read_csv(solar_flux_file, delim_whitespace=True, comment='#', names=['wvl', 'flux'])
-    wvl_solar = f_solar['wvl'].values
-    flux_solar = f_solar['flux'].values/1000 # in W/m^2/nm
-    flux_solar *= er3t.util.cal_sol_fac(date)
-    return interp1d(wvl_solar, flux_solar, bounds_error=False, fill_value=0.0)
 
 def write_2col_file(filename, wvl, val, header):
     """Write two-column data to a file with a header"""
@@ -332,99 +239,6 @@ def write_2col_file(filename, wvl, val, header):
         f.write(header)
         for i in range(len(val)):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')
-
-def gas_abs_masking(wvl, alb, alt):
-    o2a_1_start, o2a_1_end = 748, 780
-    h2o_1_start, h2o_1_end = 672, 706
-    h2o_2_start, h2o_2_end = 705, 746
-    h2o_3_start, h2o_3_end = 884, 996
-    h2o_4_start, h2o_4_end = 1084, 1175
-    h2o_5_start, h2o_5_end = 1230, 1286
-    h2o_6_start, h2o_6_end = 1290, 1509
-    h2o_7_start, h2o_7_end = 1748, 2050
-    h2o_8_start, h2o_8_end = 801, 843
-    final_start, final_end = 2110, 2200
-    
-    effective_mask_ = np.ones_like(alb)
-    alb_mask = alb.copy()
-    if alt > 0.5:
-        alb_mask[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-        effective_mask_[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-    else: 
-        # Not mask O2 band and water abs band at VIS and NIR if altitude is low
-        alb_mask[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                # ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-        effective_mask_[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                # ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-    
-    # interpolation if nan in effective_mask_ range
-    if np.sum(~np.isnan(effective_mask_)) != np.isfinite(alb_mask).sum():
-        eff_wvl_real_mask = np.logical_and(~np.isnan(effective_mask_), np.isfinite(alb_mask))
-        fit_wvl_mask = np.logical_and(~np.isnan(effective_mask_), np.isnan(alb_mask))
-        # effective_mask_func = interp1d(wvl[eff_wvl_real_mask], effective_mask_[eff_wvl_real_mask], bounds_error=False, fill_value=np.nan)
-        
-        
-        # alb_mask[fit_wvl_mask] = effective_mask_func(wvl[fit_wvl_mask])
-        
-        s = pd.Series(alb_mask[effective_mask_==1])
-        s_mask = np.isnan(alb_mask[effective_mask_==1])
-        # Fills NaN with the value immediately preceding it
-        s_ffill = s.fillna(method='ffill', limit=2)
-        s_ffill = s_ffill.fillna(method='bfill', limit=2)
-        while np.any(np.isnan(s_ffill)):
-            s_ffill = s_ffill.fillna(method='ffill', limit=2)
-            s_ffill = s_ffill.fillna(method='bfill', limit=2)
-        
-        
-        alb_mask[fit_wvl_mask] = np.array(s_ffill)[s_mask]
-        
-        
-    
-    return alb_mask
-   
-
 
 
 def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),

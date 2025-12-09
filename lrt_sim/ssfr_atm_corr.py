@@ -317,14 +317,6 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_pitch_roll_heading_550nm_time_%.2f-%.2f.png' % (date_s, date_s, case_tag, time_start, time_end), bbox_inches='tight', dpi=150)
 
-def solar_interpolation_func(solar_flux_file, date):
-    """Solar spectrum interpolation function"""
-    from scipy.interpolate import interp1d
-    f_solar = pd.read_csv(solar_flux_file, delim_whitespace=True, comment='#', names=['wvl', 'flux'])
-    wvl_solar = f_solar['wvl'].values
-    flux_solar = f_solar['flux'].values/1000 # in W/m^2/nm
-    flux_solar *= er3t.util.cal_sol_fac(date)
-    return interp1d(wvl_solar, flux_solar, bounds_error=False, fill_value=0.0)
 
 def write_2col_file(filename, wvl, val, header):
     """Write two-column data to a file with a header"""

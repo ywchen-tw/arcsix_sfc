@@ -986,6 +986,17 @@ def dropsonde_time_loc_list(dir_dropsonde=f'data/dropsonde'):
         lat_list.append(np.mean(data_dropsonde['lat_all']))
     return np.array(file_list), np.array(date_list), np.array(tmhr_list), np.array(lon_list), np.array(lat_list)
 
+
+def solar_interpolation_func(solar_flux_file, date):
+    """Solar spectrum interpolation function"""
+    from scipy.interpolate import interp1d
+    f_solar = pd.read_csv(solar_flux_file, delim_whitespace=True, comment='#', names=['wvl', 'flux'])
+    wvl_solar = f_solar['wvl'].values
+    flux_solar = f_solar['flux'].values/1000 # in W/m^2/nm
+    flux_solar *= er3t.util.cal_sol_fac(date)
+    return interp1d(wvl_solar, flux_solar, bounds_error=False, fill_value=0.0)
+
+
 if __name__ == '__main__':
 
 
