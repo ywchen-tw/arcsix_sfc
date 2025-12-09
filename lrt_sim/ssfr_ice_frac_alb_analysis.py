@@ -77,6 +77,7 @@ import bisect
 import pandas as pd
 import xarray as xr
 from collections import defaultdict
+import statsmodels.api as sm
 import gc
 from pyproj import Transformer
 from util import *
@@ -282,6 +283,13 @@ def combined_atm_corr():
     broadband_alb_date_cond_unc = []
     myi_ratio_date_cond = []
     myi_ratio_date_cond_std = []
+    fyi_raio_date_cond = []
+    fyi_ratio_date_cond_std = []
+    yi_ratio_date_cond = []
+    yi_ratio_date_cond_std = []
+    fyi_yi_ratio_date_cond = []
+    fyi_yi_ratio_date_cond_std = []
+    ice_ratio_date_cond = []
     
     
     for date_key in (ice_frac_time_offset.keys()):
@@ -301,9 +309,20 @@ def combined_atm_corr():
             alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
             broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
             myi_selected_all = combined_data['myi_ratio_summer_all'][final_mask] if date_select > '20240630' else combined_data['myi_ratio_spring_all'][final_mask]
+            fyi_selected_all = combined_data['fyi_ratio_summer_all'][final_mask] if date_select > '20240630' else combined_data['fyi_ratio_spring_all'][final_mask]
+            yi_selected_all = combined_data['yi_ratio_summer_all'][final_mask] if date_select > '20240630' else combined_data['yi_ratio_spring_all'][final_mask]
             ice_ratio_selected_all = combined_data['ice_ratio_summer_all'][final_mask] if date_select > '20240630' else combined_data['ice_ratio_spring_all'][final_mask]
+            ice_age_selected_all = combined_data['ice_age_summer_all'][final_mask] if date_select > '20240630' else combined_data['ice_age_spring_all'][final_mask]
             
-            myi_selected_all = myi_selected_all / (ice_ratio_selected_all + 1e-6) * 100  # to percentage
+            ice_total = myi_selected_all + fyi_selected_all + yi_selected_all
+            # myi_selected_all = myi_selected_all / (ice_ratio_selected_all + 1e-6) * 100  # to percentage
+            # fyi_selected_all = fyi_selected_all / (ice_ratio_selected_all + 1e-6) * 100
+            # yi_selected_all = yi_selected_all / (ice_ratio_selected_all + 1e-6) * 100
+            
+            myi_selected_all = myi_selected_all / (ice_total + 1e-8) * 100  # to percentage
+            fyi_selected_all = fyi_selected_all / (ice_total + 1e-8) * 100
+            yi_selected_all = yi_selected_all / (ice_total + 1e-8) * 100
+            
             
             
             alt_mask = (alt_selected_all >= 0) & (alt_selected_all <=   1.6)
@@ -319,7 +338,11 @@ def combined_atm_corr():
             alb_selected_all = alb_selected_all[alt_mask, :]
             broadband_alb_selected_all = broadband_alb_selected_all[alt_mask]
             time_selected_all = time_selected_all[alt_mask]
+            ice_ratio_selected_all = ice_ratio_selected_all[alt_mask]
             myi_selected_all = myi_selected_all[alt_mask]
+            fyi_selected_all = fyi_selected_all[alt_mask]
+            yi_selected_all = yi_selected_all[alt_mask]
+            ice_age_selected_all = ice_age_selected_all[alt_mask]
 
 
             cam_time = ice_frac_time[ice_frac_date == int(date_key)]
@@ -329,6 +352,11 @@ def combined_atm_corr():
             alb_selected_all_avg = np.nanmean(alb_selected_all, axis=0)
             alb_selected_all_std = np.nanstd(alb_selected_all, axis=0)
             alt_selected_all_avg = np.nanmean(alt_selected_all)
+            
+            print("ice_age_selected_all min max:", np.nanmin(ice_age_selected_all), np.nanmax(ice_age_selected_all))
+            myi_age_avg = np.nansum(ice_age_selected_all>=2)/len(ice_age_selected_all)
+            myi_age_median = np.nanmedian(ice_age_selected_all)
+            myi_age_perc_range = np.percentile(ice_age_selected_all, 95) - np.percentile(ice_age_selected_all, 5)
             
             """
             # find best time offset for cam ice fraction
@@ -426,7 +454,15 @@ def combined_atm_corr():
             broadband_alb_cam_time[:] = np.nan
             myi_cam_time = np.zeros_like(cam_time)
             myi_cam_time[:] = np.nan
+            fyi_cam_time = np.zeros_like(cam_time)
+            fyi_cam_time[:] = np.nan
+            yi_cam_time = np.zeros_like(cam_time)
+            yi_cam_time[:] = np.nan
+            ice_ratio_cam_time = np.zeros_like(cam_time)
+            ice_ratio_cam_time[:] = np.nan
             alb_cam_time = np.zeros((len(cam_time), alb_selected_all.shape[1]))
+            ice_age_cam_time = np.zeros_like(cam_time)
+            ice_age_cam_time[:] = np.nan
             alb_cam_time[:] = np.nan
             for i, t in enumerate(cam_time):
                 time_diff = np.abs(time_selected_all - t)
@@ -435,6 +471,11 @@ def combined_atm_corr():
                     broadband_alb_cam_time[i] = broadband_alb_selected_all[closest_idx]
                     alb_cam_time[i, :] = alb_selected_all[closest_idx, :]
                     myi_cam_time[i] = myi_selected_all[closest_idx]
+                    fyi_cam_time[i] = fyi_selected_all[closest_idx]
+                    yi_cam_time[i] = yi_selected_all[closest_idx]
+                    ice_ratio_cam_time[i] = ice_ratio_selected_all[closest_idx]
+                    ice_age_cam_time[i] = ice_age_selected_all[closest_idx]
+                    
             
             valid_mask = ~np.isnan(cam_ice_fraction) & ~np.isnan(broadband_alb_cam_time)
             corr_coef = np.corrcoef(cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask])[0, 1]
@@ -463,14 +504,14 @@ def combined_atm_corr():
             if np.sum(valid_mask) > 2:
                 x_sorted, y_pred, lower_bound, upper_bound, res = linear_regression_with_confidence(
                     cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], confidence=0.95)
-                # slope, intercept = np.polyfit(cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], 1)
-                # corr_coef = np.corrcoef(cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask])[0, 1]
-                # # x_vals = np.array([0, 1])
-                # x_vals = np.array([np.min(cam_ice_fraction[valid_mask]), np.max(cam_ice_fraction[valid_mask])])
-                # y_vals = intercept + slope * x_vals
+                slope, intercept = np.polyfit(cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], 1)
+                corr_coef = np.corrcoef(cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask])[0, 1]
+                # x_vals = np.array([0, 1])
+                x_vals = np.array([np.min(cam_ice_fraction[valid_mask]), np.max(cam_ice_fraction[valid_mask])])
+                y_vals = intercept + slope * x_vals
                 # axr.plot(x_vals, y_vals, color='orange', linestyle='--', label=f'Fit: y={slope:.2f}x+{intercept:.2f}\nR={corr_coef:.2f}')
-                axr.plot(x_sorted, y_pred, color='orange', linestyle='--', label=f'Fit: y={res.slope:.2f}x+{res.intercept:.2f}\nR={res.rvalue:.2f}')
-                axr.fill_between(x_sorted, lower_bound, upper_bound, color='orange', alpha=0.2, label='95% Confidence Interval')
+                axr.plot(x_sorted, y_pred, color='orange', linestyle='--', label=r'Fit: y=%.2fx+%.2f\n$\mathrm{R^2}$=%.2f' %(res.slope, res.intercept, res.rvalue**2))
+                # axr.fill_between(x_sorted, lower_bound, upper_bound, color='orange', alpha=0.2, label='95% Confidence Interval')
                 intercept = res.intercept
                 slope = res.slope
                 axr.legend(fontsize=10)
@@ -490,16 +531,97 @@ def combined_atm_corr():
                 # broadband_alb_date_cond_upper.append((intercept + slope * 1.0) + delta)
                 # broadband_alb_date_cond_lower.append((intercept + slope * 1.0) - delta)
                 # broadband_alb_date_cond_unc.append(delta)
+                
+                
+                X_fit = sm.add_constant(cam_ice_fraction[valid_mask])
+                quantiles = [0.05, 0.5, 0.95]
+                models = {}
+
+                for q in quantiles:
+                    # Initialize the model with (endog=y, exog=X_design)
+                    mod = sm.QuantReg(broadband_alb_cam_time[valid_mask], X_fit)
+                    res = mod.fit(q=q)
+                    models[q] = res
+                    
+                y_fit_05 = models[0.05].predict(X_fit)
+                y_fit_50 = models[0.5].predict(X_fit)
+                y_fit_95 = models[0.95].predict(X_fit)
+                
+                # axr.plot(cam_ice_fraction[valid_mask], y_fit_50, color='orange', linestyle='--', label='Quantile Reg (50th)')
+                axr.fill_between(cam_ice_fraction[valid_mask], y_fit_05, y_fit_95, color='orange', alpha=0.2, label='Quantile Regression (5th-95th)')
+                axr.legend(fontsize=10)
+                    
+                
+                
                 x_1_index = np.argmin(np.abs(x_sorted - 1.0))
                 broadband_alb_at_1 = y_pred[x_1_index]
                 broadband_alb_at_1_upper = upper_bound[x_1_index]
                 broadband_alb_at_1_lower = lower_bound[x_1_index]
+                
+                broadband_alb_at_1 = models[0.5].predict([1.0, 1.0])[0]
+                broadband_alb_at_1_upper = models[0.95].predict([1.0, 1.0])[0]
+                broadband_alb_at_1_lower = models[0.05].predict([1.0, 1.0])[0]
+                
+                # broadband_alb_date_cond.append(broadband_alb_at_1)
                 broadband_alb_date_cond_upper.append(broadband_alb_at_1_upper)
                 broadband_alb_date_cond_lower.append(broadband_alb_at_1_lower)
                 broadband_alb_date_cond_unc.append((broadband_alb_at_1_upper - broadband_alb_at_1_lower)/2)
                 
-                myi_ratio_date_cond.append(np.nanmean(myi_cam_time))
-                myi_ratio_date_cond_std.append(np.nanstd(myi_cam_time))
+                myi_cam_time_valid = myi_cam_time[valid_mask]
+                myi_cam_time_valid = myi_cam_time_valid[myi_cam_time_valid<=100]
+                fyi_cam_time_valid = fyi_cam_time[valid_mask]
+                fyi_cam_time_valid = fyi_cam_time_valid[fyi_cam_time_valid<=100]
+                yi_cam_time_valid = yi_cam_time[valid_mask]
+                yi_cam_time_valid = yi_cam_time_valid[yi_cam_time_valid<=100]
+                ice_ratio_cam_time_valid = ice_ratio_cam_time[valid_mask]
+                ice_ratio_cam_time_valid = ice_ratio_cam_time_valid[ice_ratio_cam_time_valid<=100]
+                # myi_ratio_date_cond.append(np.nanmean(myi_cam_time_valid))
+                # myi_ratio_date_cond_std.append(np.nanstd(myi_cam_time_valid))
+                # fyi_raio_date_cond.append(np.nanmean(fyi_cam_time_valid))
+                # fyi_ratio_date_cond_std.append(np.nanstd(fyi_cam_time_valid))
+                # yi_ratio_date_cond.append(np.nanmean(yi_cam_time_valid))
+                # yi_ratio_date_cond_std.append(np.nanstd(yi_cam_time_valid))
+                # fyi_yi_ratio_date_cond.append(np.nanmean(fyi_cam_time_valid + yi_cam_time_valid))
+                # fyi_yi_ratio_date_cond_std.append(np.nanstd(fyi_cam_time_valid + yi_cam_time_valid))
+
+                
+                myi_ratio_date_cond_ = np.nansum(myi_cam_time_valid*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid)
+                fyi_ratio_date_cond_ = np.nansum(fyi_cam_time_valid*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid)
+                yi_ratio_date_cond_ = np.nansum(yi_cam_time_valid*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid)
+                fyi_yi_ratio_date_cond_ = np.nansum((fyi_cam_time_valid + yi_cam_time_valid)*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid)
+                myi_ratio_date_cond_std_ = np.sqrt(np.nansum(((myi_cam_time_valid - myi_ratio_date_cond_)**2)*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid))
+                fyi_ratio_date_cond_std_ = np.sqrt(np.nansum(((fyi_cam_time_valid - fyi_ratio_date_cond_)**2)*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid))
+                yi_ratio_date_cond_std_ = np.sqrt(np.nansum(((yi_cam_time_valid - yi_ratio_date_cond_)**2)*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid))
+                fyi_yi_ratio_date_cond_std_ = np.sqrt(np.nansum((((fyi_cam_time_valid + yi_cam_time_valid) - fyi_yi_ratio_date_cond_)**2)*ice_ratio_cam_time_valid)/np.nansum(ice_ratio_cam_time_valid))
+                myi_ratio_date_cond.append(myi_ratio_date_cond_)
+                myi_ratio_date_cond_std.append(myi_ratio_date_cond_std_)
+                fyi_raio_date_cond.append(fyi_ratio_date_cond_)
+                fyi_ratio_date_cond_std.append(fyi_ratio_date_cond_std_)
+                yi_ratio_date_cond.append(yi_ratio_date_cond_)
+                yi_ratio_date_cond_std.append( yi_ratio_date_cond_std_)
+                fyi_yi_ratio_date_cond.append(fyi_yi_ratio_date_cond_)
+                fyi_yi_ratio_date_cond_std.append( fyi_yi_ratio_date_cond_std_)
+                
+                # myi_ratio_date_cond.append(np.nanmedian(myi_cam_time_valid))
+                # myi_ratio_date_cond_std.append(np.percentile(myi_cam_time_valid, 95) - np.percentile(myi_cam_time_valid, 5))
+                # fyi_raio_date_cond.append(np.nanmedian(fyi_selected_all))
+                # fyi_ratio_date_cond_std.append(np.percentile(fyi_selected_all, 95) - np.percentile(fyi_selected_all, 5))
+                # yi_ratio_date_cond.append(np.nanmedian(yi_selected_all))
+                # yi_ratio_date_cond_std.append(np.percentile(yi_selected_all, 95) - np.percentile(yi_selected_all, 5))
+                # fyi_yi_ratio_date_cond.append(np.nanmedian(fyi_selected_all + yi_selected_all))
+                # fyi_yi_ratio_date_cond_std.append(np.percentile(fyi_selected_all + yi_selected_all, 95) - np.percentile(fyi_selected_all + yi_selected_all, 5))
+                
+                # myi_ratio_date_cond.append(myi_age_median)  # to percentage
+                # myi_ratio_date_cond_std.append(myi_age_perc_range)
+                
+                
+                
+                print(f"Date: {date_key}, Case: {case_tag}, Broadband Albedo at Ice Fraction=1.0: {broadband_alb_at_1:.3f} (+{broadband_alb_at_1_upper - broadband_alb_at_1:.3f}/-{broadband_alb_at_1 - broadband_alb_at_1_lower:.3f})")
+                print(f"    Mean MYI Ratio: {myi_ratio_date_cond[-1]:.2f} +/- {myi_ratio_date_cond_std[-1]:.2f} %")
+                print(f"    Mean FYI Ratio: {fyi_raio_date_cond[-1]:.2f} +/- {fyi_ratio_date_cond_std[-1]:.2f} %")
+                print(f"    Mean YI Ratio: {yi_ratio_date_cond[-1]:.2f} +/- {yi_ratio_date_cond_std[-1]:.2f} %")
+                print(f"    Mean FYI+YI Ratio: {fyi_yi_ratio_date_cond[-1]:.2f} +/- {fyi_yi_ratio_date_cond_std[-1]:.2f} %")
+                
                 
             axr.set_xlabel('Camera Ice Fraction', fontsize=14)
             axr.set_ylabel('Broadband Albedo', fontsize=14)
@@ -546,6 +668,177 @@ def combined_atm_corr():
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio.png', bbox_inches='tight', dpi=150)
     # plt.show()
     plt.close(fig)
+    
+    print("broadband_alb_date_cond min, max:", np.min(broadband_alb_date_cond), np.max(broadband_alb_date_cond))
+    
+    date_conditions_simplified = [dc.replace('2024', '').replace('_', '-') for dc in date_conditions]
+    plt.close('all')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    ax1.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc,
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
+    ax1.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax1.set_xticks(np.arange(len(broadband_alb_date_cond)))
+    ax1.set_xticklabels(date_conditions_simplified, rotation=45, ha='right')
+    ax1.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
+                       mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
+    ax1.set_xlabel('Date and condition', fontsize=14)
+    ax1.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    
+    # fit line in ax2
+    sample_weights = 1.0 / (np.array(broadband_alb_date_cond_unc) + 1e-6)**2
+    X = sm.add_constant(myi_ratio_date_cond)
+    y = np.array(broadband_alb_date_cond)
+
+    mod_wls = sm.WLS(y, X )#weights=sample_weights)
+    res_wls = mod_wls.fit()
+    slope = res_wls.params[1]
+    intercept = res_wls.params[0]
+    r_value = res_wls.rsquared
+    x_fit = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 100)
+    y_fit = intercept + slope * x_fit
+    p_values = res_wls.pvalues
+    
+    ax2.errorbar(myi_ratio_date_cond, broadband_alb_date_cond, 
+                xerr=myi_ratio_date_cond_std,
+                yerr=broadband_alb_date_cond_unc, 
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#label='Data Points with Uncertainty')
+    ax2.scatter(myi_ratio_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+    ax2.legend(fontsize=12)
+    ax2.set_xlabel('Mean Multi-year Sea Ice Coverage (%)', fontsize=14)
+    ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.tick_params(labelsize=12)
+        ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16,  va='top', ha='left')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_summary.png', bbox_inches='tight', dpi=150)
+    
+    # multi variables regression
+    X_multi = np.column_stack((myi_ratio_date_cond, fyi_raio_date_cond, yi_ratio_date_cond))
+    X_multi = sm.add_constant(X_multi)
+    y_multi = np.array(broadband_alb_date_cond)
+    mod_multi = sm.OLS(y_multi, X_multi)
+    res_multi = mod_multi.fit()
+    print(res_multi.summary())
+    print("Fit: y = %.3f + %.3f*MYI + %.3f*FYI + %.3f*YI" % (res_multi.params[0], res_multi.params[1]*100, res_multi.params[2]*100, res_multi.params[3]*100))
+    print("R-squared:", res_multi.rsquared)
+    print("p-values:", res_multi.pvalues)
+    #
+    
+    plt.close('all')
+    # plot 3D scatter
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    sc = ax.scatter(myi_ratio_date_cond, fyi_raio_date_cond, yi_ratio_date_cond, c=broadband_alb_date_cond,
+                    cmap='jet', s=100)
+    # plot fitting line
+    m_yi = res_multi.params[3]
+    m_fyi = res_multi.params[2]
+    m_myi = res_multi.params[1]
+    b = res_multi.params[0]
+    # create grid to plot plane
+    myi_range = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 10)
+    fyi_range = np.linspace(0, np.max(fyi_raio_date_cond)*1.05, 10)
+    myi_grid, fyi_grid = np.meshgrid(myi_range, fyi_range)
+    yi_grid = (b + m_myi * myi_grid + m_fyi * fyi_grid) / (-m_yi + 1e-6) 
+    ax.plot_surface(myi_grid, fyi_grid, yi_grid, alpha=0.5, color='orange')
+    ax.set_xlabel('Mean Multi-year Sea Ice Coverage (%)', fontsize=12)
+    ax.set_ylabel('Mean First-year Sea Ice Coverage (%)', fontsize=12)
+    ax.set_zlabel('Mean Young Ice Coverage (%)', fontsize=12)
+    cbar = fig.colorbar(sc, ax=ax, pad=0.1)
+    cbar.set_label('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=12)
+    ax.tick_params(labelsize=10)
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_3d_scatter.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    
+    # multi variables regression
+    X_multi = np.column_stack((myi_ratio_date_cond, fyi_yi_ratio_date_cond))
+    X_multi = sm.add_constant(X_multi)
+    y_multi = np.array(broadband_alb_date_cond)
+    mod_multi = sm.OLS(y_multi, X_multi)
+    res_multi = mod_multi.fit()
+    print(res_multi.summary())
+    print("Fit: y = %.3f + %.3f*MYI + %.3f*(FYI + YI)" % (res_multi.params[0], res_multi.params[1]*100, res_multi.params[2]*100,))
+    print("R-squared:", res_multi.rsquared)
+    print("p-values:", res_multi.pvalues)
+    #
+    
+    plt.close('all')
+    # plot 3D scatter
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    sc = ax.scatter(myi_ratio_date_cond, fyi_yi_ratio_date_cond, broadband_alb_date_cond,
+                    color='k', s=100)
+    # plot fitting line
+    m_fyiyi = res_multi.params[2]
+    m_myi = res_multi.params[1]
+    b = res_multi.params[0]
+    # create grid to plot plane
+    myi_range = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 10)
+    fyi_range = np.linspace(0, np.max(fyi_yi_ratio_date_cond)*1.05, 10)
+    myi_grid, fyi_grid = np.meshgrid(myi_range, fyi_range)
+    z_grid = b + m_myi * myi_grid + m_fyiyi * fyi_grid
+    ax.plot_surface(myi_grid, fyi_grid, z_grid, alpha=0.5, color='orange')
+    ax.set_xlabel('Mean Multi-year Sea Ice Coverage (%)', fontsize=12)
+    ax.set_ylabel('Mean First-year + Young Sea Ice Coverage (%)', fontsize=12)
+    ax.set_zlabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=12)
+    ax.tick_params(labelsize=10)
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_3d_scatter_2.png', dpi=150)
+    plt.close(fig)
+    
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(9, 5))
+    cc = ax.scatter(myi_ratio_date_cond, fyi_yi_ratio_date_cond, c=broadband_alb_date_cond, edgecolors='k',
+                    cmap='jet', s=100, vmin=0, vmax=1.0, zorder=2)
+    x_fit = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 100)
+    y_fit = np.linspace(0, np.max(fyi_yi_ratio_date_cond)*1.05, 100)
+    X1_fit, X2_fit = np.meshgrid(x_fit, y_fit)
+    Z_fit = b + m_myi * X1_fit + m_fyiyi * X2_fit
+    ax.contourf(X1_fit, X2_fit, Z_fit, cmap='jet', vmin=0, vmax=1.0, zorder=1, levels=101)
+    ax.set_xlabel('Mean Multi-year Sea Ice Coverage (%)', fontsize=12)
+    ax.set_ylabel('Mean First-year + Young Sea Ice Coverage (%)', fontsize=12)
+    cbar = fig.colorbar(cc, ax=ax)
+    cbar.set_label('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=12)
+    ax.tick_params(labelsize=10)
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_contourf.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    
+    # multi variables regression
+    X_multi = np.column_stack((myi_ratio_date_cond, 100-np.array(myi_ratio_date_cond)))
+    X_multi = sm.add_constant(X_multi)
+    y_multi = np.array(broadband_alb_date_cond)
+    mod_multi = sm.OLS(y_multi, X_multi)
+    res_multi = mod_multi.fit()
+    print(res_multi.summary())
+    print("Fit: y = %.3f + %.3f*MYI + %.3f*(FYI + YI)" % (res_multi.params[0], res_multi.params[1]*100, res_multi.params[2]*100,))
+    print("R-squared:", res_multi.rsquared)
+    print("p-values:", res_multi.pvalues)
+    #
+
+    
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(9, 5))
+    cc = ax.scatter(myi_ratio_date_cond, 100-np.array(myi_ratio_date_cond), c=broadband_alb_date_cond, edgecolors='k',
+                    cmap='jet', s=100, vmin=0, vmax=1.0, zorder=2)
+    x_fit = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 100)
+    y_fit = np.linspace(0, np.max(1-np.array(myi_ratio_date_cond))*1.05, 100)
+    X1_fit, X2_fit = np.meshgrid(x_fit, y_fit)
+    Z_fit = b + m_myi * X1_fit + m_fyiyi * X2_fit
+    ax.contourf(X1_fit, X2_fit, Z_fit, cmap='jet', vmin=0, vmax=1.0, zorder=1, levels=101)
+    ax.set_xlabel('Mean Multi-year Sea Ice Coverage (%)', fontsize=12)
+    ax.set_ylabel('Mean First-year + Young Sea Ice Coverage (%)', fontsize=12)
+    cbar = fig.colorbar(cc, ax=ax)
+    cbar.set_label('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=12)
+    ax.tick_params(labelsize=10)
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_contourf_2.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    
+    
+    sys.exit()
 
     
     
@@ -748,6 +1041,8 @@ def combined_atm_corr():
         wvl_r2[i] = r_value**2
         wvl_slope[i] = slope
         # print(f'Wavelength: {alb_wvl[i]:.1f} nm, Slope: {slope:.4f}, R²: {r_value**2:.4f}')
+        
+        
     fig, ax = plt.subplots(figsize=(8, 6))
     ax2 = ax.twinx()
     c1 = ax.scatter(alb_wvl, wvl_slope, c=wvl_r2, s=10, cmap='jet', vmin=0, vmax=1)
@@ -770,6 +1065,147 @@ def combined_atm_corr():
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_wvl_icefraction_correlation.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
+    
+    
+    mask = np.isfinite(broadband_alb_cam_time) & np.isfinite(cam_ice_fraction)
+    X_fit = sm.add_constant(cam_ice_fraction[mask])
+    quantiles = [0.05, 0.5, 0.95]
+    models = {}
+
+    for q in quantiles:
+        # Initialize the model with (endog=y, exog=X_design)
+        mod = sm.QuantReg(broadband_alb_cam_time[mask], X_fit)
+        res = mod.fit(q=q)
+        models[q] = res
+        
+    y_fit_05 = models[0.05].predict(X_fit)
+    y_fit_50 = models[0.5].predict(X_fit)
+    y_fit_95 = models[0.95].predict(X_fit)
+    
+    slope, intercept, r_value, p_value, std_err = linregress(cam_ice_fraction[mask], broadband_alb_cam_time[mask])
+    sorted_ice_frac = np.sort(cam_ice_fraction[mask])
+    
+    fig = plt.figure(figsize=(18, 9.5 ))
+    gs = gridspec.GridSpec(3, 16, height_ratios=[1, 1, 1.5], hspace=0.5, wspace=0.6)
+    ax11 = fig.add_subplot(gs[:2, :8])
+    ax11_2 = ax11.twinx()
+    ax12 = fig.add_subplot(gs[:2, 9:])
+    ax21 = fig.add_subplot(gs[2, :4])
+    ax22 = fig.add_subplot(gs[2, 4:8])
+    ax23 = fig.add_subplot(gs[2, 8:12])
+    ax24 = fig.add_subplot(gs[2, 12:])
+    
+    from datetime import datetime, timedelta
+    import matplotlib.dates as mdates
+    base_date = datetime(2024, 8, 1)  # example date
+    time_selected_all_dt = [base_date + timedelta(hours=t) for t in time_selected_all]
+    cam_time_dt = [base_date + timedelta(hours=t) for t in cam_time]
+    l1 = ax11.scatter(time_selected_all_dt, broadband_alb_selected_all, label=f'Broadband albedo', c='b', s=10)
+    l2 = ax11_2.scatter(cam_time_dt, cam_ice_fraction, label='camera SIC', c='r', s=5)
+    ax11.set_xlabel('Time (UTC)', fontsize=14)
+    ax11.set_ylabel('Broadband Albedo', fontsize=14, color='b')
+    ax11_2.set_ylabel('Camera Sea Ice Fraction', fontsize=14, color='r')
+    ax11_2.set_ylim(-0.05, 1.05)
+    lns = [l1, l2]
+    labs = [l.get_label() for l in lns]
+    # set legend box background to white with some transparency
+    ax11.legend(lns, labs, fontsize=10, loc='center left', bbox_to_anchor=(0.15, 0.1))
+    # set ax11 x tick in hours and minutes
+    
+    
+    ax11.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))  # every 5 minutes
+    ax11.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    
+    # plot arrow to indicate time of images
+    image_times = [13+53/60 + 55/3600, 13+56/60 + 47/3600, 13+59/60 + 11/3600, 14+4/60 + 24/3600]
+      
+    img_colors = ['purple', 'green', 'orange', 'brown']
+    directions = ['down', 'up', 'leftup', 'rightup']
+    
+    for i in range(len(image_times)):
+        it = image_times[i]
+        direction = directions[i]
+        ind_closest = np.argmin(np.abs(time_selected_all - it))
+        y_closest = broadband_alb_selected_all[ind_closest]
+        
+        arrow_props=dict(facecolor=img_colors[i], 
+                         edgecolor=img_colors[i],
+                         shrink=0.05, width=2, headwidth=8)
+        
+        if direction == 'up':
+            ax11.annotate('', xy=(base_date + timedelta(hours=it), y_closest - 0.01),
+                      xytext=(base_date + timedelta(hours=it), y_closest - 0.09),
+                      arrowprops=arrow_props
+                      )
+        elif direction == 'down':
+            ax11.annotate('', xy=(base_date + timedelta(hours=it), y_closest + 0.01),
+                        xytext=(base_date + timedelta(hours=it), y_closest + 0.09),
+                        arrowprops=arrow_props,
+                        )
+        
+        elif direction == 'leftup':
+            ax11.annotate('', xy=(base_date + timedelta(hours=it) + timedelta(minutes=0.5), y_closest - 0.01),
+                        xytext=(base_date + timedelta(hours=it) + timedelta(minutes=1.5), y_closest - 0.09),
+                        arrowprops=arrow_props,
+                        )
+        elif direction == 'rightup':
+            ax11.annotate('', xy=(base_date + timedelta(hours=it) - timedelta(minutes=0.5), y_closest - 0.01),
+                        xytext=(base_date + timedelta(hours=it) - timedelta(minutes=1.5), y_closest - 0.09),
+                        arrowprops=arrow_props,
+                        )
+    
+    ax11.tick_params(labelsize=12)
+    
+    
+    
+    ax12.scatter(cam_ice_fraction, broadband_alb_cam_time, s=10, c='k')
+    ax12.plot(sorted_ice_frac, slope*sorted_ice_frac + intercept, color='red', 
+              linestyle='--', label=r'Linear Fit: y=%.2fx+%.2f, $\mathrm{R^2}$=%.2f' %(slope, intercept, r_value**2))
+    ax12.fill_between(sorted_ice_frac, models[0.05].predict(sm.add_constant(sorted_ice_frac)), 
+                     models[0.95].predict(sm.add_constant(sorted_ice_frac)), color='coral', alpha=0.3, label='Quantile Regression (5th-95th)')
+    ax12.set_xlabel('Camera Sea Ice Fraction', fontsize=14)
+    ax12.set_ylabel('Broadband Albedo', fontsize=14)
+    ax12.legend(fontsize=10)
+    ax12.tick_params(labelsize=12)
+    
+    img_x_start = 0
+    img_x_end = 1980
+    img_y_start = 500
+    img_y_end = 2500
+    img_fontsize = 14
+    img3_fn = f'{_fdir_general_}/camera/20240801/Capture_02436_13_53_54Z.jpg'
+    img3 = plt.imread(img3_fn)
+    print("img3 shape:", img3.shape)
+    ax21.imshow(img3[img_x_start:img_x_end, img_y_start:img_y_end, :])
+    ax21.set_title('13:53:54 UTC', color=img_colors[0], fontsize=img_fontsize)
+    ax21.axis('off')
+    
+    img4_fn = f'{_fdir_general_}/camera/20240801/Capture_02584_13_56_47Z.jpg'
+    img4 = plt.imread(img4_fn)
+    ax22.imshow(img4[img_x_start:img_x_end, img_y_start:img_y_end, :])
+    ax22.set_title('13:56:47 UTC', color=img_colors[1], fontsize=img_fontsize)
+    ax22.axis('off')
+    
+    img5_fn = f'{_fdir_general_}/camera/20240801/Capture_02712_13_59_11Z.jpg'
+    img5 = plt.imread(img5_fn)
+    ax23.imshow(img5[img_x_start:img_x_end, img_y_start:img_y_end, :])
+    ax23.set_title('13:59:11 UTC', color=img_colors[2], fontsize=img_fontsize)
+    ax23.axis('off')
+    
+    img6_fn = f'{_fdir_general_}/camera/20240801/Capture_02991_14_04_24Z.jpg'
+    img6 = plt.imread(img6_fn)
+    ax24.imshow(img6[img_x_start:img_x_end, img_y_start:img_y_end, :])
+    ax24.set_title('14:04:24 UTC', color=img_colors[3], fontsize=img_fontsize)
+    ax24.axis('off')
+    
+    for ax, cap in zip([ax11, ax12, ax21, ax22, ax23, ax24],
+                       ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)']):
+        ax.text(0 , 1.025, cap, transform=ax.transAxes,
+                fontsize=16, va='bottom', ha='left')
+    
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_broadband_icefraction_combined.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    sys.exit()
     
     
     ### Plot flight tracks
@@ -830,6 +1266,9 @@ def combined_atm_corr():
     leg.get_frame().set_facecolor('white')
 
     plt.savefig(f'{fig_dir}/arcsix_flight_paths_0801_clear.png', dpi=300, bbox_inches='tight')
+    
+    
+    sys.exit()
     
     
     # 8/1 clear_atm_corr 2

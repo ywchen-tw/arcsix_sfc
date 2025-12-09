@@ -803,6 +803,7 @@ def combined_atm_corr():
     date_myi_ratio_std = []
     date_ice_age_avg = []
     date_ice_age_std = []
+    date_ice_age_myi_ratio = []
     date_clear_all = []
     date_alb_clear = []
     date_alb_clear_std = []
@@ -852,6 +853,8 @@ def combined_atm_corr():
         date_ice_age_std_ = np.nanstd(ice_age_spring_all[date_mask])
         date_ice_age_avg.append(date_ice_age_avg_)
         date_ice_age_std.append(date_ice_age_std_)
+        date_ice_age_myi_raio_ = (ice_age_spring_all[date_mask] >= 2).sum()/len(ice_age_spring_all[date_mask])
+        date_ice_age_myi_ratio.append(date_ice_age_myi_raio_)
         
         clear_mask = date_mask & (leg_contidions_all_spring == 'clear')
         if np.any(clear_mask):
@@ -920,6 +923,8 @@ def combined_atm_corr():
         date_ice_age_std_ = np.nanstd(ice_age_summer_all[date_mask])
         date_ice_age_avg.append(date_ice_age_avg_)
         date_ice_age_std.append(date_ice_age_std_)
+        date_ice_age_myi_raio_ = (ice_age_summer_all[date_mask] >= 2).sum()/len(ice_age_summer_all[date_mask])
+        date_ice_age_myi_ratio.append(date_ice_age_myi_raio_)
         
         clear_mask = date_mask & (leg_contidions_all_summer == 'clear')
         if np.any(clear_mask):
@@ -1096,7 +1101,7 @@ def combined_atm_corr():
     fig, ax = plt.subplots(figsize=(9, 5))
     for i in range(len(date_all)):
         if date_all[i] not in ['0808', '0809']:
-            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, Ice Age={date_ice_age_avg[i]:.1f} y', color=color_series[i])
+            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, Ice Age={date_ice_age_avg[i]:.1f} +/- {date_ice_age_std[i]:.1f} y', color=color_series[i])
             ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
     for band in gas_bands:
         ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -1111,8 +1116,26 @@ def combined_atm_corr():
     fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_partial_ice_age.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i in range(len(date_all)):
+        if date_all[i] not in ['0808', '0809']:
+            ax.plot(date_alb_wvl[i], date_alb[i], label=f'{date_all[i]}, MYI={date_ice_age_myi_ratio[i]*100:.1f}%', color=color_series[i])
+            ax.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title('Surface Albedo (atm corr + fit)\nexclude 0808, 0809', fontsize=13)
+    ax.set_xlim(350, 2000)
+    fig.tight_layout()
+    fig.savefig(f'{fig_dir}/arcsix_ albedo_all_flights_partial_ice_age_myi_ratio.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
     
-    # sys.exit()
+    
+    sys.exit()
     
     """
     for date in sorted((set(dates_spring_all))):
@@ -1725,11 +1748,11 @@ def combined_atm_corr():
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
     
+    eff_alb_ = gas_abs_masking(date_alb_wvl[0], np.ones_like(date_alb_wvl[0]), alt=5)
     for i in range(len(date_all)):
         ax12.plot(date_alb_wvl[i], date_alb[i], label=f'{SF_into[date_all[i]]} ({date_all[i]})', color=color_series[i])
         ax12.fill_between(date_alb_wvl[i], date_alb[i]-date_alb_std[i], date_alb[i]+date_alb_std[i], color=color_series[i], alpha=0.1)
-    for band in gas_bands:
-        ax12.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    ax12.fill_between(date_alb_wvl[0], -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)# label='Mask Gas absorption bands')
     ax12.set_xlabel('Wavelength (nm)', fontsize=14)
     ax12.set_ylabel('Surface Albedo', fontsize=14)
     ax12.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.05, -0.1))
@@ -1748,7 +1771,7 @@ def combined_atm_corr():
     ax22.tick_params(labelsize=12)
     ax22.set_xlim(0.1, 1.10)
     ax22.set_ylim(0.1, 0.9)
-    for ax, cap in zip([ax11, ax12, ax21, ax22], ['(a)', '(b)', '(c)', '(d)']):
+    for ax, cap in zip([ax11, ax12, ax21, ax22], ['(a)', '(c)', '(b)', '(d)']):
         ax.text(0.0, 1.01, cap, transform=ax.transAxes, fontsize=14,
                 verticalalignment='bottom', horizontalalignment='left')
     fig.savefig(f'{fig_dir}/arcsix_broadband_albedo_vs_longitude_polar_projection_spring_summer_combined.png', bbox_inches='tight', dpi=300)

@@ -213,6 +213,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         tmhr_ranges_select = tmhr_ranges_select_new
 
     
+    
     # read satellite granule
     #/----------------------------------------------------------------------------\#
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
@@ -239,7 +240,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
         
         fname_cld_obs_info = '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl' % (fdir_cld_obs_info, _mission_.lower(), _platform_.lower(), date_s, case_tag, time_start, time_end)
-        print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
+        # print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
         
         processed_file = f'{processed_dir}/sfc_alb_update_{date_s}_{case_tag}_time_{tmhr_ranges_select[0][0]:.3f}_{tmhr_ranges_select[-1][-1]:.3f}.pkl'
         
@@ -275,11 +276,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 alb_iter2_all = np.vstack((alb_iter2_all, vars()[f"processed_leg_{i}"]['alb_iter2_all']))
             
         else:
-            print(f"Processed file {processed_file} not found. Skipping leg {i}.")
+            # print(f"Processed file {processed_file} not found. Skipping leg {i}.")
+            None
         
     
     
-       
+    
     lon_avg = np.round(np.mean(lon_all), 2)
     lat_avg = np.round(np.mean(lat_all), 2)
     lon_min, lon_max = np.round(np.min(lon_all), 2), np.round(np.max(lon_all), 2)
@@ -290,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-
+    sza_arr = np.array([50, 55, 60, 65, 70, 75, 80, 85, np.round(sza_avg, 2)], dtype=np.float32)
         
         
     if clear_sky:
@@ -299,170 +301,407 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     else:
         fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
         fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
+    
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
+    
+    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
-    if manual_alb is None:
-        manual_alb = [None]
-    elif isinstance(manual_alb, str):
-        manual_alb = [manual_alb]
-    else:
-        assert isinstance(manual_alb, list) #"manual_alb should be None, str, or list of str"
-        
-    cot_list_all = []
-    cwp_list_all = []
-    cer_list_all = []
-    cth_list_all = []
-    cbh_list_all = []
-    Fup_sfc_sw_all = []
-    Fdn_sfc_sw_all = []
-    F_sfc_sw_cre_all = []
-    F_sfc_lw_cre_all = []
-    F_sfc_net_cre_all = []
-    
-    cot_real_list_all = []
-    cwp_real_list_all = []
-    cer_real_list_all = []
-    cth_real_list_all = []
-    cbh_real_list_all = []
-    Fup_real_sfc_sw_all = []
-    Fdn_real_sfc_sw_all = []
-    F_sfc_sw_cre_real_all = []
-    F_sfc_lw_cre_real_all = []
-    F_sfc_net_cre_real_all = []
-    
-    alb_wvl_all = []
-    alb_all = []
-    broadband_alb_all = []
-    broadband_alb_ori_all = []
-    
-    # use CU solar spectrum
-    df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
-    wvl_solar = np.array(df_solor.iloc[:, 0])
-    flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
-    
-    # interpolate to 1 nm grid
-    f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
-    
-    
-    for i in range(len(manual_alb)):
-        manual_alb_i = manual_alb[i]
-        if manual_alb_i is None:
-            output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw.csv'
-            output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw.csv'
+        if manual_alb is None:
+            manual_alb = [None]
+        elif isinstance(manual_alb, str):
+            manual_alb = [manual_alb]
         else:
-            output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
-            output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
-
-        os.makedirs(fdir_tmp, exist_ok=True)
-        os.makedirs(fdir, exist_ok=True)
-        
-
-        # read csv and extract simulated fluxes
-        with open(output_csv_name_sw, 'r') as f:
-            df_sw = pd.read_csv(f)
+            assert isinstance(manual_alb, list) #"manual_alb should be None, str, or list of str"
             
-        with open(output_csv_name_lw, 'r') as f:
-            df_lw = pd.read_csv(f)
+        cot_list_all = []
+        cwp_list_all = []
+        cer_list_all = []
+        cth_list_all = []
+        cbh_list_all = []
+        sza_list_all = []
+        Fup_sfc_sw_all = []
+        Fdn_sfc_sw_all = []
+        F_sfc_sw_cre_all = []
+        F_sfc_lw_cre_all = []
+        F_sfc_net_cre_all = []
+        broadband_alb_list_all = []
+        broadband_alb_ori_list_all = []
         
-        cot_list = df_sw['cot'].values
-        cwp_list = df_sw['cwp'].values
-        cer_list = df_sw['cer'].values
-        cth_list = df_sw['cth'].values
-        cbh_list = df_sw['cbh'].values
-        Fup_sfc_sw = df_sw['Fup_sfc'].values
-        Fdn_sfc_sw = df_sw['Fdn_sfc'].values
-        Fup_sfc_lw = df_lw['Fup_sfc'].values
-        Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+        cot_real_list_all = []
+        cwp_real_list_all = []
+        cer_real_list_all = []
+        cth_real_list_all = []
+        cbh_real_list_all = []
+        sza_real_list_all = []
+        Fup_real_sfc_sw_all = []
+        Fdn_real_sfc_sw_all = []
+        F_sfc_sw_cre_real_all = []
+        F_sfc_lw_cre_real_all = []
+        F_sfc_net_cre_real_all = []
+        broadband_alb_list_real_all = []
+        broadband_alb_ori_list_real_all = []
         
-        Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
-        Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
+        alb_wvl_all = []
+        alb_all = []
+        broadband_alb_all = []
+        broadband_alb_ori_all = []
         
-        cot0_ind = cot_list == 0.0
         
-        F_sfc_sw = Fdn_sfc_sw - Fup_sfc_sw
-        F_sfc_lw = Fdn_sfc_lw - Fup_sfc_lw
-        F_sfc_sw_clear = F_sfc_sw[cot0_ind]
-        F_sfc_lw_clear = F_sfc_lw[cot0_ind]
-        F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
-        F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
-        cot_cre = cot_list
-        cwp_cre = np.array(cwp_list) * 1000
-        F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
+        # use CU solar spectrum
+        df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
+        wvl_solar = np.array(df_solor.iloc[:, 0])
+        flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
         
-        print("cwp_cre:", cwp_cre)
-        print("F_sfc_sw_cre:", F_sfc_sw_cre)
-        print("F_sfc_lw_cre:", F_sfc_lw_cre)
+        # interpolate to 1 nm grid
+        f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
         
-        select = np.array([cwp%2.5==0 for cwp in cwp_cre])
-        case_sel = ~select
         
-        plt.close('all')
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
-        ax.plot(cwp_cre[select], F_sfc_lw_cre[select], '-', label='LW CRE')
-        ax.plot(cwp_cre[select], F_sfc_net_cre[select], '-', label='Net CRE')
-        ax.scatter(cwp_cre[case_sel], F_sfc_net_cre[case_sel], c='C0', marker='o', s=50, label='Flight case')
-        ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-        ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
-        ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
-        ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
-        ax.legend(fontsize=12)
-        fig.tight_layout()
-        if manual_alb_i is not None:
-            fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}_alb-manual-{manual_alb_i.replace(".dat", "")}.png', dpi=300)
-        else:
-            fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
+        
+        
+        
+        # if manual_alb is None:
+        #     output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}.csv'
+        # else:
+        #     output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_alb-manual-{manual_alb.replace(".dat", "")}.csv'
+
+        for i in range(len(manual_alb)):
+            for sza_sim in sza_arr:
+                
+                manual_alb_i = manual_alb[i]
+                if manual_alb_i is None:
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}.csv'
+                else:
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
+
+                os.makedirs(fdir_tmp, exist_ok=True)
+                os.makedirs(fdir, exist_ok=True)
+                
+
+                # read csv and extract simulated fluxes
+                with open(output_csv_name_sw, 'r') as f:
+                    df_sw = pd.read_csv(f)
+                    
+                with open(output_csv_name_lw, 'r') as f:
+                    df_lw = pd.read_csv(f)
+                
+                cot_list = df_sw['cot'].values
+                cwp_list = df_sw['cwp'].values
+                cer_list = df_sw['cer'].values
+                cth_list = df_sw['cth'].values
+                cbh_list = df_sw['cbh'].values
+                sza_list = df_sw['sza'].values
+                Fup_sfc_sw = df_sw['Fup_sfc'].values
+                Fdn_sfc_sw = df_sw['Fdn_sfc'].values
+                Fup_sfc_lw = df_lw['Fup_sfc'].values
+                Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+                
+                Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
+                Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
+                
+                cot0_ind = cot_list == 0.0
+                
+                F_sfc_sw = Fdn_sfc_sw - Fup_sfc_sw
+                F_sfc_lw = Fdn_sfc_lw - Fup_sfc_lw
+                F_sfc_sw_clear = F_sfc_sw[cot0_ind]
+                F_sfc_lw_clear = F_sfc_lw[cot0_ind]
+                F_sfc_sw_cre = F_sfc_sw - F_sfc_sw_clear
+                F_sfc_lw_cre = F_sfc_lw - F_sfc_lw_clear
+                cot_cre = cot_list
+                cwp_cre = np.array(cwp_list) * 1000
+                F_sfc_net_cre = F_sfc_sw_cre + F_sfc_lw_cre
+                
+                # print("cwp_cre:", cwp_cre)
+                # print("F_sfc_sw_cre:", F_sfc_sw_cre)
+                # print("F_sfc_lw_cre:", F_sfc_lw_cre)
+                
+                select = np.array([cwp%1==0 for cwp in cwp_cre])
+                case_sel = ~select
+                
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(8, 6))
+                ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
+                ax.plot(cwp_cre[select], F_sfc_lw_cre[select], '-', label='LW CRE')
+                ax.plot(cwp_cre[select], F_sfc_net_cre[select], '-', label='Net CRE')
+                ax.scatter(cwp_cre[case_sel], F_sfc_net_cre[case_sel], c='C0', marker='o', s=50, label='Flight case')
+                ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+                ax.set_ylabel('Surface CRE (W/m2)', fontsize=14)
+                ax.set_title(f'Surface CRE vs. LWP on {date_s}', fontsize=16)
+                ax.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
+                ax.legend(fontsize=12)
+                fig.tight_layout()
+                if manual_alb_i is not None:
+                    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}_alb-manual-{manual_alb_i.replace(".dat", "")}.png', dpi=300)
+                else:
+                    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_{date_s}_{case_tag}.png', dpi=300)
+            
+                plt.close(fig)
+                
+                cot_list_all.extend(cot_list[select])
+                cwp_list_all.extend(cwp_cre[select])
+                cer_list_all.extend(cer_list[select])
+                cth_list_all.extend(cth_list[select])
+                cbh_list_all.extend(cbh_list[select])
+                sza_list_all.extend(sza_list[select])
+                Fup_sfc_sw_all.extend(Fup_sfc_sw[select])
+                Fdn_sfc_sw_all.extend(Fdn_sfc_sw[select])
+                F_sfc_sw_cre_all.extend(F_sfc_sw_cre[select])
+                F_sfc_lw_cre_all.extend(F_sfc_lw_cre[select])
+                F_sfc_net_cre_all.extend(F_sfc_net_cre[select])
+                
+                cot_real_list_all.extend(cot_list[case_sel])
+                cwp_real_list_all.extend(cwp_cre[case_sel])
+                cer_real_list_all.extend(cer_list[case_sel])
+                cth_real_list_all.extend(cth_list[case_sel])
+                cbh_real_list_all.extend(cbh_list[case_sel])
+                sza_real_list_all.extend(sza_list[case_sel])
+                Fup_real_sfc_sw_all.extend(Fup_sfc_sw[case_sel])
+                Fdn_real_sfc_sw_all.extend(Fdn_sfc_sw[case_sel])
+                F_sfc_sw_cre_real_all.extend(F_sfc_sw_cre[case_sel])
+                F_sfc_lw_cre_real_all.extend(F_sfc_lw_cre[case_sel])
+                F_sfc_net_cre_real_all.extend(F_sfc_net_cre[case_sel])
+                
+                if manual_alb_i is None:
+                    f_alb = f'{fdir_alb}/sfc_alb_{date_s}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.dat'
+                else:
+                    f_alb = f'{fdir_alb}/{manual_alb_i}'
+                alb_data = np.loadtxt(f_alb)
+                ext_wvl = alb_data[:, 0]
+                ext_alb = alb_data[:, 1]
+                
+                
+                
+                flux_solar_interp = f_interp(ext_wvl)
+                broadband_alb = np.trapz(ext_alb * flux_solar_interp, ext_wvl) / np.trapz(flux_solar_interp, ext_wvl)
+                # broadband_alb = np.sum(ext_alb * flux_solar_interp) / np.sum(flux_solar_interp)
+                broadband_alb = np.round(broadband_alb, 3)
+                
+                broadband_alb_list_all.extend([broadband_alb]*len(cot_list[select]))
+                broadband_alb_list_real_all.extend([broadband_alb]*len(cot_list[case_sel]))
+                
+                flux_solar_interp_ori = f_interp(alb_wvl)
+                alb_ori = ext_alb[np.logical_and(ext_wvl >=alb_wvl[0], ext_wvl <= alb_wvl[-1])]
+                broadband_alb_ori = np.trapz(alb_ori * flux_solar_interp_ori, alb_wvl) / np.trapz(flux_solar_interp_ori, alb_wvl)
+                # broadband_alb_ori = np.sum(alb_ori * flux_solar_interp_ori) / np.sum(flux_solar_interp_ori)
+                broadband_alb_ori = np.round(broadband_alb_ori, 3)
+                
+                broadband_alb_ori_list_all.extend([broadband_alb_ori]*len(cot_list[select]))
+                broadband_alb_ori_list_real_all.extend([broadband_alb_ori]*len(cot_list[case_sel]))
+                
+            alb_wvl_all.append(ext_wvl)
+            alb_all.append(ext_alb)
+            broadband_alb_all.append(broadband_alb)
+            broadband_alb_ori_all.append(broadband_alb_ori)
+        
+        
+        cot_list_all = np.array(cot_list_all).flatten()
+        cwp_list_all = np.array(cwp_list_all).flatten()
+        cer_list_all = np.array(cer_list_all).flatten()
+        cth_list_all = np.array(cth_list_all).flatten()
+        cbh_list_all = np.array(cbh_list_all).flatten()
+        sza_list_all = np.array(sza_list_all).flatten()
+        Fup_sfc_sw_all = np.array(Fup_sfc_sw_all).flatten()
+        Fdn_sfc_sw_all = np.array(Fdn_sfc_sw_all).flatten()
+        F_sfc_sw_cre_all = np.array(F_sfc_sw_cre_all).flatten()
+        F_sfc_lw_cre_all = np.array(F_sfc_lw_cre_all).flatten()
+        F_sfc_net_cre_all = np.array(F_sfc_net_cre_all).flatten()
+        broadband_alb_list_all = np.array(broadband_alb_list_all).flatten()
+        broadband_alb_ori_list_all = np.array(broadband_alb_ori_list_all).flatten()
+        
+        cot_real_list_all = np.array(cot_real_list_all).flatten()
+        cwp_real_list_all = np.array(cwp_real_list_all).flatten()
+        cer_real_list_all = np.array(cer_real_list_all).flatten()
+        cth_real_list_all = np.array(cth_real_list_all).flatten()
+        cbh_real_list_all = np.array(cbh_real_list_all).flatten()
+        sza_real_list_all = np.array(sza_real_list_all).flatten()
+        Fup_real_sfc_sw_all = np.array(Fup_real_sfc_sw_all).flatten()
+        Fdn_real_sfc_sw_all = np.array(Fdn_real_sfc_sw_all).flatten()
+        F_sfc_sw_cre_real_all = np.array(F_sfc_sw_cre_real_all).flatten()
+        F_sfc_lw_cre_real_all = np.array(F_sfc_lw_cre_real_all).flatten()
+        F_sfc_net_cre_real_all = np.array(F_sfc_net_cre_real_all).flatten()
+        broadband_alb_list_real_all = np.array(broadband_alb_list_real_all).flatten()
+        broadband_alb_ori_list_real_all = np.array(broadband_alb_ori_list_real_all).flatten()
+        
+        
+        df_all = pd.DataFrame({"cot": cot_list_all,
+                            "cwp": cwp_list_all,
+                            "cer": cer_list_all,
+                            "cth": cth_list_all,
+                            "cbh": cbh_list_all,
+                            "sza": sza_list_all,
+                            "Fup_sfc_sw": Fup_sfc_sw_all,
+                            "Fdn_sfc_sw": Fdn_sfc_sw_all,
+                            "F_sfc_sw_cre": F_sfc_sw_cre_all,
+                            "F_sfc_lw_cre": F_sfc_lw_cre_all,
+                            "F_sfc_net_cre": F_sfc_net_cre_all,
+                            "broadband_alb": broadband_alb_list_all,
+                            "broadband_alb_ori": broadband_alb_ori_list_all,
+                            })
+        df_all.to_csv(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv', index=False)
+        
+        df_real_all = pd.DataFrame({"cot": cot_real_list_all,
+                            "cwp": cwp_real_list_all,
+                            "cer": cer_real_list_all,
+                            "cth": cth_real_list_all,
+                            "cbh": cbh_real_list_all,
+                            "sza": sza_real_list_all,
+                            "Fup_sfc_sw": Fup_real_sfc_sw_all,
+                            "Fdn_sfc_sw": Fdn_real_sfc_sw_all,
+                            "F_sfc_sw_cre": F_sfc_sw_cre_real_all,
+                            "F_sfc_lw_cre": F_sfc_lw_cre_real_all,
+                            "F_sfc_net_cre": F_sfc_net_cre_real_all,
+                            "broadband_alb": broadband_alb_list_real_all,
+                            "broadband_alb_ori": broadband_alb_ori_list_real_all,
+                            })
+        df_real_all.to_csv(f'{fdir}/{date_s}_{case_tag}_cre_simulations_real_cases_all_alb.csv', index=False)
+        
+        
+        alb_spectra_all = {'alb_wvl_all': alb_wvl_all,
+                           'alb_all': alb_all,
+                           'broadband_alb_all': broadband_alb_all,
+                           'broadband_alb_ori_all': broadband_alb_ori_all,
+                           }
+        with open(f'{fdir}/{date_s}_{case_tag}_cre_simulations_alb_spectra.pkl', 'wb') as f:
+            pickle.dump(alb_spectra_all, f)
+        
+        print("unique broadband_alb_all:", np.unique(broadband_alb_all))
+        # 0.561 0.655 0.735 0.766
+        print("unique broadband_alb_ori_all:", np.unique(broadband_alb_ori_all))
     
-        plt.close(fig)
+    else:
+        with open(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv', 'r') as f:
+            df_all = pd.read_csv(f)
         
-        cot_list_all.append(cot_list[select])
-        cwp_list_all.append(cwp_cre[select])
-        cer_list_all.append(cer_list[select])
-        cth_list_all.append(cth_list[select])
-        cbh_list_all.append(cbh_list[select])
-        Fup_sfc_sw_all.append(Fup_sfc_sw[select])
-        Fdn_sfc_sw_all.append(Fdn_sfc_sw[select])
-        F_sfc_sw_cre_all.append(F_sfc_sw_cre[select])
-        F_sfc_lw_cre_all.append(F_sfc_lw_cre[select])
-        F_sfc_net_cre_all.append(F_sfc_net_cre[select])
+        with open(f'{fdir}/{date_s}_{case_tag}_cre_simulations_real_cases_all_alb.csv', 'r') as f:
+            df_real_all = pd.read_csv(f)
+            
+        with open(f'{fdir}/{date_s}_{case_tag}_cre_simulations_alb_spectra.pkl', 'rb') as f:
+            alb_spectra_all = pickle.load(f)
+            alb_wvl_all = alb_spectra_all['alb_wvl_all']
+            alb_all = alb_spectra_all['alb_all']
+            broadband_alb_all = alb_spectra_all['broadband_alb_all']
+            broadband_alb_ori_all = alb_spectra_all['broadband_alb_ori_all']
+    
+    
+    df_real_all = df_real_all.loc[np.logical_and(df_real_all['sza'].values%5 > 0, df_real_all['cwp'].values%0.5 > 0), :]
+    print(df_real_all)
+    
+
+    
+    broadband_alb_all_unique = sorted(list(set(df_all['broadband_alb'].values)))
+    print("broadband_alb_all_unique:", broadband_alb_all_unique)
+    
+    sza_mesh, broadband_alb_mesh = np.meshgrid(sza_arr, broadband_alb_all_unique, indexing='ij')
+    cwp_zero_arr = np.zeros_like(sza_mesh, dtype=np.float32) * np.nan
+    for i in range(sza_mesh.shape[0]):
+        for j in range(sza_mesh.shape[1]):
+            sza_sim = sza_arr[i]
+            broadband_alb = broadband_alb_all_unique[j]
+            df_select_mask = np.logical_and((df_all['sza'].values==sza_sim), (df_all['broadband_alb'].values==broadband_alb))
+            df_sub = df_all.loc[df_select_mask, :]
+            cwp_arr = df_sub['cwp'].values
+            F_cre_net_arr = df_sub['F_sfc_net_cre'].values
         
-        cot_real_list_all.append(cot_list[case_sel])
-        cwp_real_list_all.append(cwp_cre[case_sel])
-        cer_real_list_all.append(cer_list[case_sel])
-        cth_real_list_all.append(cth_list[case_sel])
-        cbh_real_list_all.append(cbh_list[case_sel])
-        Fup_real_sfc_sw_all.append(Fup_sfc_sw[case_sel])
-        Fdn_real_sfc_sw_all.append(Fdn_sfc_sw[case_sel])
-        F_sfc_sw_cre_real_all.append(F_sfc_sw_cre[case_sel])
-        F_sfc_lw_cre_real_all.append(F_sfc_lw_cre[case_sel])
-        F_sfc_net_cre_real_all.append(F_sfc_net_cre[case_sel])
-        
-        if manual_alb_i is None:
-            f_alb = f'{fdir_alb}/sfc_alb_{date_s}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.dat'
-        else:
-            f_alb = f'{fdir_alb}/{manual_alb_i}'
-        alb_data = np.loadtxt(f_alb)
-        ext_wvl = alb_data[:, 0]
-        ext_alb = alb_data[:, 1]
-        
-        alb_wvl_all.append(ext_wvl)
-        alb_all.append(ext_alb)
-        
-        flux_solar_interp = f_interp(ext_wvl)
-        broadband_alb = np.trapz(ext_alb * flux_solar_interp, ext_wvl) / np.trapz(flux_solar_interp, ext_wvl)
-        # broadband_alb = np.sum(ext_alb * flux_solar_interp) / np.sum(flux_solar_interp)
-        broadband_alb_all.append(broadband_alb)
-        
-        flux_solar_interp_ori = f_interp(alb_wvl)
-        alb_ori = ext_alb[np.logical_and(ext_wvl >=alb_wvl[0], ext_wvl <= alb_wvl[-1])]
-        broadband_alb_ori = np.trapz(alb_ori * flux_solar_interp_ori, alb_wvl) / np.trapz(flux_solar_interp_ori, alb_wvl)
-        # broadband_alb_ori = np.sum(alb_ori * flux_solar_interp_ori) / np.sum(flux_solar_interp_ori)
-        broadband_alb_ori_all.append(broadband_alb_ori)
+            
+            # find zero crossing
+            zero_crossings = np.where(np.diff(np.sign(F_cre_net_arr)))[0]
+            print(f'  Zero crossings indices: {zero_crossings}')
+            zero_crossings_tmp = []
+            for zero_crossing in zero_crossings[1:]:
+                cwp1 = cwp_arr[zero_crossing]
+                cwp2 = cwp_arr[zero_crossing + 1]
+                F1 = F_cre_net_arr[zero_crossing]
+                F2 = F_cre_net_arr[zero_crossing + 1]
+                # linear interpolation to find the root
+                cwp_zero = cwp1 - F1 * (cwp2 - cwp1) / (F2 - F1)
+                print(f'  Zero crossing at CWP: {cwp_zero:.2f} g/m2 between {cwp1:.2f} and {cwp2:.2f} g/m2')
+                zero_crossings_tmp.append(cwp_zero)
+            if len(zero_crossings_tmp) > 0:
+                # sza_sim_list.append(sza_sim)
+                # broadband_alb_sim_list.append(broadband_alb)
+                # cwp_zero_list.append(np.nanmean(zero_crossings_tmp))
+                cwp_zero_arr[i, j] = np.nanmean(zero_crossings_tmp)
+                
+                # plt.close('all')
+                # fig, ax = plt.subplots(figsize=(8, 6))
+                # ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+                # ax.scatter(np.nanmean(zero_crossings_tmp), 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+                # ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+                # ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+                # ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+                # ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
+                # ax.legend(fontsize=12)
+                # fig.tight_layout()
+                # plt.show()
+                # plt.close(fig)
+    
     
     # Create a ScalarMappable
     color_series = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',]
     
+    plt.close('all')
+    fig = plt.figure(figsize=(15, 9))
+    gs = gridspec.GridSpec(11, 11, figure=fig, hspace=0.4, wspace=0.3)
+    ax1 = fig.add_subplot(gs[:5, :6])
+    ax2 = fig.add_subplot(gs[6:, :6])
+    ax3 = fig.add_subplot(gs[2:10, 7:])
+    sza_real_df_all = df_all.loc[df_all['sza']==61.46, :]
+    sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==61.46, :]
+    for i in range(len(broadband_alb_all_unique)):
+        broadband_alb_i = broadband_alb_all_unique[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_sw_cre'].values, '--', color=color_series[i], alpha=0.5)
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_lw_cre'].values, '-.', color=color_series[i], alpha=0.5)
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i], label=f'Albedo-{i+1}')
+        ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
+                
+        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
     
+    from matplotlib.lines import Line2D
+    linestyles = ['-', '--', '-.']
+    # Create proxy artists (one per linestyle). Use a neutral color so legend doesn't reflect line colors.
+    proxy_handles = [Line2D([0], [0], color='black', lw=1, linestyle=ls) for ls in linestyles]
+    proxy_labels  = ['Net', 'SW', 'LW']
+
+    ax1.legend(proxy_handles, proxy_labels, fontsize=10)
+    
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    
+    ax2.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    ax1.set_xlim(0, np.max(sza_real_df_all['cwp'].values))
+    ax2.set_xlim(300, 4000)
+    ax2.set_ylim(-0.05, 1.05)
+    ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
+    
+    level_labels = [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 170, 200, 240]
+    cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet')
+    ax3.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    print("cc levels:", cc.levels)
+    level_labels = [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 170, 200]
+    # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
+    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # cbar = fig.colorbar(cc, ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
+    # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
+    #                fontsize=14)
+    
+    for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
+    
+    sys.exit()
     
     
     plt.close('all')
@@ -484,7 +723,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     ax2.legend(fontsize=12,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax1.hlines(0, xmin=0, xmax=np.max(cwp_list_all), colors='gray', linestyles='dashed')
-    ax1.set_xlim(0, np.max(cwp_list_all))
+    ax1.set_xlim(0, 250)
     ax2.set_xlim(300, 4000)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
