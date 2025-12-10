@@ -476,7 +476,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     marli_all_wvmr = np.array([])
     
     init = True
-    alb_iter2_all = []
+    alb_iter2_all = None
     
     for i in range(len(tmhr_ranges_select)):
         time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
@@ -729,9 +729,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 #/----------------------------------------------------------------------------/#
 
                 
-                
-                
-                
+
                 
 
                 input_dict_extra = copy.deepcopy(input_dict_extra_general)
