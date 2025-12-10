@@ -292,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 55, 60, 65, 70, 75, 80, 85, np.round(sza_avg, 2)], dtype=np.float32)
+    sza_arr = np.array([50, 55, 60, 65, 70, 75, 77.5, 80, 82.5, 85, 87, np.round(sza_avg, 2)], dtype=np.float32)
         
         
     if clear_sky:
@@ -365,15 +365,17 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         #     output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_alb-manual-{manual_alb.replace(".dat", "")}.csv'
 
         for i in range(len(manual_alb)):
+            print(f"Processing manual_alb {i+1}/{len(manual_alb)} ...")
+            
             for sza_sim in sza_arr:
                 
                 manual_alb_i = manual_alb[i]
                 if manual_alb_i is None:
-                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}.csv'
-                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}.csv'
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_0.99.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_0.99.csv'
                 else:
-                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
-                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}.csv'
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
 
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
@@ -386,33 +388,33 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 with open(output_csv_name_lw, 'r') as f:
                     df_lw = pd.read_csv(f)
                     
-                with open(output_csv_name_sw.replace('.csv', '_2.csv'), 'r') as f:
-                    df_sw_2 = pd.read_csv(f)
+                # with open(output_csv_name_sw.replace('.csv', '_2.csv'), 'r') as f:
+                #     df_sw_2 = pd.read_csv(f)
                     
-                with open(output_csv_name_lw.replace('.csv', '_2.csv'), 'r') as f:
-                    df_lw_2 = pd.read_csv(f)
+                # with open(output_csv_name_lw.replace('.csv', '_2.csv'), 'r') as f:
+                #     df_lw_2 = pd.read_csv(f)
                     
-                # cot_list = df_sw['cot'].values 
-                # cwp_list = df_sw['cwp'].values
-                # cer_list = df_sw['cer'].values
-                # cth_list = df_sw['cth'].values
-                # cbh_list = df_sw['cbh'].values
-                # sza_list = df_sw['sza'].values
-                # Fup_sfc_sw = df_sw['Fup_sfc'].values
-                # Fdn_sfc_sw = df_sw['Fdn_sfc'].values
-                # Fup_sfc_lw = df_lw['Fup_sfc'].values
-                # Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+                cot_list = df_sw['cot'].values 
+                cwp_list = df_sw['cwp'].values
+                cer_list = df_sw['cer'].values
+                cth_list = df_sw['cth'].values
+                cbh_list = df_sw['cbh'].values
+                sza_list = df_sw['sza'].values
+                Fup_sfc_sw = df_sw['Fup_sfc'].values
+                Fdn_sfc_sw = df_sw['Fdn_sfc'].values
+                Fup_sfc_lw = df_lw['Fup_sfc'].values
+                Fdn_sfc_lw = df_lw['Fdn_sfc'].values
                 
-                cot_list = np.concatenate((df_sw['cot'].values, df_sw_2['cot'].values))
-                cwp_list = np.concatenate((df_sw['cwp'].values, df_sw_2['cwp'].values))
-                cer_list = np.concatenate((df_sw['cer'].values, df_sw_2['cer'].values))
-                cth_list = np.concatenate((df_sw['cth'].values, df_sw_2['cth'].values))
-                cbh_list = np.concatenate((df_sw['cbh'].values, df_sw_2['cbh'].values))
-                sza_list = np.concatenate((df_sw['sza'].values, df_sw_2['sza'].values))
-                Fup_sfc_sw = np.concatenate((df_sw['Fup_sfc'].values, df_sw_2['Fup_sfc'].values))
-                Fdn_sfc_sw = np.concatenate((df_sw['Fdn_sfc'].values, df_sw_2['Fdn_sfc'].values))
-                Fup_sfc_lw = np.concatenate((df_lw['Fup_sfc'].values, df_lw_2['Fup_sfc'].values))
-                Fdn_sfc_lw = np.concatenate((df_lw['Fdn_sfc'].values, df_lw_2['Fdn_sfc'].values))
+                # cot_list = np.concatenate((df_sw['cot'].values, df_sw_2['cot'].values))
+                # cwp_list = np.concatenate((df_sw['cwp'].values, df_sw_2['cwp'].values))
+                # cer_list = np.concatenate((df_sw['cer'].values, df_sw_2['cer'].values))
+                # cth_list = np.concatenate((df_sw['cth'].values, df_sw_2['cth'].values))
+                # cbh_list = np.concatenate((df_sw['cbh'].values, df_sw_2['cbh'].values))
+                # sza_list = np.concatenate((df_sw['sza'].values, df_sw_2['sza'].values))
+                # Fup_sfc_sw = np.concatenate((df_sw['Fup_sfc'].values, df_sw_2['Fup_sfc'].values))
+                # Fdn_sfc_sw = np.concatenate((df_sw['Fdn_sfc'].values, df_sw_2['Fdn_sfc'].values))
+                # Fup_sfc_lw = np.concatenate((df_lw['Fup_sfc'].values, df_lw_2['Fup_sfc'].values))
+                # Fdn_sfc_lw = np.concatenate((df_lw['Fdn_sfc'].values, df_lw_2['Fdn_sfc'].values))
                 
                 
                 Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
@@ -681,8 +683,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i], label=f'Albedo-{i+1}')
         ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
                 
-        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
-    
+        # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
+        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f}')
+
     from matplotlib.lines import Line2D
     linestyles = ['-', '--', '-.']
     # Create proxy artists (one per linestyle). Use a neutral color so legend doesn't reflect line colors.
@@ -708,16 +711,26 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     
     level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250, 300]
-    cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet')
-    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=40, cmap='jet')
+    
+    cc1 = ax3.scatter(sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
+    
+    
+    
+    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet')
+    # # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
+    # ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    
+    cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    print("cc levels:", cc.levels)
-    # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
-    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
-    # cbar = fig.colorbar(cc, ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
-    # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
-    #                fontsize=14)
+
+    
+    
+    cbar = fig.colorbar(cc1, ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
+    cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
+                   fontsize=14)
+    ax3.scatter(61.46, 0.735, color='red', marker='^', s=100, label='Flight Case SZA and Albedo')
+    ax3.set_xlim(50, 80)
     
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
         ax.tick_params(axis='both', which='major', labelsize=12)
@@ -856,17 +869,17 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
     
-    albedo_plot([
-                'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
-                'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-                'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
-                'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
-                'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
-                'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
-                ], 
-                '20240607')
+    # albedo_plot([
+    #             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+    #             'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    #             'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
+    #             'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #             'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+    #             'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+    #             ], 
+    #             '20240607')
     
-    sys.exit()
+    # sys.exit()
     
     
     
@@ -887,6 +900,8 @@ if __name__ == '__main__':
                     manual_alb=[
                                 'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
                                 None,
+                                'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+                                
                                 'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
                                 'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
                                 ]
