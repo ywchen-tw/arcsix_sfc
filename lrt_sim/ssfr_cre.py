@@ -418,7 +418,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         xx_wvl_grid_lw = np.arange(5000, 100000.1, 10.0)
         
 
-    if 1:#not os.path.exists('wvl_grid_test_cre_sw.dat') or not os.path.exists('wvl_grid_test_cre_lw.dat'):
+    if not os.path.exists('wvl_grid_test_cre_sw.dat') or not os.path.exists('wvl_grid_test_cre_lw.dat'):
         write_2col_file('wvl_grid_test_cre_sw.dat', xx_wvl_grid_sw, np.zeros_like(xx_wvl_grid_sw),
                         header=('# SSFR Wavelength grid test file\n'
                                 '# wavelength (nm)\n'))
@@ -429,7 +429,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # write out the convolved solar flux
     #/----------------------------------------------------------------------------\#
     # Kurudz solar spectrum has a resolution of 0.5 nm
-    if 1:
+    if 1:#not os.path.exists('arcsix_ssfr_solar_flux_raw_cre.dat'):
         # use Kurudz solar spectrum
         # df_solor = pd.read_csv('kurudz_0.1nm.dat', sep='\s+', header=None)
         # use CU solar spectrum
@@ -521,6 +521,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             print(f"Processed file {processed_file} not found. Skipping leg {i}.")
         
     
+    
+    
     sfc_T += 273.15  # convert to K
     
     lon_avg = np.round(np.mean(lon_all), 2)
@@ -558,6 +560,10 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     else:
         fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
         fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
+        
+    
+    del lon_all, lat_all, alt_all, sza_all, saa_all, sfc_T, marli_all_h, marli_all_wvmr
+    gc.collect()
     
     
     mode = 'lw' if lw else 'sw'
@@ -875,6 +881,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             del Fup_p3, Fdn_p3
             del Fup_sfc, Fdn_sfc
             del ext_alb, ext_wvl
+            del flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results
             
             gc.collect()
 
