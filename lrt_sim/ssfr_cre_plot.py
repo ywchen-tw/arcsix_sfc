@@ -439,6 +439,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 select = np.array([cwp%0.5==0 for cwp in cwp_cre])
                 case_sel = ~select
                 
+                select = cwp >= 0
+                case_sel = ~np.array([cwp%0.5==0 for cwp in cwp_cre])
+                
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(8, 6))
                 ax.plot(cwp_cre[select], F_sfc_sw_cre[select], '-', label='SW CRE')
