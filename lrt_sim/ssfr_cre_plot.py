@@ -304,7 +304,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -439,8 +439,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 select = np.array([cwp%0.5==0 for cwp in cwp_cre])
                 case_sel = ~select
                 
-                select = cwp >= 0
-                case_sel = ~np.array([cwp%0.5==0 for cwp in cwp_cre])
+                # select = np.array([cwp>=0 for cwp in cwp_cre])
+                # case_sel = ~np.array([cwp%0.5==0 for cwp in cwp_cre])
                 
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(8, 6))
