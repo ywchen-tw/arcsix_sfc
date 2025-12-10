@@ -794,7 +794,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                     flux_key_ix.append(dict_key)
                     
             # # Run RT
-            print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
+            print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')}, mode: {mode}. alb mean: {alb_mean}")
             # #/----------------------------------------------------------------------------\#
             # check output file size
             output_file_check = f'{fdir_tmp}/output_0000_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_sza_{sza_sim}_alb_{alb_mean}_{mode}.txt'
@@ -828,7 +828,15 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                     for i in range(len(inits_rad)):
                         if run:
                             er3t.rtm.lrt.lrt_run(inits_rad[i])
-                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                            
+                        try:
+                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                        
+                        except Exception as e:
+                            print(f"Error reading output for index {i}, retrying once. Error: {e}")
+                            # retry once
+                            er3t.rtm.lrt.lrt_run(inits_rad[i])
+                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
                         
                         flux_down_results.append(np.squeeze(data.f_down))
                         flux_down_dir_results.append(np.squeeze(data.f_down_direct))
