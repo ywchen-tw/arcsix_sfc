@@ -625,7 +625,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                     ext_alb = pd.read_csv(alb_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 1].values
                     ext_wvl = pd.read_csv(alb_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 0].values
             
-            alb_mean = np.round(np.nanmean(ext_alb[(ext_wvl >= 400) & (ext_wvl <= 2500)]), 2)
+            alb_mean = np.round(np.nanmean(ext_alb[(ext_wvl >= 400) & (ext_wvl <= 2500)]), 5)
             plt.close('all')
             fig, ax = plt.subplots(figsize=(8, 5))
             ax.plot(ext_wvl, ext_alb, label='Extended Surface Albedo')
