@@ -561,13 +561,13 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     
     
     mode = 'lw' if lw else 'sw'
-    sza_arr = np.array([50, 55, 60, 65, 70, 75, 80, 85, sza_avg], dtype=np.float32)
+    sza_arr = np.array([50, 55, 60, 65, 70, 75, 77.5, 80, 82.5, 85, 87, sza_avg], dtype=np.float32)
     for sza_sim in sza_arr:
     
         if manual_alb is None:
-            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_2.csv'
+            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_0.99.csv'
         else:
-            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_alb-manual-{manual_alb.replace(".dat", "")}_2.csv'
+            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_alb-manual-{manual_alb.replace(".dat", "")}_0.99.csv'
         
 
         os.makedirs(fdir_tmp, exist_ok=True)
@@ -648,8 +648,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             if platform.system() == 'Darwin':
                 cwp_list = [0, 5, 10, 30, 50, 100, 200]  # g/m^2
             elif platform.system() == 'Linux':
-                # cwp_list = [0, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 300]  # g/m^2
-                cwp_list = [400, 500, 650, 800]  # g/m^2
+                # cwp_list = [0, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 650, 800]  # g/m^2
             
             cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
             cwp_list = np.array(cwp_list)/1000  # convert to kg/m^2
@@ -711,7 +710,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
 
                     input_dict_extra_general = {
                                         'source': 'thermal',
-                                        'albedo_add': '0',
+                                        'albedo_add': '0.01',
                                         'atm_z_grid': atm_z_grid_str,
                                         'mol_file': f'CH4 {ch4_file}',
                                         # 'wavelength_grid_file': 'wvl_grid_test_cre_lw.dat',
@@ -768,8 +767,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 else:
                     input_dict_extra_alb = copy.deepcopy(input_dict_extra)
                     init = er3t.rtm.lrt.lrt_init_mono_flx(
-                            input_file  = f'{fdir_tmp}/input_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_{mode}.txt',
-                            output_file = f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_{mode}.txt',
+                            input_file  = f'{fdir_tmp}/input_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_sza_{sza_sim}_{mode}.txt',
+                            output_file = f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_sza_{sza_sim}_{mode}.txt',
                             date        = date,
                             # surface_albedo=0.08,
                             solar_zenith_angle = sza_sim,
@@ -972,27 +971,27 @@ if __name__ == '__main__':
     #                 )
 
 
-    # cre_sim(date=datetime.datetime(2024, 6, 7),
-    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-    #                                     ],
-    #                 case_tag='cloudy_atm_corr',
-    #                 config=config,
-    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-    #                                         np.arange(5.0, 10.1, 2.5),
-    #                                         np.array([15, 20, 30., 40., 45.]))),
-    #                 simulation_interval=0.5,
-    #                 clear_sky=False,
-    #                 overwrite_lrt=atm_corr_overwrite_lrt,
-    #                 manual_cloud=True,
-    #                 manual_cloud_cer=6.7,
-    #                 manual_cloud_cwp=26.96/1000,
-    #                 manual_cloud_cth=0.43,
-    #                 manual_cloud_cbh=0.15,
-    #                 manual_cloud_cot=6.02,
-    #                 lw=lw,
-    #                 manual_alb=None,
-    #                 )
+    cre_sim(date=datetime.datetime(2024, 6, 7),
+                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+                                        ],
+                    case_tag='cloudy_atm_corr',
+                    config=config,
+                    levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                            np.arange(5.0, 10.1, 2.5),
+                                            np.array([15, 20, 30., 40., 45.]))),
+                    simulation_interval=0.5,
+                    clear_sky=False,
+                    overwrite_lrt=atm_corr_overwrite_lrt,
+                    manual_cloud=True,
+                    manual_cloud_cer=6.7,
+                    manual_cloud_cwp=26.96/1000,
+                    manual_cloud_cth=0.43,
+                    manual_cloud_cbh=0.15,
+                    manual_cloud_cot=6.02,
+                    lw=lw,
+                    manual_alb=None,
+                    )
     
     # cre_sim(date=datetime.datetime(2024, 6, 7),
     #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
@@ -1018,27 +1017,27 @@ if __name__ == '__main__':
     
     
     
-    cre_sim(date=datetime.datetime(2024, 6, 7),
-                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr',
-                    config=config,
-                    levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                            np.arange(5.0, 10.1, 2.5),
-                                            np.array([15, 20, 30., 40., 45.]))),
-                    simulation_interval=0.5,
-                    clear_sky=False,
-                    overwrite_lrt=atm_corr_overwrite_lrt,
-                    manual_cloud=True,
-                    manual_cloud_cer=6.7,
-                    manual_cloud_cwp=26.96/1000,
-                    manual_cloud_cth=0.43,
-                    manual_cloud_cbh=0.15,
-                    manual_cloud_cot=6.02,
-                    lw=lw,
-                    manual_alb='sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
-                    )
+    # cre_sim(date=datetime.datetime(2024, 6, 7),
+    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_cloud_cer=6.7,
+    #                 manual_cloud_cwp=26.96/1000,
+    #                 manual_cloud_cth=0.43,
+    #                 manual_cloud_cbh=0.15,
+    #                 manual_cloud_cot=6.02,
+    #                 lw=lw,
+    #                 manual_alb='sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #                 )
     
     
     # cre_sim(date=datetime.datetime(2024, 6, 7),
@@ -1061,6 +1060,28 @@ if __name__ == '__main__':
     #                 manual_cloud_cot=6.02,
     #                 lw=lw,
     #                 manual_alb='sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    #                 )
+    
+    # cre_sim(date=datetime.datetime(2024, 6, 7),
+    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_cloud_cer=6.7,
+    #                 manual_cloud_cwp=26.96/1000,
+    #                 manual_cloud_cth=0.43,
+    #                 manual_cloud_cbh=0.15,
+    #                 manual_cloud_cot=6.02,
+    #                 lw=lw,
+    #                 manual_alb='sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
     #                 )
     
 
