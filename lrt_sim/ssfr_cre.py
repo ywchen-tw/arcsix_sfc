@@ -710,7 +710,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
 
                     input_dict_extra_general = {
                                         'source': 'thermal',
-                                        'albedo_add': '0.01',
+                                        'albedo_add': '0.01',  # emissivity = 0.99
                                         'atm_z_grid': atm_z_grid_str,
                                         'mol_file': f'CH4 {ch4_file}',
                                         # 'wavelength_grid_file': 'wvl_grid_test_cre_lw.dat',
