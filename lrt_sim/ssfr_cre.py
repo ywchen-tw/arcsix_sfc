@@ -792,7 +792,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
             # #/----------------------------------------------------------------------------\#
             # check output file size
-            output_file_check = f'{fdir_tmp}/output_0000_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_{mode}.txt'
+            output_file_check = f'{fdir_tmp}/output_0000_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_sza_{sza_sim}_alb_{alb_mean}_{mode}.txt',
             run = True
             if (not overwrite_lrt) and os.path.exists(output_file_check):
                 if os.path.getsize(output_file_check) > 100:
