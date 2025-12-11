@@ -568,7 +568,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     
     mode = 'lw' if lw else 'sw'
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 72.5, 75, 77.5, 80, 82.5, 85, 87, sza_avg], dtype=np.float32)
-    sza_arr = np.array([50, 52.5, 55,], dtype=np.float32)
+    sza_arr = np.array([57.5, 60, 62.5], dtype=np.float32)
     for sza_sim in sza_arr:
     
         if manual_alb is None:
