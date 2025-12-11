@@ -72,6 +72,7 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cartopy
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import bisect
 import pandas as pd
 import xarray as xr
@@ -437,6 +438,7 @@ def combined_atm_corr():
     dates_summer_all = np.array(dates_summer_all)
     dates_all = np.concatenate((dates_spring_all, dates_summer_all))
     
+    os.makedirs('./fig/ice_age', exist_ok=True)
     # load ice fraction data
     file = f'{_fdir_general_}/ice_frac/ice_frac_all.pkl'
     with open(file, 'rb') as f:
@@ -560,6 +562,7 @@ def combined_atm_corr():
             ice_ratio_nc = nc.variables['TOTAL_ICE'][:]
             open_water_nc = nc.variables['OW'][:]
         
+        lonlat_shape = lon.shape
         lon = lon.flatten()
         lat = lat.flatten()
         myi_age_ratio_nc = myi_age_ratio_nc.flatten()
@@ -601,6 +604,45 @@ def combined_atm_corr():
                         method='nearest'
                     )
             ow_ratio_spring_all[date_mask] = ow_ratio_mesh.copy()
+            
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_age_ratio_nc.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            ax.coastlines()
+            ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Conc (%)')
+            fig.savefig(f'./fig/ice_age/myi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
+            myi_fyi_yi_total = ice_ratio_nc
+            myi_fyi_yi_total_flight = myi_age_ratio_spring_all[date_mask] + fyi_age_ratio_spring_all[date_mask] + yi_age_ratio_spring_all[date_mask]
+            myi_to_tatal_ratio = myi_age_ratio_nc / (myi_fyi_yi_total+1e-7) * 100
+            myi_to_tatal_ratio_flight = myi_age_ratio_spring_all[date_mask] / (myi_fyi_yi_total_flight+1e-7) * 100
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_to_tatal_ratio.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            c2 = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], c=myi_to_tatal_ratio_flight, transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100, edgecolors='k')
+            ax.coastlines()
+            ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Percentage (%)')
+            fig.savefig(f'./fig/ice_age/myi_percentage_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            
             # for i in range(len(lon_all_spring[date_mask])):
                 # # find closest lon/lat
                 # lon_diff = np.abs(lon - lon_all_spring[date_mask][i])
@@ -635,6 +677,23 @@ def combined_atm_corr():
                     method='nearest'
                 )
         ice_age_spring_all[date_mask] = ice_age_mesh.copy()
+        
+        plt.close('all')
+        central_lon = np.mean(lon_all)
+        lon_min = np.min(lon_all) - 2
+        lon_max = np.max(lon_all) + 2
+        lat_min = np.min(lat_all) - 2
+        lat_max = np.max(lat_all) + 2
+        fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+        # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
+        c1 = ax.pcolormesh(nsidc_lon, nsidc_lat, ice_age_nc.reshape(nsidc_lon.shape), transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5)
+        c2 = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], c=ice_age_spring_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
+        ax.coastlines()
+        ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+        ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+        cb = fig.colorbar(c1, ax=ax, label='Ice Age (years)')
+        fig.savefig(f'./fig/ice_age/ice_age_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
             
     for date_s in sorted(set(dates_summer_all)):
         print(f"Processing ice age data for date: {date_s}")
@@ -649,6 +708,7 @@ def combined_atm_corr():
             ice_ratio_nc = nc.variables['TOTAL_ICE'][:]
             open_water_nc = nc.variables['OW'][:]
         
+        lonlat_shape = lon.shape
         lon = lon.flatten()
         lat = lat.flatten()
         myi_age_ratio_nc = myi_age_ratio_nc.flatten()
@@ -690,6 +750,46 @@ def combined_atm_corr():
                         method='nearest'
                     )
             ow_ratio_summer_all[date_mask] = ow_ratio_mesh.copy()
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_age_ratio_nc.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            ax.coastlines()
+            ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Conc (%)')
+            fig.savefig(f'./fig/ice_age/myi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
+            myi_fyi_yi_total = ice_ratio_nc
+            myi_fyi_yi_total_flight = myi_age_ratio_summer_all[date_mask] + fyi_age_ratio_summer_all[date_mask] + yi_age_ratio_summer_all[date_mask]
+            myi_to_tatal_ratio = myi_age_ratio_nc / (myi_fyi_yi_total+1e-7) * 100
+            myi_to_tatal_ratio_flight = myi_age_ratio_summer_all[date_mask] / (myi_fyi_yi_total_flight+1e-7) * 100
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_to_tatal_ratio.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            c2 = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], c=myi_to_tatal_ratio_flight, transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100, edgecolors='k')
+            ax.coastlines()
+            ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Percentage (%)')
+            fig.savefig(f'./fig/ice_age/myi_percentage_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            
+            
+            
             # for i in range(len(lon_all_summer[date_mask])):
                 
             #     # find closest lon/lat
@@ -723,6 +823,23 @@ def combined_atm_corr():
                     method='nearest'
                 )
         ice_age_summer_all[date_mask] = ice_age_mesh.copy()
+        
+        plt.close('all')
+        central_lon = np.mean(lon_all)
+        lon_min = np.min(lon_all) - 2
+        lon_max = np.max(lon_all) + 2
+        lat_min = np.min(lat_all) - 2
+        lat_max = np.max(lat_all) + 2
+        fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+        # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
+        c1 = ax.pcolormesh(nsidc_lon, nsidc_lat, ice_age_nc.reshape(nsidc_lon.shape), transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5)
+        c2 = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], c=ice_age_summer_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
+        ax.coastlines()
+        ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+        ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+        cb = fig.colorbar(c1, ax=ax, label='Ice Age (years)')
+        fig.savefig(f'./fig/ice_age/ice_age_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
                 
     output_all_dict = {
         'wvl_spring': wvl_spring,

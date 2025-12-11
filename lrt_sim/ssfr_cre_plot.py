@@ -292,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
@@ -305,7 +305,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if  not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -649,6 +649,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("broadband_alb_all_unique:", broadband_alb_all_unique)
     
     sza_mesh, broadband_alb_mesh = np.meshgrid(sza_arr, broadband_alb_all_unique, indexing='ij')
+    cos_sza_arr = np.cos(np.deg2rad(sza_arr.copy()))
+    print("cos_sza_arr:", cos_sza_arr)
+    cos_sza_mesh, _ = np.meshgrid(cos_sza_arr, broadband_alb_all_unique, indexing='ij')
     cwp_zero_arr = np.zeros_like(sza_mesh, dtype=np.float32) * np.nan
     for i in range(sza_mesh.shape[0]):
         for j in range(sza_mesh.shape[1]):
@@ -685,21 +688,36 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # cwp_zero_list.append(np.nanmean(zero_crossings_tmp))
                 cwp_zero_arr[i, j] = zero_crossings_tmp[0]  # take the first zero crossing
                 
-                # if sza_sim >= 75 or sza_sim%0.5>0:
-                #     plt.close('all')
-                #     fig, ax = plt.subplots(figsize=(8, 6))
-                #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-                #     ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-                #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-                #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-                #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-                #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
-                #     ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
-                #     ax.legend(fontsize=12)
-                #     fig.tight_layout()
-                #     plt.show()
-                #     plt.close(fig)
-        
+            #     if sza_sim >= 70 or sza_sim%0.5>0:
+            #         plt.close('all')
+            #         fig, ax = plt.subplots(figsize=(8, 6))
+            #         ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+            #         ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+            #         ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+            #         ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+            #         ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+            #         ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
+            #         ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+            #         ax.legend(fontsize=12)
+            #         fig.tight_layout()
+            #         plt.show()
+            #         plt.close(fig)
+                    
+            # # else:
+            # #     print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
+            # #     plt.close('all')
+            # #     fig, ax = plt.subplots(figsize=(8, 6))
+            # #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+            # #     # ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+            # #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+            # #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+            # #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+            # #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
+            # #     # ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+            # #     ax.legend(fontsize=12)
+            # #     fig.tight_layout()
+            # #     plt.show()
+            # #     plt.close(fig)
     
     plt.close('all')
     sza_select = 61.46
@@ -795,15 +813,16 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cc1 = ax3.scatter(sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
-    
-    cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=450, zorder=2)
+    print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
+
+    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=450 , zorder=2)
     ax3.clabel(cc, level_labels, fontsize=12, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
     
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
-    ax3.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14)
+    ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
 
     
@@ -811,12 +830,33 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
-    ax3.scatter(61.46, 0.735, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
-    ax3.set_xlim(50, 80)
+    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
+    ax3.scatter(cos_sza_real, 0.735, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
+    # ax3.set_xlim(50, 80)
+    ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
+    
+    # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    
+    ax3.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    bottom=True,      # Show ticks on the bottom
+                    top=True,         # Show ticks on the top
+                    labelbottom=True, # Show labels on the bottom
+                    labeltop=True,    # Show labels on the top
+                        # Optional: adjust label rotation if needed
+                        # labelrotation=45,
+                    )   
+    # set ax3 with both top and bottom x-axis
+    ax3_top = ax3.secondary_xaxis('top')
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=25)
+    ax3_top.set_xticks([angle for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
     
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
         ax.tick_params(axis='both', which='major', labelsize=12)
-        ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+        if ax == ax3:
+            ax.text(0.0, 1.08 , subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+        else:
+            ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
     fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
     
     sys.exit()
