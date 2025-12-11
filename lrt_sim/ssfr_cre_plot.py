@@ -305,7 +305,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -864,12 +864,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     plt.close('all')
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'hspace': 0.3})
-    for i in range(len(manual_alb)):
+    for i in range(5):
         ax1.plot(cwp_list_all[i], F_sfc_sw_cre_all[i], '--', color=color_series[i], alpha=0.5)
         ax1.plot(cwp_list_all[i], F_sfc_lw_cre_all[i], '-.', color=color_series[i], alpha=0.5)
         ax1.plot(cwp_list_all[i], F_sfc_net_cre_all[i], '-', color=color_series[i], label=f'Albedo-{i+1}')
         ax1.scatter(cwp_real_list_all[i], F_sfc_net_cre_real_all[i], color=color_series[i], marker='o', s=50, edgecolors='k')
-        
+
         ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
     
     ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
@@ -1026,6 +1026,11 @@ if __name__ == '__main__':
                                 
                                 'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
                                 'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+                                
+                                'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+                                'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
+                                'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
+                                
                                 ]
                     )
     

@@ -289,7 +289,11 @@ def combined_atm_corr():
     yi_ratio_date_cond_std = []
     fyi_yi_ratio_date_cond = []
     fyi_yi_ratio_date_cond_std = []
-    ice_ratio_date_cond = []
+    ice_age_date_cond = []
+    ice_age_date_cond_upper = []
+    ice_age_date_cond_lower = []
+    ice_age_over1_date_cond = []
+    ice_age_over2_date_cond = []
     
     
     for date_key in (ice_frac_time_offset.keys()):
@@ -357,6 +361,10 @@ def combined_atm_corr():
             myi_age_avg = np.nansum(ice_age_selected_all>=2)/len(ice_age_selected_all)
             myi_age_median = np.nanmedian(ice_age_selected_all)
             myi_age_perc_range = np.percentile(ice_age_selected_all, 95) - np.percentile(ice_age_selected_all, 5)
+            ice_age_avg = np.nanmean(ice_age_selected_all)
+            ice_age_median = np.nanmedian(ice_age_selected_all)
+            ice_age_perc_range = np.percentile(ice_age_selected_all, 95) - np.percentile(ice_age_selected_all, 5)
+            print(f"Date: {date_key}, Case: {case_tag}, Alt < 1.6 km, Ice Age Avg: {ice_age_avg:.2f} h, Median: {ice_age_median:.2f} h, 5-95 Perc Range: {ice_age_perc_range:.2f} h")
             
             """
             # find best time offset for cam ice fraction
@@ -575,6 +583,9 @@ def combined_atm_corr():
                 yi_cam_time_valid = yi_cam_time_valid[yi_cam_time_valid<=100]
                 ice_ratio_cam_time_valid = ice_ratio_cam_time[valid_mask]
                 ice_ratio_cam_time_valid = ice_ratio_cam_time_valid[ice_ratio_cam_time_valid<=100]
+                ice_age_cam_time_valid = ice_age_cam_time[valid_mask]
+                
+                
                 # myi_ratio_date_cond.append(np.nanmean(myi_cam_time_valid))
                 # myi_ratio_date_cond_std.append(np.nanstd(myi_cam_time_valid))
                 # fyi_raio_date_cond.append(np.nanmean(fyi_cam_time_valid))
@@ -602,6 +613,8 @@ def combined_atm_corr():
                 fyi_yi_ratio_date_cond.append(fyi_yi_ratio_date_cond_)
                 fyi_yi_ratio_date_cond_std.append( fyi_yi_ratio_date_cond_std_)
                 
+                
+                
                 # myi_ratio_date_cond.append(np.nanmedian(myi_cam_time_valid))
                 # myi_ratio_date_cond_std.append(np.percentile(myi_cam_time_valid, 95) - np.percentile(myi_cam_time_valid, 5))
                 # fyi_raio_date_cond.append(np.nanmedian(fyi_selected_all))
@@ -613,6 +626,12 @@ def combined_atm_corr():
                 
                 # myi_ratio_date_cond.append(myi_age_median)  # to percentage
                 # myi_ratio_date_cond_std.append(myi_age_perc_range)
+                
+                ice_age_date_cond.append(np.median(ice_age_cam_time_valid))
+                ice_age_date_cond_lower.append(np.percentile(ice_age_cam_time_valid, 5))
+                ice_age_date_cond_upper.append(np.percentile(ice_age_cam_time_valid, 95))
+                ice_age_over1_date_cond.append(np.nansum(ice_age_cam_time_valid>=1)/len(ice_age_cam_time_valid))
+                ice_age_over2_date_cond.append(np.nansum(ice_age_cam_time_valid>=2)/len(ice_age_cam_time_valid))
                 
                 
                 
@@ -712,6 +731,127 @@ def combined_atm_corr():
         ax.tick_params(labelsize=12)
         ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16,  va='top', ha='left')
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_summary.png', bbox_inches='tight', dpi=150)
+    
+    
+    plt.close('all')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    ax1.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc,
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
+    ax1.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax1.set_xticks(np.arange(len(broadband_alb_date_cond)))
+    ax1.set_xticklabels(date_conditions_simplified, rotation=45, ha='right')
+    ax1.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
+                       mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
+    ax1.set_xlabel('Date and condition', fontsize=14)
+    ax1.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    
+    # fit line in ax2
+    ice_age_unc = (np.array(ice_age_date_cond_upper) - np.array(ice_age_date_cond_lower)) / 2
+    sample_weights = 1.0 / (ice_age_unc + 1e-6)**2
+    X = sm.add_constant(ice_age_date_cond)
+    y = np.array(broadband_alb_date_cond)
+
+    mod_wls = sm.WLS(y, X )#weights=sample_weights)
+    res_wls = mod_wls.fit()
+    slope = res_wls.params[1]
+    intercept = res_wls.params[0]
+    r_value = res_wls.rsquared
+    x_fit = np.linspace(0, np.max(ice_age_date_cond)*1.05, 100)
+    y_fit = intercept + slope * x_fit
+    p_values = res_wls.pvalues
+    
+    ax2.errorbar(ice_age_date_cond, broadband_alb_date_cond, 
+                xerr=(ice_age_date_cond_lower, ice_age_date_cond_upper),
+                yerr=broadband_alb_date_cond_unc, 
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#label='Data Points with Uncertainty')
+    ax2.scatter(ice_age_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+    ax2.legend(fontsize=12)
+    ax2.set_xlabel('Median Sea Ice Age (year)', fontsize=14)
+    ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.tick_params(labelsize=12)
+        ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16,  va='top', ha='left')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_age_summary.png', bbox_inches='tight', dpi=150)
+    
+    plt.close('all')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    ax1.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc,
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
+    ax1.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax1.set_xticks(np.arange(len(broadband_alb_date_cond)))
+    ax1.set_xticklabels(date_conditions_simplified, rotation=45, ha='right')
+    ax1.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
+                       mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
+    ax1.set_xlabel('Date and condition', fontsize=14)
+    ax1.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    
+    # fit line in ax2
+    X = sm.add_constant(ice_age_over1_date_cond)
+    y = np.array(broadband_alb_date_cond)
+
+    mod_wls = sm.WLS(y, X )#weights=sample_weights)
+    res_wls = mod_wls.fit()
+    slope = res_wls.params[1]
+    intercept = res_wls.params[0]
+    r_value = res_wls.rsquared
+    x_fit = np.linspace(0, np.max(ice_age_date_cond)*1.05, 100)
+    y_fit = intercept + slope * x_fit
+    p_values = res_wls.pvalues
+    
+    ax2.errorbar(ice_age_over1_date_cond, broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc, 
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#label='Data Points with Uncertainty')
+    ax2.scatter(ice_age_over1_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+    ax2.legend(fontsize=12)
+    ax2.set_xlabel('Median Sea Ice Age >= 1 year ratio', fontsize=14)
+    ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.tick_params(labelsize=12)
+        ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16,  va='top', ha='left')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_age_over1_summary.png', bbox_inches='tight', dpi=150)
+    
+    plt.close('all')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    ax1.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc,
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
+    ax1.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax1.set_xticks(np.arange(len(broadband_alb_date_cond)))
+    ax1.set_xticklabels(date_conditions_simplified, rotation=45, ha='right')
+    ax1.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
+                       mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
+    ax1.set_xlabel('Date and condition', fontsize=14)
+    ax1.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    
+    # fit line in ax2
+    X = sm.add_constant(ice_age_over2_date_cond)
+    y = np.array(broadband_alb_date_cond)
+
+    mod_wls = sm.WLS(y, X )#weights=sample_weights)
+    res_wls = mod_wls.fit()
+    slope = res_wls.params[1]
+    intercept = res_wls.params[0]
+    r_value = res_wls.rsquared
+    x_fit = np.linspace(0, np.max(ice_age_date_cond)*1.05, 100)
+    y_fit = intercept + slope * x_fit
+    p_values = res_wls.pvalues
+    
+    ax2.errorbar(ice_age_over2_date_cond, broadband_alb_date_cond, 
+                yerr=broadband_alb_date_cond_unc, 
+                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#label='Data Points with Uncertainty')
+    ax2.scatter(ice_age_over2_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+    ax2.legend(fontsize=12)
+    ax2.set_xlabel('Median Sea Ice Age >= 2 year ratio', fontsize=14)
+    ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+    for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.tick_params(labelsize=12)
+        ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16,  va='top', ha='left')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_age_over2_summary.png', bbox_inches='tight', dpi=150)
     
     # multi variables regression
     X_multi = np.column_stack((myi_ratio_date_cond, fyi_raio_date_cond, yi_ratio_date_cond))
