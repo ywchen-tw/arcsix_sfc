@@ -646,7 +646,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 fig.savefig(f'fig/{date_s}/{date_s}_{case_tag}_manual_{manual_alb.replace(".dat", "")}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.png', bbox_inches='tight', dpi=150)
             # plt.show()
             #\----------------------------------------------------------------------------/#
-            sys.exit()
+            # sys.exit()
             
             
             atm_z_grid = levels
