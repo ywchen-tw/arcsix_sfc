@@ -293,6 +293,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
         
     sza_arr = np.array([50, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
     if clear_sky:
@@ -304,7 +305,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if  not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -379,13 +380,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
-                
-                if not os.path.exists(output_csv_name_sw):
-                    print("SW output_csv_name_sw:", output_csv_name_sw, os.path.exists(output_csv_name_sw))
-                if not os.path.exists(output_csv_name_lw):
                     
-                    print("LW output_csv_name_lw:", output_csv_name_lw, os.path.exists(output_csv_name_lw))
-                continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -422,6 +417,20 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # Fup_sfc_lw = np.concatenate((df_lw['Fup_sfc'].values, df_lw_2['Fup_sfc'].values))
                 # Fdn_sfc_lw = np.concatenate((df_lw['Fdn_sfc'].values, df_lw_2['Fdn_sfc'].values))
                 
+                cwp_sort_ind = np.argsort(cwp_list)
+                cot_list = cot_list[cwp_sort_ind]
+                cwp_list = cwp_list[cwp_sort_ind]
+                cer_list = cer_list[cwp_sort_ind]
+                cth_list = cth_list[cwp_sort_ind]
+                cbh_list = cbh_list[cwp_sort_ind]
+                sza_list = sza_list[cwp_sort_ind]
+                Fup_sfc_sw = Fup_sfc_sw[cwp_sort_ind]
+                Fdn_sfc_sw = Fdn_sfc_sw[cwp_sort_ind]
+                Fup_sfc_lw = Fup_sfc_lw[cwp_sort_ind]
+                Fdn_sfc_lw = Fdn_sfc_lw[cwp_sort_ind]
+                
+                sza_list = np.round(sza_list, 2)
+                
                 
                 Fup_sfc_lw *= 1000  # convert kW/m2 to W/m2
                 Fdn_sfc_lw *= 1000  # convert kW/m2 to W/m2
@@ -442,11 +451,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # print("F_sfc_sw_cre:", F_sfc_sw_cre)
                 # print("F_sfc_lw_cre:", F_sfc_lw_cre)
                 
-                select = np.array([cwp%0.5==0 for cwp in cwp_cre])
-                case_sel = ~select
+                # select = np.array([cwp%0.5==0 for cwp in cwp_cre])
+                # case_sel = ~select
                 
-                # select = np.array([cwp>=0 for cwp in cwp_cre])
-                # case_sel = ~np.array([cwp%0.5==0 for cwp in cwp_cre])
+                select = np.array([cwp>=0 for cwp in cwp_cre])
+                case_sel = ~np.array([cwp%0.5==0 for cwp in cwp_cre])
                 
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -518,39 +527,56 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 broadband_alb_ori_list_all.extend([broadband_alb_ori]*len(cot_list[select]))
                 broadband_alb_ori_list_real_all.extend([broadband_alb_ori]*len(cot_list[case_sel]))
                 
-        #     alb_wvl_all.append(ext_wvl)
-        #     alb_all.append(ext_alb)
-        #     broadband_alb_all.append(broadband_alb)
-        #     broadband_alb_ori_all.append(broadband_alb_ori)
+                # if manual_alb_i is None and sza_sim % 0.5 > 0:
+                #     plt.figure()
+                #     plt.plot(cwp_cre, F_sfc_net_cre, '-o', label='NET CRE')
+                #     plt.xlabel('CWP (g/m2)')
+                #     plt.ylabel('Surface NET CRE (W/m2)')
+                #     plt.title(f'Surface NET CRE vs. CWP on {date_s} (sza={sza_sim:.2f}°, alb broadband={broadband_alb})')
+                #     plt.hlines(0, xmin=0, xmax=np.max(cwp_cre), colors='gray', linestyles='dashed')
+                #     plt.legend()
+                #     plt.grid()
+                #     plt.show()
+                #     return
+                
+            alb_wvl_all.append(ext_wvl)
+            alb_all.append(ext_alb)
+            broadband_alb_all.append(broadband_alb)
+            broadband_alb_ori_all.append(broadband_alb_ori)
+            
+            if manual_alb_i is None:
+                print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            else:
+                print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
         
         
-        # cot_list_all = np.array(cot_list_all).flatten()
-        # cwp_list_all = np.array(cwp_list_all).flatten()
-        # cer_list_all = np.array(cer_list_all).flatten()
-        # cth_list_all = np.array(cth_list_all).flatten()
-        # cbh_list_all = np.array(cbh_list_all).flatten()
-        # sza_list_all = np.array(sza_list_all).flatten()
-        # Fup_sfc_sw_all = np.array(Fup_sfc_sw_all).flatten()
-        # Fdn_sfc_sw_all = np.array(Fdn_sfc_sw_all).flatten()
-        # F_sfc_sw_cre_all = np.array(F_sfc_sw_cre_all).flatten()
-        # F_sfc_lw_cre_all = np.array(F_sfc_lw_cre_all).flatten()
-        # F_sfc_net_cre_all = np.array(F_sfc_net_cre_all).flatten()
-        # broadband_alb_list_all = np.array(broadband_alb_list_all).flatten()
-        # broadband_alb_ori_list_all = np.array(broadband_alb_ori_list_all).flatten()
+        cot_list_all = np.array(cot_list_all).flatten()
+        cwp_list_all = np.array(cwp_list_all).flatten()
+        cer_list_all = np.array(cer_list_all).flatten()
+        cth_list_all = np.array(cth_list_all).flatten()
+        cbh_list_all = np.array(cbh_list_all).flatten()
+        sza_list_all = np.array(sza_list_all).flatten()
+        Fup_sfc_sw_all = np.array(Fup_sfc_sw_all).flatten()
+        Fdn_sfc_sw_all = np.array(Fdn_sfc_sw_all).flatten()
+        F_sfc_sw_cre_all = np.array(F_sfc_sw_cre_all).flatten()
+        F_sfc_lw_cre_all = np.array(F_sfc_lw_cre_all).flatten()
+        F_sfc_net_cre_all = np.array(F_sfc_net_cre_all).flatten()
+        broadband_alb_list_all = np.array(broadband_alb_list_all).flatten()
+        broadband_alb_ori_list_all = np.array(broadband_alb_ori_list_all).flatten()
         
-        # cot_real_list_all = np.array(cot_real_list_all).flatten()
-        # cwp_real_list_all = np.array(cwp_real_list_all).flatten()
-        # cer_real_list_all = np.array(cer_real_list_all).flatten()
-        # cth_real_list_all = np.array(cth_real_list_all).flatten()
-        # cbh_real_list_all = np.array(cbh_real_list_all).flatten()
-        # sza_real_list_all = np.array(sza_real_list_all).flatten()
-        # Fup_real_sfc_sw_all = np.array(Fup_real_sfc_sw_all).flatten()
-        # Fdn_real_sfc_sw_all = np.array(Fdn_real_sfc_sw_all).flatten()
-        # F_sfc_sw_cre_real_all = np.array(F_sfc_sw_cre_real_all).flatten()
-        # F_sfc_lw_cre_real_all = np.array(F_sfc_lw_cre_real_all).flatten()
-        # F_sfc_net_cre_real_all = np.array(F_sfc_net_cre_real_all).flatten()
-        # broadband_alb_list_real_all = np.array(broadband_alb_list_real_all).flatten()
-        # broadband_alb_ori_list_real_all = np.array(broadband_alb_ori_list_real_all).flatten()
+        cot_real_list_all = np.array(cot_real_list_all).flatten()
+        cwp_real_list_all = np.array(cwp_real_list_all).flatten()
+        cer_real_list_all = np.array(cer_real_list_all).flatten()
+        cth_real_list_all = np.array(cth_real_list_all).flatten()
+        cbh_real_list_all = np.array(cbh_real_list_all).flatten()
+        sza_real_list_all = np.array(sza_real_list_all).flatten()
+        Fup_real_sfc_sw_all = np.array(Fup_real_sfc_sw_all).flatten()
+        Fdn_real_sfc_sw_all = np.array(Fdn_real_sfc_sw_all).flatten()
+        F_sfc_sw_cre_real_all = np.array(F_sfc_sw_cre_real_all).flatten()
+        F_sfc_lw_cre_real_all = np.array(F_sfc_lw_cre_real_all).flatten()
+        F_sfc_net_cre_real_all = np.array(F_sfc_net_cre_real_all).flatten()
+        broadband_alb_list_real_all = np.array(broadband_alb_list_real_all).flatten()
+        broadband_alb_ori_list_real_all = np.array(broadband_alb_ori_list_real_all).flatten()
         
         
         df_all = pd.DataFrame({"cot": cot_list_all,
@@ -619,7 +645,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         print(f"{col} data:", df_real_all[col].values)
 
     
-    broadband_alb_all_unique = sorted(list(set(df_all['broadband_alb'].values)))
+    broadband_alb_all_unique = sorted(list(set(df_all['broadband_alb'].values)), reverse=True) # sort largest to smallest
     print("broadband_alb_all_unique:", broadband_alb_all_unique)
     
     sza_mesh, broadband_alb_mesh = np.meshgrid(sza_arr, broadband_alb_all_unique, indexing='ij')
@@ -628,7 +654,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         for j in range(sza_mesh.shape[1]):
             sza_sim = sza_arr[i]
             broadband_alb = broadband_alb_all_unique[j]
-            df_select_mask = np.logical_and((df_all['sza'].values==sza_sim), (df_all['broadband_alb'].values==broadband_alb))
+            sza_value_unique = np.unique(df_all['sza'].values)
+            sza_sim_select = sza_value_unique[np.argmin(np.abs(sza_value_unique - sza_sim))]
+            if np.abs(sza_sim - sza_sim_select) > 1e-2:
+                print(f"  Skip sza_sim: {sza_sim}, broadband_alb: {broadband_alb} due to no matching sza in simulations.")
+                continue
+            df_select_mask = np.logical_and((df_all['sza'].values==sza_sim_select), (df_all['broadband_alb'].values==broadband_alb))
             df_sub = df_all.loc[df_select_mask, :]
             cwp_arr = df_sub['cwp'].values
             F_cre_net_arr = df_sub['F_sfc_net_cre'].values
@@ -636,7 +667,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             
             # find zero crossing
             zero_crossings = np.where(np.diff(np.sign(F_cre_net_arr)))[0]
-            print(f'  Zero crossings indices: {zero_crossings}')
+            # print(f'  Zero crossings indices: {zero_crossings}')
             zero_crossings_tmp = []
             for zero_crossing in zero_crossings[1:]:
                 cwp1 = cwp_arr[zero_crossing]
@@ -645,8 +676,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 F2 = F_cre_net_arr[zero_crossing + 1]
                 # linear interpolation to find the root
                 cwp_zero = cwp1 - F1 * (cwp2 - cwp1) / (F2 - F1)
-                print(f' sza: {sza_sim}, broadband_alb: {broadband_alb}')
-                print(f'  Zero crossing at CWP: {cwp_zero:.2f} g/m2 between {cwp1:.2f} and {cwp2:.2f} g/m2')
+                # print(f' sza: {sza_sim}, broadband_alb: {broadband_alb}')
+                # print(f'  Zero crossing at CWP: {cwp_zero:.2f} g/m2 between {cwp1:.2f} and {cwp2:.2f} g/m2')
                 zero_crossings_tmp.append(cwp_zero)
             if len(zero_crossings_tmp) > 0:
                 # sza_sim_list.append(sza_sim)
@@ -654,20 +685,49 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # cwp_zero_list.append(np.nanmean(zero_crossings_tmp))
                 cwp_zero_arr[i, j] = zero_crossings_tmp[0]  # take the first zero crossing
                 
-                if sza_sim >= 75 or len(zero_crossings_tmp) > 1:
-                    plt.close('all')
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-                    ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-                    ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-                    ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-                    ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-                    ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
-                    ax.legend(fontsize=12)
-                    fig.tight_layout()
-                    plt.show()
-                    plt.close(fig)
+                # if sza_sim >= 75 or sza_sim%0.5>0:
+                #     plt.close('all')
+                #     fig, ax = plt.subplots(figsize=(8, 6))
+                #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+                #     ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+                #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+                #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+                #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+                #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
+                #     ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+                #     ax.legend(fontsize=12)
+                #     fig.tight_layout()
+                #     plt.show()
+                #     plt.close(fig)
         
+    
+    plt.close('all')
+    sza_select = 61.46
+    sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
+    broadband_alb_select = 0.735
+    broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
+    df_alb_sel = df_all.loc[(df_all['broadband_alb'].values==broadband_alb_all_unique[broadband_alb_delect_ind]), :]
+
+    
+    # fig, ax = plt.subplots(figsize=(8, 6))
+    # for sza_val in sza_arr:
+    #     sza_select_ind = np.argmin(np.abs(sza_arr - sza_val))
+    #     if cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind] is np.nan:
+    #         continue
+    #     df_sza_sel = df_all.loc[(df_all['broadband_alb'].values==broadband_alb_all_unique[broadband_alb_delect_ind]) & (df_all['sza'].values==sza_val), :]
+    #     ax.plot(df_sza_sel['cwp'].values, df_sza_sel['F_sfc_net_cre'].values, label=f'SZA: {sza_val:.2f}')  
+    #     print(f"SZA: {sza_val:.2f}, Zero Crossing at CWP: {cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind]:.2f} g/m2")  
+    #     ax.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, marker='x', s=100, label=f"SZA: {sza_val:.2f}")
+    # ax.hlines(0, xmin=0, xmax=np.max(df_alb_sel['cwp'].values), colors='gray', linestyles='dashed')
+    # ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+    # ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+    # ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_select}, Broadband Albedo: {broadband_alb_select}', fontsize=16)
+    # ax.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    # fig.tight_layout()
+    # plt.show()
+    # plt.close()
+
+    
     
     # Create a ScalarMappable
     color_series = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',]
@@ -678,8 +738,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax1 = fig.add_subplot(gs[:5, :6])
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
-    sza_real_df_all = df_all.loc[df_all['sza']==61.46, :]
-    sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==61.46, :]
+    sza_select = 61.46
+    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values))))
+    sza_select_ind = np.argmin(np.abs(sza_unique_sorted - sza_select))
+    sza_real_df_all = df_all.loc[df_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    print("sum df_all['sza']==sza_unique_sorted[sza_select_ind]:", np.sum(df_all['sza']==sza_unique_sorted[sza_select_ind]))
+    print("sza_unique_sorted[sza_select_ind]:", sza_unique_sorted[sza_select_ind])
+    print("sza_unique_sorted:", sza_unique_sorted)
+    print("sza_real_df_all length:", len(sza_real_df_all))
     for i in range(len(broadband_alb_all_unique)):
         broadband_alb_i = broadband_alb_all_unique[i]
         df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
@@ -690,10 +757,14 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_sw_cre'].values, '--', color=color_series[i], alpha=0.5)
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_lw_cre'].values, '-.', color=color_series[i], alpha=0.5)
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i], label=f'Albedo-{i+1}')
-        ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
+        if i == 1:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, i], 0, color=color_series[i], marker='^', s=100, label=f'Zero Crossing Albedo-{i+1}')
+            real_cond_color = color_series[i]
                 
         # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
-        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f}')
+        broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_i))
+        ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f}')
 
     from matplotlib.lines import Line2D
     linestyles = ['-', '--', '-.']
@@ -719,26 +790,28 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     
-    level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250, 300]
+    level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300, 400]
     
-    cc1 = ax3.scatter(sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
+    # cc1 = ax3.scatter(sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
     
-    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet')
-    # # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
-    # ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=450, zorder=2)
+    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
+    # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
-    cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
+    
+    # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
 
     
     
-    cbar = fig.colorbar(cc1, ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
-    cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
-                   fontsize=14)
-    ax3.scatter(61.46, 0.735, color='red', marker='^', s=100, label='Flight Case SZA and Albedo')
+    # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
+    # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
+    #                fontsize=14)
+    ax3.scatter(61.46, 0.735, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     ax3.set_xlim(50, 80)
     
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
