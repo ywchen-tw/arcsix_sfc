@@ -945,7 +945,7 @@ def combined_atm_corr():
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
             fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r',)# vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -960,7 +960,7 @@ def combined_atm_corr():
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
             fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc+yi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc+yi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r',)# vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())

@@ -292,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 72.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
@@ -381,13 +381,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
                     
-                if not os.path.exists(output_csv_name_sw):
-                    print(f"File {output_csv_name_sw} not found. Skipping ...")
+                # if not os.path.exists(output_csv_name_sw):
+                #     print(f"File {output_csv_name_sw} not found. Skipping ...")
 
-                if not os.path.exists(output_csv_name_lw):
-                    print(f"File {output_csv_name_lw} not found. Skipping ...")
+                # if not os.path.exists(output_csv_name_lw):
+                #     print(f"File {output_csv_name_lw} not found. Skipping ...")
                     
-                continue
+                # continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -546,15 +546,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 #     plt.show()
                 #     return
                 
-            # alb_wvl_all.append(ext_wvl)
-            # alb_all.append(ext_alb)
-            # broadband_alb_all.append(broadband_alb)
-            # broadband_alb_ori_all.append(broadband_alb_ori)
+            alb_wvl_all.append(ext_wvl)
+            alb_all.append(ext_alb)
+            broadband_alb_all.append(broadband_alb)
+            broadband_alb_ori_all.append(broadband_alb_ori)
             
-            # if manual_alb_i is None:
-            #     print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
-            # else:
-            #     print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            if manual_alb_i is None:
+                print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            else:
+                print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
         
         
         cot_list_all = np.array(cot_list_all).flatten()
@@ -710,7 +710,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             #         plt.show()
             #         plt.close(fig)
                     
-            # # else:
+            # # elif sza_sim >= 70:
             # #     print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
             # #     plt.close('all')
             # #     fig, ax = plt.subplots(figsize=(8, 6))
@@ -772,8 +772,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_unique_sorted[sza_select_ind]:", sza_unique_sorted[sza_select_ind])
     print("sza_unique_sorted:", sza_unique_sorted)
     print("sza_real_df_all length:", len(sza_real_df_all))
-    for i in range(len(broadband_alb_all_unique)):
-        broadband_alb_i = broadband_alb_all_unique[i]
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
         df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
         sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
         df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
@@ -788,7 +788,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             real_cond_color = color_series[i]
                 
         # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
-        broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_i))
+        broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
         ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f}')
 
     from matplotlib.lines import Line2D
@@ -842,21 +842,22 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
     
-    # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)],  labels=[f'{angle}°' for angle in range(75, 45, -5)])
     
     ax3.tick_params(
                     axis='x',         # Apply to the x-axis
                     bottom=True,      # Show ticks on the bottom
-                    top=True,         # Show ticks on the top
+                    top=False,         # Show ticks on the top
                     labelbottom=True, # Show labels on the bottom
-                    labeltop=True,    # Show labels on the top
+                    labeltop=False,    # Show labels on the top
                         # Optional: adjust label rotation if needed
                         # labelrotation=45,
                     )   
     # set ax3 with both top and bottom x-axis
     ax3_top = ax3.secondary_xaxis('top')
     ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=25)
-    ax3_top.set_xticks([angle for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    # ax3_top.set_xticklabels(ax3_top.get_xticklabels(), rotation=0)
     
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
         ax.tick_params(axis='both', which='major', labelsize=12)
