@@ -305,7 +305,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -695,36 +695,37 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # cwp_zero_list.append(np.nanmean(zero_crossings_tmp))
                 cwp_zero_arr[i, j] = zero_crossings_tmp[0]  # take the first zero crossing
                 
-            #     if sza_sim >= 70 or sza_sim%0.5>0:
-            #         plt.close('all')
-            #         fig, ax = plt.subplots(figsize=(8, 6))
-            #         ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-            #         ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-            #         ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-            #         ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-            #         ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-            #         ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
-            #         ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
-            #         ax.legend(fontsize=12)
-            #         fig.tight_layout()
-            #         plt.show()
-            #         plt.close(fig)
+                # if sza_sim >= 70 or sza_sim%0.5>0:
+                if sza_sim >= 70  and np.abs(broadband_alb - 0.666) < 1e-3:
+                    plt.close('all')
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+                    ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+                    ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+                    ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+                    ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+                    ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
+                    ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+                    ax.legend(fontsize=12)
+                    fig.tight_layout()
+                    plt.show()
+                    plt.close(fig)
                     
-            # # elif sza_sim >= 70:
-            # #     print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
-            # #     plt.close('all')
-            # #     fig, ax = plt.subplots(figsize=(8, 6))
-            # #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-            # #     # ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-            # #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-            # #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-            # #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-            # #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim}, Broadband Albedo: {broadband_alb}', fontsize=16)
-            # #     # ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
-            # #     ax.legend(fontsize=12)
-            # #     fig.tight_layout()
-            # #     plt.show()
-            # #     plt.close(fig)
+            # elif sza_sim >= 70 and np.abs(broadband_alb - 0.666) < 1e-3:
+            #     print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
+            #     plt.close('all')
+            #     fig, ax = plt.subplots(figsize=(8, 6))
+            #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+            #     # ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+            #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+            #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+            #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+            #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
+            #     # ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+            #     ax.legend(fontsize=12)
+            #     fig.tight_layout()
+            #     plt.show()
+            #     plt.close(fig)
     
     plt.close('all')
     sza_select = 61.46
