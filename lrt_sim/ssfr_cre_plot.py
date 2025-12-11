@@ -292,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 55, 60, 65, 70, 75, 77.5, 80, 82.5, 85, 87, np.round(sza_avg, 2)], dtype=np.float32)
+    sza_arr = np.array([50, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
     if clear_sky:
@@ -379,7 +379,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
+                
+                if not os.path.exists(output_csv_name_sw):
+                    print("SW output_csv_name_sw:", output_csv_name_sw, os.path.exists(output_csv_name_sw))
+                if not os.path.exists(output_csv_name_lw):
                     
+                    print("LW output_csv_name_lw:", output_csv_name_lw, os.path.exists(output_csv_name_lw))
+                continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -512,39 +518,39 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 broadband_alb_ori_list_all.extend([broadband_alb_ori]*len(cot_list[select]))
                 broadband_alb_ori_list_real_all.extend([broadband_alb_ori]*len(cot_list[case_sel]))
                 
-            alb_wvl_all.append(ext_wvl)
-            alb_all.append(ext_alb)
-            broadband_alb_all.append(broadband_alb)
-            broadband_alb_ori_all.append(broadband_alb_ori)
+        #     alb_wvl_all.append(ext_wvl)
+        #     alb_all.append(ext_alb)
+        #     broadband_alb_all.append(broadband_alb)
+        #     broadband_alb_ori_all.append(broadband_alb_ori)
         
         
-        cot_list_all = np.array(cot_list_all).flatten()
-        cwp_list_all = np.array(cwp_list_all).flatten()
-        cer_list_all = np.array(cer_list_all).flatten()
-        cth_list_all = np.array(cth_list_all).flatten()
-        cbh_list_all = np.array(cbh_list_all).flatten()
-        sza_list_all = np.array(sza_list_all).flatten()
-        Fup_sfc_sw_all = np.array(Fup_sfc_sw_all).flatten()
-        Fdn_sfc_sw_all = np.array(Fdn_sfc_sw_all).flatten()
-        F_sfc_sw_cre_all = np.array(F_sfc_sw_cre_all).flatten()
-        F_sfc_lw_cre_all = np.array(F_sfc_lw_cre_all).flatten()
-        F_sfc_net_cre_all = np.array(F_sfc_net_cre_all).flatten()
-        broadband_alb_list_all = np.array(broadband_alb_list_all).flatten()
-        broadband_alb_ori_list_all = np.array(broadband_alb_ori_list_all).flatten()
+        # cot_list_all = np.array(cot_list_all).flatten()
+        # cwp_list_all = np.array(cwp_list_all).flatten()
+        # cer_list_all = np.array(cer_list_all).flatten()
+        # cth_list_all = np.array(cth_list_all).flatten()
+        # cbh_list_all = np.array(cbh_list_all).flatten()
+        # sza_list_all = np.array(sza_list_all).flatten()
+        # Fup_sfc_sw_all = np.array(Fup_sfc_sw_all).flatten()
+        # Fdn_sfc_sw_all = np.array(Fdn_sfc_sw_all).flatten()
+        # F_sfc_sw_cre_all = np.array(F_sfc_sw_cre_all).flatten()
+        # F_sfc_lw_cre_all = np.array(F_sfc_lw_cre_all).flatten()
+        # F_sfc_net_cre_all = np.array(F_sfc_net_cre_all).flatten()
+        # broadband_alb_list_all = np.array(broadband_alb_list_all).flatten()
+        # broadband_alb_ori_list_all = np.array(broadband_alb_ori_list_all).flatten()
         
-        cot_real_list_all = np.array(cot_real_list_all).flatten()
-        cwp_real_list_all = np.array(cwp_real_list_all).flatten()
-        cer_real_list_all = np.array(cer_real_list_all).flatten()
-        cth_real_list_all = np.array(cth_real_list_all).flatten()
-        cbh_real_list_all = np.array(cbh_real_list_all).flatten()
-        sza_real_list_all = np.array(sza_real_list_all).flatten()
-        Fup_real_sfc_sw_all = np.array(Fup_real_sfc_sw_all).flatten()
-        Fdn_real_sfc_sw_all = np.array(Fdn_real_sfc_sw_all).flatten()
-        F_sfc_sw_cre_real_all = np.array(F_sfc_sw_cre_real_all).flatten()
-        F_sfc_lw_cre_real_all = np.array(F_sfc_lw_cre_real_all).flatten()
-        F_sfc_net_cre_real_all = np.array(F_sfc_net_cre_real_all).flatten()
-        broadband_alb_list_real_all = np.array(broadband_alb_list_real_all).flatten()
-        broadband_alb_ori_list_real_all = np.array(broadband_alb_ori_list_real_all).flatten()
+        # cot_real_list_all = np.array(cot_real_list_all).flatten()
+        # cwp_real_list_all = np.array(cwp_real_list_all).flatten()
+        # cer_real_list_all = np.array(cer_real_list_all).flatten()
+        # cth_real_list_all = np.array(cth_real_list_all).flatten()
+        # cbh_real_list_all = np.array(cbh_real_list_all).flatten()
+        # sza_real_list_all = np.array(sza_real_list_all).flatten()
+        # Fup_real_sfc_sw_all = np.array(Fup_real_sfc_sw_all).flatten()
+        # Fdn_real_sfc_sw_all = np.array(Fdn_real_sfc_sw_all).flatten()
+        # F_sfc_sw_cre_real_all = np.array(F_sfc_sw_cre_real_all).flatten()
+        # F_sfc_lw_cre_real_all = np.array(F_sfc_lw_cre_real_all).flatten()
+        # F_sfc_net_cre_real_all = np.array(F_sfc_net_cre_real_all).flatten()
+        # broadband_alb_list_real_all = np.array(broadband_alb_list_real_all).flatten()
+        # broadband_alb_ori_list_real_all = np.array(broadband_alb_ori_list_real_all).flatten()
         
         
         df_all = pd.DataFrame({"cot": cot_list_all,
