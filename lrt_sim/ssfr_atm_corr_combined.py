@@ -677,6 +677,7 @@ def combined_atm_corr():
                     method='nearest'
                 )
         ice_age_spring_all[date_mask] = ice_age_mesh.copy()
+        ice_age_spring_all[np.isnan(ice_age_spring_all)] = 0 # set ice age to 0 if nan
         
         plt.close('all')
         central_lon = np.mean(lon_all)
@@ -823,6 +824,7 @@ def combined_atm_corr():
                     method='nearest'
                 )
         ice_age_summer_all[date_mask] = ice_age_mesh.copy()
+        ice_age_summer_all[np.isnan(ice_age_summer_all)] = 0 # set ice age to 0 if nan
         
         plt.close('all')
         central_lon = np.mean(lon_all)
