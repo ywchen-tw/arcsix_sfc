@@ -381,13 +381,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
                     
-                # if not os.path.exists(output_csv_name_sw):
-                #     print(f"File {output_csv_name_sw} not found. Skipping ...")
+                if not os.path.exists(output_csv_name_sw):
+                    print(f"File {output_csv_name_sw} not found. Skipping ...")
 
-                # if not os.path.exists(output_csv_name_lw):
-                #     print(f"File {output_csv_name_lw} not found. Skipping ...")
+                if not os.path.exists(output_csv_name_lw):
+                    print(f"File {output_csv_name_lw} not found. Skipping ...")
                     
-                # continue
+                continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -546,15 +546,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 #     plt.show()
                 #     return
                 
-            alb_wvl_all.append(ext_wvl)
-            alb_all.append(ext_alb)
-            broadband_alb_all.append(broadband_alb)
-            broadband_alb_ori_all.append(broadband_alb_ori)
+            # alb_wvl_all.append(ext_wvl)
+            # alb_all.append(ext_alb)
+            # broadband_alb_all.append(broadband_alb)
+            # broadband_alb_ori_all.append(broadband_alb_ori)
             
-            if manual_alb_i is None:
-                print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
-            else:
-                print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            # if manual_alb_i is None:
+            #     print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            # else:
+            #     print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
         
         
         cot_list_all = np.array(cot_list_all).flatten()
