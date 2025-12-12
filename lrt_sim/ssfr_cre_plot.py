@@ -292,7 +292,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 72.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 72.5, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
@@ -695,37 +695,37 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # cwp_zero_list.append(np.nanmean(zero_crossings_tmp))
                 cwp_zero_arr[i, j] = zero_crossings_tmp[0]  # take the first zero crossing
                 
-                # if sza_sim >= 70 or sza_sim%0.5>0:
-                if sza_sim >= 70  and np.abs(broadband_alb - 0.666) < 1e-3:
-                    plt.close('all')
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-                    ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-                    ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-                    ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-                    ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-                    ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
-                    ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
-                    ax.legend(fontsize=12)
-                    fig.tight_layout()
-                    plt.show()
-                    plt.close(fig)
+            #     # if sza_sim >= 70 or sza_sim%0.5>0:
+            #     if sza_sim >= 70  and np.abs(broadband_alb - 0.666) < 1e-3:
+            #         plt.close('all')
+            #         fig, ax = plt.subplots(figsize=(8, 6))
+            #         ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+            #         ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+            #         ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+            #         ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+            #         ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+            #         ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
+            #         ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+            #         ax.legend(fontsize=12)
+            #         fig.tight_layout()
+            #         plt.show()
+            #         plt.close(fig)
                     
-            # elif sza_sim >= 70 and np.abs(broadband_alb - 0.666) < 1e-3:
-            #     print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
-            #     plt.close('all')
-            #     fig, ax = plt.subplots(figsize=(8, 6))
-            #     ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
-            #     # ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
-            #     ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
-            #     ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
-            #     ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
-            #     ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
-            #     # ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
-            #     ax.legend(fontsize=12)
-            #     fig.tight_layout()
-            #     plt.show()
-            #     plt.close(fig)
+            elif sza_sim >= 71 and np.abs(broadband_alb - 0.666) < 1e-3:
+                print(f'  No zero crossing found for sza: {sza_sim}, broadband_alb: {broadband_alb}')
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(8, 6))
+                ax.plot(cwp_arr, F_cre_net_arr, '-', label='Net CRE')
+                # ax.scatter(zero_crossings_tmp[0], 0, c='C0', marker='o', s=50, label='Zero Crossing' if len(zero_crossings_tmp)>0 else '')
+                ax.hlines(0, xmin=0, xmax=np.max(cwp_arr), colors='gray', linestyles='dashed')
+                ax.set_xlabel('Cloud Liquid Water Path (g/m2)', fontsize=14)
+                ax.set_ylabel('Surface Net CRE (W/m2)', fontsize=14)
+                ax.set_title(f'Surface Net CRE vs. LWP on {date_s}, SZA: {sza_sim:.2f}, Broadband Albedo: {broadband_alb}', fontsize=16)
+                # ax.text(0.05, 0.9, f'Zero Crossing at CWP: {zero_crossings_tmp[0]:.2f} g/m2', transform=ax.transAxes, fontsize=12, verticalalignment='top')
+                ax.legend(fontsize=12)
+                fig.tight_layout()
+                plt.show()
+                plt.close(fig)
     
     plt.close('all')
     sza_select = 61.46
@@ -818,7 +818,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300, 400]
     
-    # cc1 = ax3.scatter(sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
+    cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
     print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
@@ -858,6 +858,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3_top = ax3.secondary_xaxis('top')
     ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=25)
     ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    ax3_top.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    labelsize=12,)
     # ax3_top.set_xticklabels(ax3_top.get_xticklabels(), rotation=0)
     
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
