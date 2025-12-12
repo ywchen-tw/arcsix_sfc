@@ -1266,7 +1266,7 @@ if __name__ == '__main__':
     #                     manual_cloud_cbh=0.15,
     #                     manual_cloud_cot=6.02,
     #                     lw=lw,
-    #                     manual_alb='sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97.dat',
+    #                     manual_alb='sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97X.dat',
     #                     )
     
     
@@ -1290,7 +1290,7 @@ if __name__ == '__main__':
                         manual_cloud_cbh=0.15,
                         manual_cloud_cot=6.02,
                         lw=lw,
-                        manual_alb='sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012.dat',
+                        manual_alb='sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',
                         )
     
 
