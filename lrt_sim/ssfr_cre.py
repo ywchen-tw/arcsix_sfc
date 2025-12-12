@@ -1147,7 +1147,7 @@ if __name__ == '__main__':
     #                     manual_alb='sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
     #                     )
     
-    for lw in [False, True]:
+    for lw in [True]:
         cre_sim(date=datetime.datetime(2024, 6, 7),
                         tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
                                             ],
