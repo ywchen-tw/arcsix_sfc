@@ -122,43 +122,6 @@ _fdir_tmp_graph_ = 'tmp-graph_flt-vid'
 
 _title_extra_ = 'ARCSIX RF#1'
 
-_tmhr_range_ = {
-        '20240517': [19.20, 23.00],
-        '20240521': [14.80, 17.50],
-        }
-
-# dates for ARCSIX-1
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates1_ = [
-        datetime.datetime(2024, 5, 28),
-        datetime.datetime(2024, 5, 30),
-        datetime.datetime(2024, 5, 31),
-        datetime.datetime(2024, 6,  3),
-        datetime.datetime(2024, 6,  5),
-        datetime.datetime(2024, 6,  6),
-        datetime.datetime(2024, 6,  7),
-        datetime.datetime(2024, 6, 10),
-        datetime.datetime(2024, 6, 11),
-        datetime.datetime(2024, 6, 13),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-# dates for ARCSIX-2
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates2_ = [
-        datetime.datetime(2024, 7, 25),
-        datetime.datetime(2024, 7, 29),
-        datetime.datetime(2024, 7, 30),
-        datetime.datetime(2024, 8,  1),
-        datetime.datetime(2024, 8,  2),
-        datetime.datetime(2024, 8,  7),
-        datetime.datetime(2024, 8,  8),
-        datetime.datetime(2024, 8,  9),
-        datetime.datetime(2024, 8,  15),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-_dates_ = _dates1_
 
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -568,7 +531,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     
     mode = 'lw' if lw else 'sw'
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87, sza_avg], dtype=np.float32)
-    sza_arr = np.array([80], dtype=np.float32)
+    sza_arr = np.array([77.5], dtype=np.float32)
     for sza_sim in sza_arr:
     
         if manual_alb is None:
