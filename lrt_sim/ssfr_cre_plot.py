@@ -293,6 +293,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
         
     sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, ], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
@@ -402,16 +404,21 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # with open(output_csv_name_lw.replace('.csv', '_2.csv'), 'r') as f:
                 #     df_lw_2 = pd.read_csv(f)
                     
-                cot_list = df_sw['cot'].values 
-                cwp_list = df_sw['cwp'].values
-                cer_list = df_sw['cer'].values
-                cth_list = df_sw['cth'].values
-                cbh_list = df_sw['cbh'].values
-                sza_list = df_sw['sza'].values
-                Fup_sfc_sw = df_sw['Fup_sfc'].values
-                Fdn_sfc_sw = df_sw['Fdn_sfc'].values
-                Fup_sfc_lw = df_lw['Fup_sfc'].values
-                Fdn_sfc_lw = df_lw['Fdn_sfc'].values
+                cot_list = df_sw['cot'].values[:22]
+                cwp_list = df_sw['cwp'].values[:22]
+                cer_list = df_sw['cer'].values[:22]
+                cth_list = df_sw['cth'].values[:22]
+                cbh_list = df_sw['cbh'].values[:22]
+                sza_list = df_sw['sza'].values[:22]
+                Fup_sfc_sw = df_sw['Fup_sfc'].values[:22]
+                Fdn_sfc_sw = df_sw['Fdn_sfc'].values[:22]
+                Fup_sfc_lw = df_lw['Fup_sfc'].values[:22]
+                Fdn_sfc_lw = df_lw['Fdn_sfc'].values[:22]
+                
+                # print("cwp_list shape:", cwp_list.shape)
+                # print("cwp:", cwp_list)
+                # print("cot_list shape:", cot_list.shape)
+                # print("Fup_sfc_lw shape:", Fup_sfc_lw.shape)
                 
                 # cot_list = np.concatenate((df_sw['cot'].values, df_sw_2['cot'].values))
                 # cwp_list = np.concatenate((df_sw['cwp'].values, df_sw_2['cwp'].values))
@@ -819,7 +826,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300, 400]
     
-    cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
+    # cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
     print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
@@ -1043,6 +1050,15 @@ if __name__ == '__main__':
                                 'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
                                 'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
                                 'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
+                                
+                                
+
+                                'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
+                                'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_ori.dat',
+                                # 'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_scale_0.99.dat',
+                                'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_ori.dat',
+                                # 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97.dat',
+                                # 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012.dat',
                                 
                                 ]
                     )
