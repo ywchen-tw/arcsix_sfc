@@ -612,7 +612,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                 
                     ext_wvl, ext_alb = alb_extention(alb_wvl, alb_corr_fit_avg, clear_sky=clear_sky)
                 
-                
+                    ext_alb = np.clip(ext_alb, 0.0, 1.0)  # ensure albedo is between 0 and 1
 
                     write_2col_file(alb_fname, ext_wvl, ext_alb,
                                     header=('# SSFR derived sfc albedo\n'
@@ -633,6 +633,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                     ext_wvl = pd.read_csv(alb_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 0].values
             
             # ext_alb *= 1.012  # apply scaling factor
+            
+            ext_alb = np.clip(ext_alb, 0.0, 1.0)  # ensure albedo is between 0 and 1
             
             alb_mean = np.round(np.nanmean(ext_alb[(ext_wvl >= 400) & (ext_wvl <= 2500)]), 5)
             plt.close('all')
