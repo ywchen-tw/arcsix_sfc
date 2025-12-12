@@ -802,23 +802,44 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             elif platform.system() == 'Linux':
                 if len(inits_rad) > 0:
                     print('Running libratran calculations ...')
-                    for i in range(len(inits_rad)):
-                        if run:
-                            er3t.rtm.lrt.lrt_run(inits_rad[i])
+                    # for i in range(len(inits_rad)):
+                    #     if run:
+                    #         er3t.rtm.lrt.lrt_run(inits_rad[i])
                             
-                        try:
-                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                    #     try:
+                    #         data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
                         
-                        except Exception as e:
-                            print(f"Error reading output for index {i}, retrying once. Error: {e}")
-                            # retry once
-                            er3t.rtm.lrt.lrt_run(inits_rad[i])
-                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                    #     except Exception as e:
+                    #         print(f"Error reading output for index {i}, retrying once. Error: {e}")
+                    #         # retry once
+                    #         er3t.rtm.lrt.lrt_run(inits_rad[i])
+                    #         data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
                         
-                        flux_down_results.append(np.squeeze(data.f_down))
-                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
-                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
-                        flux_up_results.append(np.squeeze(data.f_up))
+                    #     flux_down_results.append(np.squeeze(data.f_down))
+                    #     flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                    #     flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                    #     flux_up_results.append(np.squeeze(data.f_up))
+                        
+                    if run:
+                        # check available CPU cores
+                        er3t.rtm.lrt.lrt_run_mp(inits_rad)
+                    try:
+                        for i in range(len(inits_rad)):
+                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                            
+                            flux_down_results.append(np.squeeze(data.f_down))
+                            flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                            flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                            flux_up_results.append(np.squeeze(data.f_up))
+                    except Exception as e:
+                        er3t.rtm.lrt.lrt_run_mp(inits_rad)
+                        for i in range(len(inits_rad)):
+                            data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
+                            
+                            flux_down_results.append(np.squeeze(data.f_down))
+                            flux_down_dir_results.append(np.squeeze(data.f_down_direct))
+                            flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
+                            flux_up_results.append(np.squeeze(data.f_up))
             # #\----------------------------------------------------------------------------/#
             ###### delete input, output, cld txt files
             # for prefix in ['input', 'output', 'cld']:
