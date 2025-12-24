@@ -857,7 +857,7 @@ def combined_atm_corr():
     slope = res_wls.params[1]
     intercept = res_wls.params[0]
     r_value = res_wls.rsquared
-    x_fit = np.linspace(0, np.max(ice_age_date_cond)*1.05, 100)
+    x_fit = np.linspace(0, np.max(ice_age_over1_date_cond)*1.05, 100)
     y_fit = intercept + slope * x_fit
     p_values = res_wls.pvalues
     
@@ -867,7 +867,7 @@ def combined_atm_corr():
     ax2.scatter(ice_age_over1_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
     ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
     ax2.legend(fontsize=12)
-    ax2.set_xlabel('Median Sea Ice Age >= 1 year ratio', fontsize=14)
+    ax2.set_xlabel('Sea Ice Age >= 1 year ratio', fontsize=14)
     ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
     for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
         ax.tick_params(labelsize=12)
@@ -896,7 +896,7 @@ def combined_atm_corr():
     slope = res_wls.params[1]
     intercept = res_wls.params[0]
     r_value = res_wls.rsquared
-    x_fit = np.linspace(0, np.max(ice_age_date_cond)*1.05, 100)
+    x_fit = np.linspace(0, np.max(ice_age_over2_date_cond)*1.05, 100)
     y_fit = intercept + slope * x_fit
     p_values = res_wls.pvalues
     
@@ -906,7 +906,7 @@ def combined_atm_corr():
     ax2.scatter(ice_age_over2_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
     ax2.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
     ax2.legend(fontsize=12)
-    ax2.set_xlabel('Median Sea Ice Age >= 2 year ratio', fontsize=14)
+    ax2.set_xlabel('Sea Ice Age >= 2 year ratio', fontsize=14)
     ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
     for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
         ax.tick_params(labelsize=12)

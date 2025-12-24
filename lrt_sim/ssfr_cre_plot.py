@@ -294,7 +294,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         
     sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
 
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, ], dtype=np.float32)
+    # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, ], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
         
         
@@ -667,7 +667,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     cos_sza_arr = np.cos(np.deg2rad(sza_arr.copy()))
     print("cos_sza_arr:", cos_sza_arr)
     cos_sza_mesh, _ = np.meshgrid(cos_sza_arr, broadband_alb_all_unique, indexing='ij')
-    cwp_zero_arr = np.zeros_like(sza_mesh, dtype=np.float32) * np.nan
+    cwp_zero_arr = np.zeros_like(cos_sza_mesh, dtype=np.float32) * np.nan
     for i in range(sza_mesh.shape[0]):
         for j in range(sza_mesh.shape[1]):
             sza_sim = sza_arr[i]
@@ -761,6 +761,20 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # plt.show()
     # plt.close()
 
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(9, 10))
+    ax.plot([50, 54, 60, 65, 68, 70, 72, 73, 75], [0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464], linewidth=1.5, color='r')
+    ax.set_xlim(30, 90)
+    ax.set_ylim(0, 1)
+    # Set the background color of the Figure to transparent
+    fig.patch.set_facecolor('none')
+    # Alternatively: fig.patch.set_alpha(0.0)
+
+    # Set the background color of the Axes (plot area) to transparent
+    ax.patch.set_facecolor('none')
+    # Alternatively: ax.patch.set_alpha(0.0)
+    fig.savefig(f'fig/{date_s}/shupe_paper_lwp_30_test.png', dpi=300, bbox_inches='tight')
+
     
     
     # Create a ScalarMappable
@@ -773,8 +787,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
     sza_select = 61.46
-    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values))))
-    sza_select_ind = np.argmin(np.abs(sza_unique_sorted - sza_select))
+    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
+    cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
+    sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
     sza_real_df_all = df_all.loc[df_all['sza']==sza_unique_sorted[sza_select_ind], :]
     sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==sza_unique_sorted[sza_select_ind], :]
     print("sum df_all['sza']==sza_unique_sorted[sza_select_ind]:", np.sum(df_all['sza']==sza_unique_sorted[sza_select_ind]))
@@ -793,7 +808,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i], label=f'Albedo-{i+1}')
         if i == 1:
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
-            ax1.scatter(cwp_zero_arr[sza_select_ind, i], 0, color=color_series[i], marker='^', s=100, label=f'Zero Crossing Albedo-{i+1}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='^', s=100, label=f'Zero Crossing Albedo-{i+1}')
             real_cond_color = color_series[i]
                 
         # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
@@ -824,22 +839,28 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     
-    level_labels = [20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300, 400]
+    level_labels = [20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300,  ]
     
     # cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
     print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
 
-    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=450 , zorder=2)
+    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
     ax3.clabel(cc, level_labels, fontsize=12, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
-    
+    shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
+    shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
+    shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
+    shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
+    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
 
     
     
@@ -850,6 +871,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3.scatter(cos_sza_real, 0.735, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
+    ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
     
     # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)],  labels=[f'{angle}°' for angle in range(75, 45, -5)])
     
@@ -864,7 +886,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                     )   
     # set ax3 with both top and bottom x-axis
     ax3_top = ax3.secondary_xaxis('top')
-    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=25)
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=15)
     ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
     ax3_top.tick_params(
                     axis='x',         # Apply to the x-axis
@@ -1055,10 +1077,10 @@ if __name__ == '__main__':
 
                                 'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
                                 'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_ori.dat',
-                                # 'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_scale_0.99.dat',
+                                'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_scale_0.99X.dat',
                                 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_ori.dat',
-                                # 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97.dat',
-                                # 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012.dat',
+                                'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97X.dat',
+                                'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',
                                 
                                 ]
                     )
