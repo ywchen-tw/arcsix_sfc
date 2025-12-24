@@ -975,29 +975,6 @@ if __name__ == '__main__':
     #                     manual_alb=None,
     #                     )
         
-    for lw in [False, True]:
-        cre_sim(date=datetime.datetime(2024, 6, 3),
-                        tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
-                                            ],
-                        case_tag='cloudy_atm_corr_2',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
-                                                np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
-                                                np.arange(5.0, 10.1, 2.5),
-                                                np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=0.5,
-                        clear_sky=False,
-                        overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=True,
-                        manual_cloud_cer=7.0,
-                        manual_cloud_cwp=113.65,
-                        manual_cloud_cth=1.91,
-                        manual_cloud_cbh=0.50,
-                        manual_cloud_cot=24.31,
-                        lw=lw,
-                        manual_alb='sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
-                        )
-        
     # for lw in [False, True]:
     #     cre_sim(date=datetime.datetime(2024, 6, 3),
     #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
@@ -1018,8 +995,31 @@ if __name__ == '__main__':
     #                     manual_cloud_cbh=0.50,
     #                     manual_cloud_cot=24.31,
     #                     lw=lw,
-    #                     manual_alb='sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #                     manual_alb='sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
     #                     )
+        
+    for lw in [False, True]:
+        cre_sim(date=datetime.datetime(2024, 6, 3),
+                        tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
+                                            ],
+                        case_tag='cloudy_atm_corr_2',
+                        config=config,
+                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
+                                                np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+                                                np.arange(5.0, 10.1, 2.5),
+                                                np.array([15, 20, 30., 40., 45.]))),
+                        simulation_interval=0.5,
+                        clear_sky=False,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=True,
+                        manual_cloud_cer=7.0,
+                        manual_cloud_cwp=113.65,
+                        manual_cloud_cth=1.91,
+                        manual_cloud_cbh=0.50,
+                        manual_cloud_cot=24.31,
+                        lw=lw,
+                        manual_alb='sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+                        )
         
     # for lw in [False, True]:
     #     cre_sim(date=datetime.datetime(2024, 6, 3),
