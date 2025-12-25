@@ -727,7 +727,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                     cth_ind_cld = bisect.bisect_left(z_list, cth_x)
                     cbh_ind_cld = bisect.bisect_left(z_list, cbh_x)
                     
-                    fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km.txt'
+                    fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_sza_{sza_sim}_alb_{alb_mean}.txt'
                     if os.path.exists(fname_cld):
                         os.remove(fname_cld)
                     cld_cfg = er3t.rtm.lrt.get_cld_cfg()
