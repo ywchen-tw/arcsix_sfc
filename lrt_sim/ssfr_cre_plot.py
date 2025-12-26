@@ -310,7 +310,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -386,13 +386,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
                     
-                if not os.path.exists(output_csv_name_sw):
-                    print(f"File {output_csv_name_sw} not found. Skipping ...")
+                # if not os.path.exists(output_csv_name_sw):
+                #     print(f"File {output_csv_name_sw} not found. Skipping ...")
 
-                if not os.path.exists(output_csv_name_lw):
-                    print(f"File {output_csv_name_lw} not found. Skipping ...")
+                # if not os.path.exists(output_csv_name_lw):
+                #     print(f"File {output_csv_name_lw} not found. Skipping ...")
                     
-                continue
+                # continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -556,15 +556,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 #     plt.show()
                 #     return
                 
-            # alb_wvl_all.append(ext_wvl)
-            # alb_all.append(ext_alb)
-            # broadband_alb_all.append(broadband_alb)
-            # broadband_alb_ori_all.append(broadband_alb_ori)
+            alb_wvl_all.append(ext_wvl)
+            alb_all.append(ext_alb)
+            broadband_alb_all.append(broadband_alb)
+            broadband_alb_ori_all.append(broadband_alb_ori)
             
-            # if manual_alb_i is None:
-            #     print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
-            # else:
-            #     print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            if manual_alb_i is None:
+                print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            else:
+                print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
         
         
         cot_list_all = np.array(cot_list_all).flatten()
@@ -656,6 +656,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             broadband_alb_ori_all = alb_spectra_all['broadband_alb_ori_all']
     
     
+    print("set df_real_all['sza']:", sorted(list(set(df_real_all['sza'].values))))
+    print("set df_real_all['cwp']:", sorted(list(set(df_real_all['cwp'].values))))
     df_real_all = df_real_all.loc[np.logical_and(df_real_all['sza'].values%5 > 0, df_real_all['cwp'].values%0.5 > 0), :]
     print(df_real_all)
     for col in df_real_all.columns:
@@ -739,7 +741,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             #     plt.close(fig)
     
     plt.close('all')
-    sza_select = 61.46
+    # sza_select = 61.46
+    sza_select = 61.72
     sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
     broadband_alb_select = 0.735
     broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
@@ -789,7 +792,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax1 = fig.add_subplot(gs[:5, :6])
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
-    sza_select = 61.46
+    # sza_select = 61.46
+    sza_select = 61.72
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -799,6 +803,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_unique_sorted[sza_select_ind]:", sza_unique_sorted[sza_select_ind])
     print("sza_unique_sorted:", sza_unique_sorted)
     print("sza_real_df_all length:", len(sza_real_df_all))
+    print("sza_real_df_real_all length:", len(sza_real_df_real_all))
     for i in range(5):
         broadband_alb_i = broadband_alb_all[i]
         df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
@@ -813,6 +818,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
             ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='^', s=100, label=f'Zero Crossing Albedo-{i+1}')
             real_cond_color = color_series[i]
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
                 
         # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
         broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
@@ -875,6 +882,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
     ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
+    
+    # print("cos_sza_real:", cos_sza_real)
     
     # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)],  labels=[f'{angle}°' for angle in range(75, 45, -5)])
     
