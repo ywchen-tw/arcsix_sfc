@@ -292,10 +292,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
 
         
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
 
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, ], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
+    
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75,], dtype=np.float32)
+
         
         
     if clear_sky:
@@ -307,7 +310,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -383,13 +386,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
                     
-                # if not os.path.exists(output_csv_name_sw):
-                #     print(f"File {output_csv_name_sw} not found. Skipping ...")
+                if not os.path.exists(output_csv_name_sw):
+                    print(f"File {output_csv_name_sw} not found. Skipping ...")
 
-                # if not os.path.exists(output_csv_name_lw):
-                #     print(f"File {output_csv_name_lw} not found. Skipping ...")
+                if not os.path.exists(output_csv_name_lw):
+                    print(f"File {output_csv_name_lw} not found. Skipping ...")
                     
-                # continue
+                continue
 
                 # read csv and extract simulated fluxes
                 with open(output_csv_name_sw, 'r') as f:
@@ -553,15 +556,15 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 #     plt.show()
                 #     return
                 
-            alb_wvl_all.append(ext_wvl)
-            alb_all.append(ext_alb)
-            broadband_alb_all.append(broadband_alb)
-            broadband_alb_ori_all.append(broadband_alb_ori)
+            # alb_wvl_all.append(ext_wvl)
+            # alb_all.append(ext_alb)
+            # broadband_alb_all.append(broadband_alb)
+            # broadband_alb_ori_all.append(broadband_alb_ori)
             
-            if manual_alb_i is None:
-                print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
-            else:
-                print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            # if manual_alb_i is None:
+            #     print(f"Processed default alb: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
+            # else:
+            #     print(f"Processed manual alb {manual_alb_i}: broadband_alb={broadband_alb}, broadband_alb_ori={broadband_alb_ori}")
         
         
         cot_list_all = np.array(cot_list_all).flatten()
@@ -1033,31 +1036,16 @@ if __name__ == '__main__':
     #                     iter=iter,
     #                     )
     
-    # albedo_plot([
-    #             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
-    #             'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-    #             'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
-    #             'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
-    #             'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
-    #             'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
-    #             ], 
-    #             '20240607')
-    
-    # sys.exit()
-    
-    
-    
-    # done   
-    cre_sim_plot(date=datetime.datetime(2024, 6, 7),
-                    tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
-                                        ],
-                    case_tag='cloudy_atm_corr',
-                    config=config,
-                    levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                            np.arange(5.0, 10.1, 2.5),
-                                            np.array([15, 20, 30., 40., 45.]))),
-                    simulation_interval=0.5,
+    cre_sim_plot(date=datetime.datetime(2024, 6, 3),
+                        tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
+                                            ],
+                        case_tag='cloudy_atm_corr_2',
+                        config=config,
+                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
+                                               np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+                                               np.arange(5.0, 10.1, 2.5),
+                                               np.array([15, 20, 30., 40., 45.]))),
+                        simulation_interval=0.5,
                     clear_sky=False,
                     overwrite_lrt=atm_corr_overwrite_lrt,
                     manual_cloud=True,
@@ -1084,6 +1072,58 @@ if __name__ == '__main__':
                                 
                                 ]
                     )
+    
+    # albedo_plot([
+    #             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+    #             'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    #             'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
+    #             'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #             'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+    #             'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+    #             ], 
+    #             '20240607')
+    
+    # sys.exit()
+    
+    
+    
+    # done   
+    # cre_sim_plot(date=datetime.datetime(2024, 6, 7),
+    #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                     ],
+    #                 case_tag='cloudy_atm_corr',
+    #                 config=config,
+    #                 levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                         np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                         np.arange(5.0, 10.1, 2.5),
+    #                                         np.array([15, 20, 30., 40., 45.]))),
+    #                 simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_alb=[
+    #                             'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    #                             None,
+    #                             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+                                
+    #                             'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #                             'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+                                
+    #                             'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+    #                             'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
+    #                             'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
+                                
+                                
+
+    #                             'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
+    #                             'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_ori.dat',
+    #                             'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_scale_0.99X.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_ori.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97X.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',
+                                
+    #                             ]
+    #                 )
     
 
     

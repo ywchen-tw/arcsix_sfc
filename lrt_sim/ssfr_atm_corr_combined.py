@@ -1932,25 +1932,25 @@ def combined_atm_corr():
     #"""
     
     SF_into = {
-        '0528': 'SF#01',
-        '0530': 'SF#02',
-        '0531': 'SF#03',
-        '0603': 'SF#04',
-        '0605': 'SF#05',
-        '0606': 'SF#06',
-        '0607': 'SF#07',
-        '0610': 'SF#08',
-        '0611': 'SF#09',
-        '0613': 'SF#10',
-        '0725': 'SF#11',
-        '0729': 'SF#12',
-        '0730': 'SF#13',
-        '0801': 'SF#14',
-        '0802': 'SF#15',
-        '0807': 'SF#16',
-        '0808': 'SF#17',
-        '0809': 'SF#18',
-        '0815': 'SF#19',
+        '0528': 'RF01',
+        '0530': 'RF02',
+        '0531': 'RF03',
+        '0603': 'RF04',
+        '0605': 'RF05',
+        '0606': 'RF06',
+        '0607': 'RF07',
+        '0610': 'RF08',
+        '0611': 'RF09',
+        '0613': 'RF10',
+        '0725': 'RF11',
+        '0729': 'RF12',
+        '0730': 'RF13',
+        '0801': 'RF14',
+        '0802': 'RF15',
+        '0807': 'RF16',
+        '0808': 'RF17',
+        '0809': 'RF18',
+        '0815': 'RF19',
     }
     
     # glob file like NSIDC-0803_SEAICE_AMSR2_N_20240528_v2.0.nc
@@ -2189,8 +2189,8 @@ def combined_atm_corr():
         ax.set_xlabel('Longitude')
         ax.set_ylabel('Latitude')
         
-    ax11.set_title(f'SF#01-10 (May 28 - June 13)', fontsize=12)
-    ax21.set_title(f'SF#11-19 (July 25 - Aug 15)', fontsize=12)
+    ax11.set_title(f'RF01-10 (May 28 - June 13)', fontsize=12)
+    ax21.set_title(f'RF11-19 (July 25 - Aug 15)', fontsize=12)
         
     n_dates = len(date_all)
     if n_dates == 0:
