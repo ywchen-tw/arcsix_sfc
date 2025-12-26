@@ -534,8 +534,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, sza_avg], dtype=np.float32)
     # sza_arr = np.array([50, 52.5, 55, 57.5,], dtype=np.float32)
     # sza_arr = np.array([60, 62.5, 65, 67.5], dtype=np.float32)
-    sza_arr = np.array([70, 71.5,], dtype=np.float32)
-    # sza_arr = np.array([72.5, 73], dtype=np.float32)
+    # sza_arr = np.array([70, 71.5,], dtype=np.float32)
+    sza_arr = np.array([72.5, 73], dtype=np.float32)
     # sza_arr = np.array([73.5, 75, sza_avg], dtype=np.float32)
     
     for sza_sim in sza_arr:
