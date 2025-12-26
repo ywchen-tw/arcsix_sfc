@@ -310,7 +310,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
