@@ -407,16 +407,16 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                 # with open(output_csv_name_lw.replace('.csv', '_2.csv'), 'r') as f:
                 #     df_lw_2 = pd.read_csv(f)
                     
-                cot_list = df_sw['cot'].values[:22]
-                cwp_list = df_sw['cwp'].values[:22]
-                cer_list = df_sw['cer'].values[:22]
-                cth_list = df_sw['cth'].values[:22]
-                cbh_list = df_sw['cbh'].values[:22]
-                sza_list = df_sw['sza'].values[:22]
-                Fup_sfc_sw = df_sw['Fup_sfc'].values[:22]
-                Fdn_sfc_sw = df_sw['Fdn_sfc'].values[:22]
-                Fup_sfc_lw = df_lw['Fup_sfc'].values[:22]
-                Fdn_sfc_lw = df_lw['Fdn_sfc'].values[:22]
+                cot_list = df_sw['cot'].values#[:22]
+                cwp_list = df_sw['cwp'].values#[:22]
+                cer_list = df_sw['cer'].values#[:22]
+                cth_list = df_sw['cth'].values#[:22]
+                cbh_list = df_sw['cbh'].values#[:22]
+                sza_list = df_sw['sza'].values#[:22]
+                Fup_sfc_sw = df_sw['Fup_sfc'].values#[:22]
+                Fdn_sfc_sw = df_sw['Fdn_sfc'].values#[:22]
+                Fup_sfc_lw = df_lw['Fup_sfc'].values#[:22]
+                Fdn_sfc_lw = df_lw['Fdn_sfc'].values#[:22]
                 
                 # print("cwp_list shape:", cwp_list.shape)
                 # print("cwp:", cwp_list)
@@ -742,7 +742,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     plt.close('all')
     # sza_select = 61.46
-    sza_select = 61.72
+    sza_select = 61.93
     sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
     broadband_alb_select = 0.735
     broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
@@ -793,7 +793,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
     # sza_select = 61.46
-    sza_select = 61.72
+    sza_select = 61.93
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -1022,45 +1022,22 @@ if __name__ == '__main__':
     #                 manual_cloud_cot=21.27,
     #                 )
 
-
-    # for iter in range(3):
-    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
-    #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
-    #                                         ],
-    #                     case_tag='cloudy_atm_corr_2',
-    #                     config=config,
-    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
-    #                                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
-    #                                            np.arange(5.0, 10.1, 2.5),
-    #                                            np.array([15, 20, 30., 40., 45.]))),
-    #                     simulation_interval=0.5,
-    #                     clear_sky=False,
-    #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    #                     manual_cloud=True,
-    #                     manual_cloud_cer=7.0,
-    #                     manual_cloud_cwp=113.65,
-    #                     manual_cloud_cth=1.91,
-    #                     manual_cloud_cbh=0.50,
-    #                     manual_cloud_cot=24.31,
-    #                     iter=iter,
-    #                     )
-    
     cre_sim_plot(date=datetime.datetime(2024, 6, 3),
-                        tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
-                                            ],
-                        case_tag='cloudy_atm_corr_2',
-                        config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=0.5,
+            tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
+                                ],
+            case_tag='cloudy_atm_corr_1',
+            config=config,
+            levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
+                                    np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
+                                    np.arange(5.0, 10.1, 2.5),
+                                    np.array([15, 20, 30., 40., 45.]))),
+            simulation_interval=0.5,
                     clear_sky=False,
                     overwrite_lrt=atm_corr_overwrite_lrt,
                     manual_cloud=True,
                     manual_alb=[
                                 'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-                                None,
+                                # None,
                                 'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
                                 
                                 'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
@@ -1081,6 +1058,43 @@ if __name__ == '__main__':
                                 
                                 ]
                     )
+    
+    # cre_sim_plot(date=datetime.datetime(2024, 6, 3),
+    #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr_2',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
+    #                                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=0.5,
+    #                 clear_sky=False,
+    #                 overwrite_lrt=atm_corr_overwrite_lrt,
+    #                 manual_cloud=True,
+    #                 manual_alb=[
+    #                             'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    #                             None,
+    #                             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+                                
+    #                             'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    #                             'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+                                
+    #                             'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+    #                             'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
+    #                             'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
+                                
+                                
+
+    #                             'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
+    #                             'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_ori.dat',
+    #                             'sfc_alb_20240528_15.610_17.404_0.22km_cre_alb_scale_0.99X.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_ori.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_0.97X.dat',
+    #                             'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',
+                                
+    #                             ]
+    #                 )
     
     # albedo_plot([
     #             'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
