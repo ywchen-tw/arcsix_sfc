@@ -406,17 +406,18 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                     
                 # with open(output_csv_name_lw.replace('.csv', '_2.csv'), 'r') as f:
                 #     df_lw_2 = pd.read_csv(f)
+                
                     
-                cot_list = df_sw['cot'].values#[:22]
-                cwp_list = df_sw['cwp'].values#[:22]
-                cer_list = df_sw['cer'].values#[:22]
-                cth_list = df_sw['cth'].values#[:22]
-                cbh_list = df_sw['cbh'].values#[:22]
-                sza_list = df_sw['sza'].values#[:22]
-                Fup_sfc_sw = df_sw['Fup_sfc'].values#[:22]
-                Fdn_sfc_sw = df_sw['Fdn_sfc'].values#[:22]
-                Fup_sfc_lw = df_lw['Fup_sfc'].values#[:22]
-                Fdn_sfc_lw = df_lw['Fdn_sfc'].values#[:22]
+                cot_list = df_sw['cot'].values[:20]
+                cwp_list = df_sw['cwp'].values[:20]
+                cer_list = df_sw['cer'].values[:20]
+                cth_list = df_sw['cth'].values[:20]
+                cbh_list = df_sw['cbh'].values[:20]
+                sza_list = df_sw['sza'].values[:20]
+                Fup_sfc_sw = df_sw['Fup_sfc'].values[:20]
+                Fdn_sfc_sw = df_sw['Fdn_sfc'].values[:20]
+                Fup_sfc_lw = df_lw['Fup_sfc'].values[:20]
+                Fdn_sfc_lw = df_lw['Fdn_sfc'].values[:20]
                 
                 # print("cwp_list shape:", cwp_list.shape)
                 # print("cwp:", cwp_list)
@@ -1037,7 +1038,7 @@ if __name__ == '__main__':
                     manual_cloud=True,
                     manual_alb=[
                                 'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-                                # None,
+                                # 'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
                                 'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
                                 
                                 'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
