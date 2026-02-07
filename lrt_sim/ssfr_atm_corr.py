@@ -2319,54 +2319,54 @@ if __name__ == '__main__':
     #                     )
     
 
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
+    #                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+    #                                         ],
+    #                     case_tag='cloudy_atm_corr',
+    #                     config=config,
+    #                     levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
+    #                                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+    #                                            np.arange(5.0, 10.1, 2.5),
+    #                                            np.array([15, 20, 30., 40., 45.]))),
+    #                     simulation_interval=0.5,
+    #                     clear_sky=False,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=True,
+    #                     manual_cloud_cer=6.7,
+    #                     manual_cloud_cwp=26.96/1000,
+    #                     manual_cloud_cth=0.43,
+    #                     manual_cloud_cbh=0.15,
+    #                     manual_cloud_cot=6.02,
+    #                     iter=iter,
+    #                     )
+    
+    
     for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
-                        tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
+        flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
+                        tmhr_ranges_select=[[14.5667, 14.5694],
+                                            [14.5986, 14.6097],
+                                            [14.6375, 14.6486], # cloud shadow
+                                            [14.6778, 14.6903],
+                                            [14.7208, 14.7403],
+                                            [14.7653, 14.7875],
+                                            [14.8125, 14.8278],
+                                            [14.8542, 14.8736],
+                                            [14.8986, 14.9389], # more cracks
                                             ],
-                        case_tag='cloudy_atm_corr',
+                        case_tag='clear_sky_spiral_atm_corr',
                         config=config,
-                        levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
-                        simulation_interval=0.5,
-                        clear_sky=False,
+                        simulation_interval=None,
+                        clear_sky=True,
                         overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=True,
-                        manual_cloud_cer=6.7,
-                        manual_cloud_cwp=26.96/1000,
-                        manual_cloud_cth=0.43,
-                        manual_cloud_cbh=0.15,
-                        manual_cloud_cot=6.02,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
                         iter=iter,
                         )
-    
-    # done
-    # # for iter in range(3):
-    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),
-    # #                     tmhr_ranges_select=[[14.5667, 14.5694],
-    # #                                         [14.5986, 14.6097],
-    # #                                         [14.6375, 14.6486], # cloud shadow
-    # #                                         [14.6778, 14.6903],
-    # #                                         [14.7208, 14.7403],
-    # #                                         [14.7653, 14.7875],
-    # #                                         [14.8125, 14.8278],
-    # #                                         [14.8542, 14.8736],
-    # #                                         [14.8986, 14.9389], # more cracks
-    # #                                         ],
-    # #                     case_tag='clear_sky_spiral_atm_corr',
-    # #                     config=config,
-    # #                     simulation_interval=None,
-    # #                     clear_sky=True,
-    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    # #                     manual_cloud=False,
-    # #                     manual_cloud_cer=0.0,
-    # #                     manual_cloud_cwp=0.0,
-    # #                     manual_cloud_cth=0.0,
-    # #                     manual_cloud_cbh=0.0,
-    # #                     manual_cloud_cot=0.0,
-    # #                     iter=iter,
-    # #                     )
     
     # done
     # # for iter in range(3):
