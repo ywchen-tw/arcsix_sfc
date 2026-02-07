@@ -579,6 +579,8 @@ if __name__ == '__main__':
                     manual_cloud_cbh=0.0,
                     manual_cloud_cot=0.0,
                     )
+    
+    sys.exit()
 
 
     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),

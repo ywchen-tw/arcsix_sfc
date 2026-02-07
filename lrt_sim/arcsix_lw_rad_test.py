@@ -177,18 +177,8 @@ class FlightConfig:
     root_linux: Path
 
     def hsk(self, date_s):    return f"{self.data_root}/{self.mission}-HSK_{self.platform}_{date_s}_v0.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R0.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R1_test.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R2_test_before_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_V1_test_before_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_V1_test_after_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_V2_test_before_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_V2_test_after_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R3_V2_test_after_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R4_V2_test_after_corr.h5"
-    # def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R5_V2_test_before_corr.h5"
-    def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R5_V2_test_after_corr.h5"
-    def ssrr(self, date_s):  return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_RA.h5"
+    def ssfr(self, date_s):   return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R1.h5"
+    # def ssrr(self, date_s):  return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_RA.h5"
     def hsr1(self, date_s):   return f"{self.data_root}/{self.mission}-HSR1_{self.platform}_{date_s}_R0.h5"
     def logic(self, date_s):  return f"{self.data_root}/{self.mission}-LOGIC_{self.platform}_{date_s}_RA.h5"
     # def sat_coll(self, date_s): return f"{self.data_root}/{self.mission}-SAT-CLD_{self.platform}_{date_s}_v0.h5"
@@ -623,7 +613,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                      manual_cloud_cth=0.945,
                      manual_cloud_cbh=0.344,
                      manual_cloud_cot=6.26,
-                     wvl=10, # wavelength in micron
+                     wvl=10.0, # wavelength in micron
                      wvl_std=0.2, # std for spectral response function
                      iter=0,
                      purturb_cot=0.0,
@@ -660,7 +650,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     # 1) Load all instrument & satellite metadata
     data_hsk  = load_h5(config.hsk(date_s))
     data_ssfr = load_h5(config.ssfr(date_s))
-    data_ssrr = load_h5(config.ssrr(date_s))
     data_hsr1 = load_h5(config.hsr1(date_s))
     
     if date_s != '20240603':
@@ -681,7 +670,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     
     t_ssfr = data_ssfr['time']/3600.0  # convert to hours
     t_hsr1 = data_hsr1['time']/3600.0  # convert to hours
-    t_ssrr = data_ssrr['tmhr']  # convert to hours
     t_marli = data_marli['time'] # in hours
 
     
@@ -812,9 +800,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             times_leg = t_hsk[mask]
             print(f"Leg {i+1}: time range {times_leg.min()}-{times_leg.max()}h")
             
-            sel_ssfr, sel_hsr1, sel_ssrr = (
+            sel_ssfr, sel_hsr1 = (
                 nearest_indices(t_hsk, mask, arr)
-                for arr in (t_ssfr, t_hsr1, t_ssrr)
+                for arr in (t_ssfr, t_hsr1)
             )
             
             if len(t_marli) > 0:
@@ -955,18 +943,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             leg['ssfr_nad_wvl'] = ssfr_zen_wvl
             leg['ssfr_toa'] = ssfr_zen_toa
             
-            
-            # ssrr
-            # interpolate ssrr zenith radiance to nadir wavelength grid
-            f_zen_rad_interp = interp1d(data_ssrr["zen/wvl"], data_ssrr["zen/rad"][sel_ssrr, :], axis=1, bounds_error=False, fill_value=np.nan)
-            ssrr_rad_zen_i = f_zen_rad_interp(ssfr_zen_wvl)
-            f_nad_rad_interp = interp1d(data_ssrr["nad/wvl"], data_ssrr["nad/rad"][sel_ssrr, :], axis=1, bounds_error=False, fill_value=np.nan)
-            ssrr_rad_nad_i = f_nad_rad_interp(ssfr_zen_wvl)
-            
-            leg['ssrr_zen_rad'] = ssrr_rad_zen_i
-            leg['ssrr_nad_rad'] = ssrr_rad_nad_i
-            leg['ssrr_zen_wvl'] = ssfr_zen_wvl
-            leg['ssrr_nad_wvl'] = ssfr_zen_wvl
 
             vars()["cld_leg_%d" % i] = leg
         
@@ -976,7 +952,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 pickle.dump(vars()["cld_leg_%d" % i], f, protocol=pickle.HIGHEST_PROTOCOL)
 
             del leg  # free memory
-            del sel_ssfr, sel_ssrr, sel_hsr1
+            del sel_ssfr, sel_hsr1
             if rsp_1lb_avail:
                 del rsp_time_all, rsp_rad_all, rsp_ref_all, rsp_lon_all, rsp_lat_all
                 del rsp_mu0_all, rsp_sd_all
@@ -1129,7 +1105,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                     # 'mol_file': 'CH4 %s' % os.path.join(zpt_filedir, f'ch4_profiles_{date_s}_{case_tag}_{time_start:.2f}_{time_end:.2f}_{alt_avg:.2f}km.dat'),
                                     # 'wavelength_grid_file': 'wvl_grid_thermal.dat',
                                     'wavelength_add' : f'{((wvl-wvl_std)*1000):.0f} {((wvl+wvl_std)*1000):.0f}', # 9820-10180 nm
-                                    'output_quantity': 'brightness',
+                                    # 'output_quantity': 'brightness',
                                     # 'output_quantity': 'sum',
                                     
                                     }
@@ -1275,7 +1251,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             # with open(f'{fdir}/flux_up_result_dict_sw_atm_corr.pk', status) as f:
             #     pickle.dump(flux_up_result_dict, f)
 
-            rad_results = np.array(rad_results)*1000 # original code use rad / 1000
+            rad_results = np.array(rad_results)#*1000 # original code use rad / 1000
             
             # rad_results = np.array(rad_results) # original code use rad / 1000
             
@@ -1289,9 +1265,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             
             # save output to pkl
             if purturb_cot > 0:
-                pkl_name = 'bT_pert_results_cer_%02dum_wvl_%.2fum.pkl' % (manual_cloud_cer, wvl)
+                pkl_name = 'rad_pert_results_cer_%02dum_wvl_%.2fum.pkl' % (manual_cloud_cer, wvl)
             else:
-                pkl_name = 'bT_results_cer_%02dum_wvl_%.2fum.pkl' % (manual_cloud_cer, wvl)
+                pkl_name = 'rad_results_cer_%02dum_wvl_%.2fum.pkl' % (manual_cloud_cer, wvl)
 
             with open(pkl_name, 'wb') as f:
                 pickle.dump({
@@ -1302,7 +1278,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     'cloud_top_height': manual_cloud_cth,
                     'cloud_base_height': manual_cloud_cbh,
                     'cloud_optical_thickness': manual_cloud_cot,
-                    'brightness_temperature_TOA': rad_results,
+                    'rad_TOA': rad_results,
                     }, f, protocol=pickle.HIGHEST_PROTOCOL)
             
             # simulated brightness T at TOA         
@@ -1331,16 +1307,16 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
 
 def plot_bt():
-    pk_files = glob.glob('bT_results_cer_20um_wvl_*.pkl')
+    pk_files = glob.glob('rad_results_cer_20um_wvl_*.pkl')
     wv_list = []
     bT_list = []
     for pk_file in pk_files:
         with open(pk_file, 'rb') as f:
             data = pickle.load(f)
-        if (data['brightness_temperature_TOA']==0).all():
+        if (data['rad_TOA']==0).all():
             continue
         wv_list.append(data['wvl'])
-        bT_list.append(data['brightness_temperature_TOA'])
+        bT_list.append(data['rad_TOA'])
         cot_list = data['cloud_optical_thickness']
         
     wv_arr = np.array(wv_list)
@@ -1384,30 +1360,30 @@ def plot_bt():
         ax.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     fig.suptitle(f'CER=10.0 $\mu$m, CTH=5.50 km, CBH=5.45 km')
     fig.tight_layout()
-    fig.savefig(f'./fig/simulated_TOA_brightness_temperature_vs_COT_CER20um_CTH5.5km_CBH5.45km.png', dpi=300)
+    fig.savefig(f'./fig/simulated_TOA_rad_vs_COT_CER20um_CTH5.5km_CBH5.45km.png', dpi=300)
     plt.show()
     
 def plot_bt2():
-    pk_files = glob.glob('bT_results_wvl_*.pkl')
-    pert_pk_files = glob.glob('bT_pert_results_wvl_*.pkl')
+    pk_files = glob.glob('rad_results_wvl_*.pkl')
+    pert_pk_files = glob.glob('rad_pert_results_wvl_*.pkl')
     wv_list = []
     bT_list = []
     bT_pert_list = []
     for pk_file in pk_files:
         with open(pk_file, 'rb') as f:
             data = pickle.load(f)
-        if (data['brightness_temperature_TOA']==0).all():
+        if (data['rad_TOA']==0).all():
             continue
         wv_list.append(data['wvl'])
-        bT_list.append(data['brightness_temperature_TOA'])
+        bT_list.append(data['rad_TOA'])
         cot_list = data['cloud_optical_thickness']
         
     for pk_file in pert_pk_files:
         with open(pk_file, 'rb') as f:
             data = pickle.load(f)
-        if (data['brightness_temperature_TOA']==0).all():
+        if (data['rad_TOA']==0).all():
             continue
-        bT_pert_list.append(data['brightness_temperature_TOA'])
+        bT_pert_list.append(data['rad_TOA'])
         cot_pert_list = data['cloud_optical_thickness']
         
     wv_arr = np.array(wv_list)
@@ -1448,7 +1424,7 @@ def plot_bt2():
         # ax2.plot(cot_avg, dbTdcot[iwv, :], label=r'wvl=%.1f $\mu m$ (%.0f $cm^{-1}$)' % (wv_arr[iwv], wn_arr[iwv]))
         ax2.plot(cot_arr, jacobian_arr[iwv, :], label=r'wvl=%.1f $\mu m$ (%.0f $cm^{-1}$)' % (wv_arr[iwv], wn_arr[iwv]))
     ax1.set_xlabel('Cloud Optical Thickness')
-    ax1.set_ylabel('Simulated TOA BT (K)')
+    ax1.set_ylabel('Simulated TOA Rad (K)')
     
     ax1.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     
@@ -1464,12 +1440,12 @@ def plot_bt2():
         ax.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     fig.suptitle(f'CER=10.0 $\mu$m, CTH=5.50 km, CBH=5.45 km')
     fig.tight_layout()
-    fig.savefig(f'./fig/simulated_TOA_brightness_temperature_vs_COT_CER20um_CTH5.5km_CBH5.45km.png', dpi=300)
+    fig.savefig(f'./fig/simulated_TOA_rad_vs_COT_CER20um_CTH5.5km_CBH5.45km.png', dpi=300)
     plt.show()
     
 def plot_bt3():
-    pk_files = glob.glob('bT_results_cer_*_wvl_*.pkl')
-    # pert_pk_files = glob.glob('bT_pert_results_wvl_*.pkl')
+    pk_files = glob.glob('rad_results_cer_*_wvl_*.pkl')
+    # pert_pk_files = glob.glob('rad_pert_results_wvl_*.pkl')
     band_list = []
     wv_list = []
     bT_list = []
@@ -1478,11 +1454,11 @@ def plot_bt3():
     for pk_file in pk_files:
         with open(pk_file, 'rb') as f:
             data = pickle.load(f)
-        if (data['brightness_temperature_TOA']==0).all():
+        if (data['rad_TOA']==0).all():
             continue
         band_list.append(data['band'])
         wv_list.append(data['wvl'])
-        bT_list.append(data['brightness_temperature_TOA'].copy())
+        bT_list.append(data['rad_TOA'].copy()*1000)
         cot_list = data['cloud_optical_thickness']
         cer_list.append(data['cloud_effective_radius'])
         
@@ -1520,7 +1496,7 @@ def plot_bt3():
     plt.close('all')
     icer = np.where(cer_sort_set==20.0)[0][0]
     plt.contourf(cot_sort_set, wvl_sort_set, bT_arr[:, icer, :], levels=20, cmap='RdBu_r')
-    plt.colorbar(label='BT (K)')
+    plt.colorbar(label='Radiance (W·m⁻²·sr⁻¹·µm⁻¹)')
     plt.xlabel('Cloud Optical Thickness')
     plt.ylabel('Wavelength ($\mu$m)')
     plt.xscale('log')
@@ -1563,12 +1539,12 @@ def plot_bt3():
         # ax2.plot(cot_avg, dbTdcot[iwv, :], label=r'wvl=%.1f $\mu m$ (%.0f $cm^{-1}$)' % (wv_arr[iwv], wn_arr[iwv]))
         ax2.plot(cot_sort_set, jacobian_arr[iwv, icer, :], label=r'band%d: %.1f $\mu m$ (%.0f $cm^{-1}$)' % (band_sort_set[iwv], wvl_sort_set[iwv], wn_sort_set[iwv]))
     ax1.set_xlabel('Cloud Optical Thickness')
-    ax1.set_ylabel('Simulated TOA BT (K)')
+    ax1.set_ylabel('Simulated TOA Radiance (W·m⁻²·sr⁻¹·µm⁻¹)')
     
     ax1.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     
     ax2.set_xlabel('Cloud Optical Thickness')
-    ax2.set_ylabel(r'dBT/d$\tau$ (K)')
+    ax2.set_ylabel(r'dI/d$\tau$ ((W·m⁻²·sr⁻¹·µm⁻¹)')
     ax2.axhline(0, color='k', linestyle='--', linewidth=1)
     
     
@@ -1579,7 +1555,7 @@ def plot_bt3():
         ax.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     fig.suptitle(f'CER=20.0 $\mu$m, CTH=10.0 km, CBH=9.8 km')
     fig.tight_layout()
-    fig.savefig(f'./fig/simulated_TOA_brightness_temperature_vs_COT_CER20um_CTH10.0km_CBH9.8km.png', dpi=300)
+    fig.savefig(f'./fig/simulated_TOA_rad_vs_COT_CER20um_CTH10.0km_CBH9.8km.png', dpi=300)
     plt.show()
     
     
@@ -1592,12 +1568,12 @@ def plot_bt3():
         # ax2.plot(cot_avg, dbTdcot[iwv, :], label=r'wvl=%.1f $\mu m$ (%.0f $cm^{-1}$)' % (wv_arr[iwv], wn_arr[iwv]))
         ax2.plot(cot_sort_set, jacobian_arr[iwv, icer, :], label=r'band%d: %.1f $\mu m$ (%.0f $cm^{-1}$)' % (band_sort_set[iwv], wvl_sort_set[iwv], wn_sort_set[iwv]))
         ax3.plot(cot_sort_set, dcer_wvl[iwv, icer, :], label=r'band%d: %.1f $\mu m$ (%.0f $cm^{-1}$)' % (band_sort_set[iwv], wvl_sort_set[iwv], wn_sort_set[iwv]))
-    ax1.set_ylabel('Simulated TOA BT (K)')
+    ax1.set_ylabel('Simulated Radiance (W·m⁻²·sr⁻¹·µm⁻¹)')
 
-    ax2.set_ylabel(r'dBT/d$\tau$ (K)')
+    ax2.set_ylabel(r'dI/d$\tau$ (W·m⁻²·sr⁻¹·µm⁻¹)')
     ax2.axhline(0, color='k', linestyle='--', linewidth=1)
 
-    ax3.set_ylabel(r'dBT/d$r_{eff}$ (K/$\mu m$)')
+    ax3.set_ylabel(r'dI/d$r_{eff}$ (W·m⁻²·sr⁻¹·µm⁻¹/$\mu m$)')
     ax3.axhline(0, color='k', linestyle='--', linewidth=1)
     
     
@@ -1610,7 +1586,7 @@ def plot_bt3():
         ax.xaxis.set_major_formatter(mtick.StrMethodFormatter('{x:.1f}'))
     fig.suptitle(f'CER=20.0 $\mu$m, CTH=10.0 km, CBH=9.8 km')
     fig.tight_layout()
-    fig.savefig(f'./fig/simulated_TOA_brightness_temperature_vs_COT_CER20um_CTH10.0km_CBH9.8km_2.png', dpi=300)
+    fig.savefig(f'./fig/simulated_TOA_rad_vs_COT_CER20um_CTH10.0km_CBH9.8km_2.png', dpi=300)
     plt.show()
 
 def numerical_jacobian(f, x, fp, xp):

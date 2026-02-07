@@ -125,43 +125,9 @@ _fdir_tmp_graph_ = 'tmp-graph_flt-vid'
 
 _title_extra_ = 'ARCSIX RF#1'
 
-_tmhr_range_ = {
-        '20240517': [19.20, 23.00],
-        '20240521': [14.80, 17.50],
-        }
+\
 
-# dates for ARCSIX-1
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates1_ = [
-        datetime.datetime(2024, 5, 28),
-        datetime.datetime(2024, 5, 30),
-        datetime.datetime(2024, 5, 31),
-        datetime.datetime(2024, 6,  3),
-        datetime.datetime(2024, 6,  5),
-        datetime.datetime(2024, 6,  6),
-        datetime.datetime(2024, 6,  7),
-        datetime.datetime(2024, 6, 10),
-        datetime.datetime(2024, 6, 11),
-        datetime.datetime(2024, 6, 13),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
 
-# dates for ARCSIX-2
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates2_ = [
-        datetime.datetime(2024, 7, 25),
-        datetime.datetime(2024, 7, 29),
-        datetime.datetime(2024, 7, 30),
-        datetime.datetime(2024, 8,  1),
-        datetime.datetime(2024, 8,  2),
-        datetime.datetime(2024, 8,  7),
-        datetime.datetime(2024, 8,  8),
-        datetime.datetime(2024, 8,  9),
-        datetime.datetime(2024, 8,  15),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-_dates_ = _dates1_
 
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -228,6 +194,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sza_all = np.array([])
     saa_all = np.array([])
     sfc_T = np.array([])
+    broadband_alb_all = np.array([])
     
     time_all = np.array([])
     marli_all_h = np.array([])
@@ -264,6 +231,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             sza_all = np.concatenate((sza_all, vars()[f"cld_leg_{i}"]['sza']))
             saa_all = np.concatenate((saa_all, vars()[f"cld_leg_{i}"]['saa']))
             sfc_T = np.concatenate((sfc_T, vars()[f"cld_leg_{i}"]['kt19_sfc_T']))
+            broadband_alb_all = np.concatenate((broadband_alb_all, vars()[f"processed_leg_{i}"]['broadband_alb_iter2_all']))
             
             if vars()[f"cld_leg_{i}"]['marli_h'] is not None:
                 marli_all_h = np.concatenate((marli_all_h, vars()[f"cld_leg_{i}"]['marli_h']))
@@ -279,9 +247,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             # print(f"Processed file {processed_file} not found. Skipping leg {i}.")
             None
         
-    
-    
-    
+        
     lon_avg = np.round(np.mean(lon_all), 2)
     lat_avg = np.round(np.mean(lat_all), 2)
     lon_min, lon_max = np.round(np.min(lon_all), 2), np.round(np.max(lon_all), 2)
@@ -290,7 +256,58 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sza_avg = np.round(np.nanmean(sza_all), 2)
     saa_avg = np.round(np.nanmean(saa_all), 2)
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
+    
+    alb_iter2_all_avg = np.nanmean(alb_iter2_all, axis=0)
+    
+    # iceage_nh_12.5km_20240101_20250923_ql.nc
+    with Dataset(f'{_fdir_general_}/era5/forecast_albedo_0_daily-mean.nc', 'r') as nc:
+        era5_lon = nc.variables['longitude'][:]
+        era5_lat = nc.variables['latitude'][:]
+        era5_time = nc.variables['valid_time'][:] # days since 2024-05-01
+        era5_alb = nc.variables['fal'][:]  # time, lat, lon
+    era5_time_dates = np.array([datetime.datetime(2024,5,1) + datetime.timedelta(days=int(t)) for t in era5_time])
+    era5_time_dates_str = np.array([t.strftime('%Y%m%d') for t in era5_time_dates])
+    era5_alb = np.array(era5_alb, dtype=np.float32)
+    era5_lat_mesh, era5_lon_mesh = np.meshgrid(era5_lat, era5_lon, indexing='ij')
+    
+    era5_alb_date = era5_alb[era5_time_dates_str == str(date_s)]
+    era5_alb_interp = griddata(
+                (era5_lon_mesh.flatten(), era5_lat_mesh.flatten()), era5_alb_date[0].flatten(),
+                (lon_all, lat_all),
+                method='nearest'
+            )
+    
+    # df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
+    # wvl_solar = np.array(df_solor.iloc[:, 0])
+    # flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
+    # # interpolate to 1 nm grid
+    # f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
+    # ext_broadband_alb_all = np.zeros_like(era5_alb_interp)
+    # ext_wvl, _ = alb_extention(alb_wvl, alb_iter2_all_avg, clear_sky=clear_sky)
+    # flux_solar_interp = f_interp(ext_wvl)
+    # for i in range(len(broadband_alb_all)):
+    #     alb_i = np.clip(alb_iter2_all[i, :], 0.0, 1.0)
+    #     if np.all(np.isnan(alb_i)):
+    #         ext_broadband_alb_all[i] = np.nan
+    #         continue
+    #     ext_wvl_i, ext_alb_i = alb_extention(alb_wvl, alb_i, clear_sky=clear_sky)
+    #     ext_broadband_alb_all[i] = np.trapz(ext_alb_i * flux_solar_interp, ext_wvl_i) / np.trapz(flux_solar_interp, ext_wvl_i)
 
+    # plt.close('all')
+    # fig, ax = plt.subplots(figsize=(8, 6))
+    # ax.scatter(ext_broadband_alb_all, era5_alb_interp, c='blue', s=10, alpha=0.5)
+    # ax.scatter(np.nanmean(ext_broadband_alb_all), np.nanmean(era5_alb_interp), c='red', s=100, label='Mean value')
+    # ax.plot([0, 1], [0, 1], 'k--')
+    # ax.set_xlim(0.2, 0.9)
+    # ax.set_ylim(0.2, 0.9)
+    # ax.set_xlabel('Surface Broadband Albedo from SSFR', fontsize=14)
+    # ax.set_ylabel('Surface Broadband Albedo from ERA5', fontsize=14)
+    # fig.savefig(f'fig/{date_s}/{date_s}_{case_tag}_sfc_alb_ssfr_vs_era5.png', dpi=300)
+    
+    # print("Average surface broadband albedo from SSFR:", np.nanmean(ext_broadband_alb_all)) # 0.7040066
+    # print("Average surface broadband albedo from ERA5:", np.nanmean(era5_alb_interp)) # 0.6548484
+    
+    
         
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
 
@@ -310,7 +327,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if 1:#not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -745,7 +762,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # sza_select = 61.46
     sza_select = 61.93
     sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
-    broadband_alb_select = 0.735
+    broadband_alb_select = 0.704
     broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
     df_alb_sel = df_all.loc[(df_all['broadband_alb'].values==broadband_alb_all_unique[broadband_alb_delect_ind]), :]
 
@@ -815,7 +832,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_sw_cre'].values, '--', color=color_series[i], alpha=0.5)
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_lw_cre'].values, '-.', color=color_series[i], alpha=0.5)
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i], label=f'Albedo-{i+1}')
-        if i == 1:
+        if i == 2:
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k')
             ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='^', s=100, label=f'Zero Crossing Albedo-{i+1}')
             real_cond_color = color_series[i]
@@ -879,7 +896,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
     cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
-    ax3.scatter(cos_sza_real, 0.735, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
+    ax3.scatter(cos_sza_real, 0.704, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
     ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
@@ -913,6 +930,218 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         else:
             ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
     fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
+    
+    
+    plt.close('all')
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i],)# label=f'Albedo-{i+1}')
+        if i == 2:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]-3
+            real_cond_color = color_series[i] 
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
+            
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
+            # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
+            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            ax1.arrow(start_cwp, start_Fnet, 
+                      end_cwp - start_cwp, end_Fnet - start_Fnet,
+                      head_width=2, head_length=2, 
+                      lw=1.5,
+                      fc='k', ec='k', linestyle='-')
+            
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    ax1.set_xlim(0, 200)
+    ax1.set_ylim(-65, 30)
+    ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
+        broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
+        ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_all[i]:.3f}')
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
+    ax2.set_xlim(300, 4000)
+    ax2.set_ylim(-0.05, 1.05)
+    ax2.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.tick_params(axis='both', which='major', labelsize=12)
+    for ax, subcase in zip([ax1, ax2], ['(a)', '(b)']):
+        ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+    
+    fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
+    
+    plt.close('all')
+    fig, ax3 = plt.subplots(figsize=(7, 8))
+    # sza_select = 61.46
+    sza_select = 61.93
+    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
+    cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
+    sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
+    sza_real_df_all = df_all.loc[df_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    print("sum df_all['sza']==sza_unique_sorted[sza_select_ind]:", np.sum(df_all['sza']==sza_unique_sorted[sza_select_ind]))
+    print("sza_unique_sorted[sza_select_ind]:", sza_unique_sorted[sza_select_ind])
+    print("sza_unique_sorted:", sza_unique_sorted)
+    print("sza_real_df_all length:", len(sza_real_df_all))
+    print("sza_real_df_real_all length:", len(sza_real_df_real_all))
+    
+    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
+    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
+    # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
+    
+    shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
+    shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
+    shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
+    shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
+    ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
+    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+
+    
+    
+    # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
+    # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
+    #                fontsize=14)
+    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
+    ax3.scatter(cos_sza_real, 0.7040066, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
+    ax3.scatter(cos_sza_real, 0.6548484, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
+    ax3.text(cos_sza_real+0.01, 0.7040066-0.002, 'ARCSIX', color='orange', fontsize=12)
+    ax3.text(cos_sza_real+0.01, 0.6548484-0.002, 'ERA5', color='orange', fontsize=12)
+    # plot arrow from SSFR Albedo to ERA5 Albedo
+    ax3.annotate('', xy=(cos_sza_real, 0.701), xytext=(cos_sza_real, 0.657),
+                 arrowprops=dict(facecolor='purple', arrowstyle='->', 
+                                 edgecolor='purple',
+                                 lw=2.5),
+                 )
+    # ax3.set_xlim(50, 80)
+    ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
+    ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
+    
+    # print("cos_sza_real:", cos_sza_real)
+    
+    # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)],  labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    
+    ax3.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    bottom=True,      # Show ticks on the bottom
+                    top=False,         # Show ticks on the top
+                    labelbottom=True, # Show labels on the bottom
+                    labeltop=False,    # Show labels on the top
+                        # Optional: adjust label rotation if needed
+                        # labelrotation=45,
+                    )   
+    # set ax3 with both top and bottom x-axis
+    ax3_top = ax3.secondary_xaxis('top')
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=15)
+    ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    ax3_top.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    labelsize=12,)
+    # ax3_top.set_xticklabels(ax3_top.get_xticklabels(), rotation=0)
+    
+
+    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined_contour_only.png', dpi=300, bbox_inches='tight')
+    
+    
+    plt.close('all')
+    fig, ax3 = plt.subplots(figsize=(7, 8))
+    # sza_select = 61.46
+    sza_select = 61.93
+    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
+    cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
+    sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
+    sza_real_df_all = df_all.loc[df_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    sza_real_df_real_all = df_real_all.loc[df_real_all['sza']==sza_unique_sorted[sza_select_ind], :]
+    print("sum df_all['sza']==sza_unique_sorted[sza_select_ind]:", np.sum(df_all['sza']==sza_unique_sorted[sza_select_ind]))
+    print("sza_unique_sorted[sza_select_ind]:", sza_unique_sorted[sza_select_ind])
+    print("sza_unique_sorted:", sza_unique_sorted)
+    print("sza_real_df_all length:", len(sza_real_df_all))
+    print("sza_real_df_real_all length:", len(sza_real_df_real_all))
+    
+    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
+    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
+    # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
+    
+    shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
+    shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
+    shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
+    shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
+    ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
+    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+
+    
+    
+    # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
+    # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
+    #                fontsize=14)
+    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
+    # plot arrow from SSFR Albedo to ERA5 Albedo
+    # ax3.annotate('', xy=(cos_sza_real, 0.657), xytext=(cos_sza_real, 0.701),
+    #              arrowprops=dict(facecolor='purple', arrowstyle='->', 
+    #                              edgecolor='purple',
+    #                              lw=2.5),
+    #              )
+    # ax3.set_xlim(50, 80)
+    ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
+    ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
+    
+    # print("cos_sza_real:", cos_sza_real)
+    
+    # ax3.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)],  labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    
+    ax3.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    bottom=True,      # Show ticks on the bottom
+                    top=False,         # Show ticks on the top
+                    labelbottom=True, # Show labels on the bottom
+                    labeltop=False,    # Show labels on the top
+                        # Optional: adjust label rotation if needed
+                        # labelrotation=45,
+                    )   
+    # set ax3 with both top and bottom x-axis
+    ax3_top = ax3.secondary_xaxis('top')
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=15)
+    ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    ax3_top.tick_params(
+                    axis='x',         # Apply to the x-axis
+                    labelsize=12,)
+    # ax3_top.set_xticklabels(ax3_top.get_xticklabels(), rotation=0)
+    
+
+    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined_contour_only_no_symbol.png', dpi=300, bbox_inches='tight')
     
     sys.exit()
     
@@ -1038,7 +1267,7 @@ if __name__ == '__main__':
                     manual_cloud=True,
                     manual_alb=[
                                 'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-                                # 'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
+                                'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
                                 'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
                                 
                                 'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
@@ -1111,7 +1340,7 @@ if __name__ == '__main__':
     
     
     
-    # done   
+    # # done   
     # cre_sim_plot(date=datetime.datetime(2024, 6, 7),
     #                 tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
     #                                     ],

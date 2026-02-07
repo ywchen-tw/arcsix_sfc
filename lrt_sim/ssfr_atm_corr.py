@@ -2099,25 +2099,25 @@ if __name__ == '__main__':
 
     atm_corr_overwrite_lrt = True
     
-    # done
-    # # for iter in range(3):
-    # #     flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
-    # #                     tmhr_ranges_select=[[15.610, 15.822],
-    # #                                         [16.905, 17.404] 
-    # #                                         ],
-    # #                     case_tag='clear_atm_corr',
-    # #                     config=config,
-    # #                     simulation_interval=0.5,
-    # #                     clear_sky=True,
-    # #                     overwrite_lrt=atm_corr_overwrite_lrt,
-    # #                     manual_cloud=False,
-    # #                     manual_cloud_cer=0.0,
-    # #                     manual_cloud_cwp=0.0,
-    # #                     manual_cloud_cth=0.0,
-    # #                     manual_cloud_cbh=0.0,
-    # #                     manual_cloud_cot=0.0,
-    # #                     iter=iter,
-    # #                     )
+    
+    for iter in range(3):
+        flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),
+                        tmhr_ranges_select=[[15.610, 15.822],
+                                            [16.905, 17.404] 
+                                            ],
+                        case_tag='clear_atm_corr',
+                        config=config,
+                        simulation_interval=0.5,
+                        clear_sky=True,
+                        overwrite_lrt=atm_corr_overwrite_lrt,
+                        manual_cloud=False,
+                        manual_cloud_cer=0.0,
+                        manual_cloud_cwp=0.0,
+                        manual_cloud_cth=0.0,
+                        manual_cloud_cbh=0.0,
+                        manual_cloud_cot=0.0,
+                        iter=iter,
+                        )
 
 
     # for iter in range(3):
@@ -2159,7 +2159,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
     #                     tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing
     #                                         ],
@@ -2182,7 +2182,7 @@ if __name__ == '__main__':
     #                     )
 
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),
     #                     tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing
     #                                         ],
@@ -2319,7 +2319,7 @@ if __name__ == '__main__':
     # #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),
     #                     tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy
     #                                         ],
@@ -2429,7 +2429,7 @@ if __name__ == '__main__':
     # #                     iter=iter,
     # #                     )
     
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy
     #                                         ],
@@ -2452,7 +2452,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy
     #                                         ],
@@ -2475,7 +2475,7 @@ if __name__ == '__main__':
     #                     )
         
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),
     #                     tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy
     #                                         ],
@@ -2518,7 +2518,7 @@ if __name__ == '__main__':
     # #                     )
 
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
     #                     tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog below
     #                                         ],
@@ -2541,7 +2541,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),
     #                     tmhr_ranges_select=[[15.881, 15.903], # 200-500m
     #                                         ],
@@ -2698,24 +2698,24 @@ if __name__ == '__main__':
     # #                     )
     
     # done
-    for iter in range(3):
-        flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
-                        tmhr_ranges_select=[
-                                            [14.739, 15.053], # 550m
-                                            ],
-                        case_tag='clear_atm_corr_2',
-                        config=config,
-                        simulation_interval=0.5,
-                        clear_sky=True,
-                        overwrite_lrt=atm_corr_overwrite_lrt,
-                        manual_cloud=False,
-                        manual_cloud_cer=0.0,
-                        manual_cloud_cwp=0.0,
-                        manual_cloud_cth=0.0,
-                        manual_cloud_cbh=0.0,
-                        manual_cloud_cot=0.0,
-                        iter=iter,
-                        )
+    # for iter in range(3):
+    #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),
+    #                     tmhr_ranges_select=[
+    #                                         [14.739, 15.053], # 550m
+    #                                         ],
+    #                     case_tag='clear_atm_corr_2',
+    #                     config=config,
+    #                     simulation_interval=0.5,
+    #                     clear_sky=True,
+    #                     overwrite_lrt=atm_corr_overwrite_lrt,
+    #                     manual_cloud=False,
+    #                     manual_cloud_cer=0.0,
+    #                     manual_cloud_cwp=0.0,
+    #                     manual_cloud_cth=0.0,
+    #                     manual_cloud_cbh=0.0,
+    #                     manual_cloud_cot=0.0,
+    #                     iter=iter,
+    #                     )
         
    
     # done
@@ -2759,7 +2759,7 @@ if __name__ == '__main__':
     # #                     )
 
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
     #                     tmhr_ranges_select=[[13.344, 13.763], # 100m, cloudy
     #                                         ],
@@ -2782,7 +2782,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 7),
     #                     tmhr_ranges_select=[
     #                                         [15.472, 15.567], # 180m, cloudy
@@ -2807,7 +2807,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
     #                     tmhr_ranges_select=[
     #                                         [12.990, 13.180], # 180m, clear
@@ -2827,7 +2827,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
     #                     tmhr_ranges_select=[
     #                                         [14.250, 14.373], # 180m, clear
@@ -2847,7 +2847,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
     #                     tmhr_ranges_select=[
     #                                         [16.471, 16.601], # 180m, clear
@@ -2867,7 +2867,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
     #                     tmhr_ranges_select=[
     #                                         [13.212, 13.347], # 100m, cloudy
@@ -2891,7 +2891,7 @@ if __name__ == '__main__':
     #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 8),
     #                     tmhr_ranges_select=[
     #                                         [15.314, 15.504], # 100m, cloudy
@@ -2915,7 +2915,7 @@ if __name__ == '__main__':
     #                     )
     
     
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
     #                     tmhr_ranges_select=[
     #                                         [13.376, 13.600], # 100m, cloudy
@@ -2960,7 +2960,7 @@ if __name__ == '__main__':
     # #                     )
     
 
-    # for iter in range(1):
+    # for iter in range(3):
     #     flt_trk_atm_corr(date=datetime.datetime(2024, 8, 9),
     #                     tmhr_ranges_select=[
     #                                         [16.029, 16.224], # 100m, cloudy

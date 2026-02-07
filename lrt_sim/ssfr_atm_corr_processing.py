@@ -297,6 +297,12 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             
     print("modis_alb_file:", modis_alb_file)
     
+    df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
+    wvl_solar = np.array(df_solor.iloc[:, 0])
+    flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
+    # interpolate to 1 nm grid
+    f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
+    
     t_hsk = np.array(data_hsk["tmhr"])
     mistmatch_count = 0
     
@@ -454,7 +460,6 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         lat_min_all[i] = leg_lat_all.min()
         lat_max_all[i] = leg_lat_all.max()
         alt_avg_all[i] = alt_avg.copy()
-        
         
         ssfr_fup_mean_all[i, :] = df_ori['ssfr_fup_mean'].values
         ssfr_fdn_mean_all[i, :] = df_ori['ssfr_fdn_mean'].values
@@ -780,6 +785,20 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     broadband_alb_iter1_all_filter = np.trapz(fdn_up_ratio_all_corr[:, gas_mask] * toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
     broadband_alb_iter2_all_filter = np.trapz(fdn_up_ratio_all_corr_fit[:, gas_mask] * toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
     
+    
+    ext_wvl, _ = alb_extention(alb_wvl, fdn_up_ratio_all_corr_fit[0, :], clear_sky=clear_sky)
+    alb_iter2_ext_all = np.zeros((len(tmhr_ranges_select), len(ext_wvl)))
+    broadband_alb_iter2_ext_all = np.zeros(len(tmhr_ranges_select))
+    for j in range(len(fdn_up_ratio_all_corr_fit)):
+        alb_j = np.clip(fdn_up_ratio_all_corr_fit[j, :], 0.0, 1.0)
+        if np.all(np.isnan(alb_j)):
+            alb_iter2_ext_all[j, :] = np.nan
+            continue
+        _, ext_alb_j = alb_extention(alb_wvl, alb_j, clear_sky=clear_sky)
+        alb_iter2_ext_all[j, :] = ext_alb_j.copy()
+        broadband_alb_iter2_ext_all[j] = np.trapz(ext_alb_j * toa_expand_all[j, :], x=ext_wvl) / np.trapz(toa_expand_all[j, :], x=ext_wvl)
+    
+    
     # plt.close('all')
     # fig, ax = plt.subplots(figsize=(8, 6))
     # ax.plot(alb_wvl, fdn_up_ratio_all_corr[0, :], '-', color='b', label='Corrected albedo (iter 1)')
@@ -923,6 +942,9 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         'broadband_alb_iter2_all': broadband_alb_iter2_all,
         'broadband_alb_iter1_all_filter': broadband_alb_iter1_all_filter,
         'broadband_alb_iter2_all_filter': broadband_alb_iter2_all_filter,
+        'ext_wvl': ext_wvl,
+        'alb_iter2_ext_all': alb_iter2_ext_all,
+        'broadband_alb_iter2_ext_all': broadband_alb_iter2_ext_all,
         'modis_alb_legs': np.array(modis_alb_legs) if modis_alb_file is not None else None,
         'modis_bands_nm': modis_bands_nm if modis_alb_file is not None else None,
     }

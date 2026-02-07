@@ -587,6 +587,7 @@ def combined_atm_corr():
         yi_age_ratio_nc = yi_age_ratio_nc.flatten()
         ice_ratio_nc = ice_ratio_nc.flatten()
         open_water_nc = open_water_nc.flatten()
+
         
         
             
@@ -639,23 +640,26 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_age_ratio_nc.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Conc (%)')
+            fig.suptitle(f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
+            
+            bt_min, bt_max = 100, 250
             plt.close('all')
             central_lon = np.mean(lon_all)
             lon_min = np.min(lon_all) - 2
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt19h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt19h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -669,8 +673,8 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -684,8 +688,8 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37v_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37v_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -699,12 +703,86 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24,4),
+                                               subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            # c1 = ax1.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            c1 = ax1.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_age_ratio_nc.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb1 = fig.colorbar(c1, ax=ax1, label='Multi-year (%)')
+            ax1.set_title('Multi-year Ice Conc.')
+            
+            c2 = ax2.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb2 = fig.colorbar(c2, ax=ax2, label='First-year (%)')
+            ax2.set_title('First-year Ice Conc.')
+            
+            c3 = ax3.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb3 = fig.colorbar(c3, ax=ax3, label='Multi-year + First-year (%)')
+            ax3.set_title('Multi-year + First-year Ice Conc.')
+            
+            for ax in [ax1, ax2, ax3]:
+                ax.coastlines()
+                ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+                ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            fig.suptitle (f"{date_s}", fontsize=16)
+            fig.savefig(f'./fig/ice_age/myi_fyi_combined_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24,4),
+                                               subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax1.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb1 = fig.colorbar(c1, ax=ax1, label='Multi-year perc (%)')
+            ax1.set_title('Multi-year Ice Perc.')
+            
+            c2 = ax2.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (fyi_age_ratio_nc/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb2 = fig.colorbar(c2, ax=ax2, label='First-year perc (%)')
+            ax2.set_title('First-year Ice Perc.')
+            
+            c3 = ax3.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), ((myi_age_ratio_nc+fyi_age_ratio_nc)/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb3 = fig.colorbar(c3, ax=ax3, label='Multi-year + First-year perc (%)')
+            ax3.set_title('Multi-year + First-year Ice Perc.')
+            
+            for ax in [ax1, ax2, ax3]:
+                ax.coastlines()
+                ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+                ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            fig.suptitle (f"{date_s}", fontsize=16)
+            fig.savefig(f'./fig/ice_age/myi_fyi_combined_perc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            ax.coastlines()
+            ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            cb = fig.colorbar(c1, ax=ax, label='First-year (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
+            fig.savefig(f'./fig/ice_age/fyi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year + First-year (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_fyi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -714,12 +792,13 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc+yi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year + First-year + Young Ice Conc (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_fyi_yi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -774,7 +853,7 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8, 4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
             myi_fyi_yi_total = ice_ratio_nc
             myi_fyi_yi_total_flight = myi_age_ratio_spring_all[date_mask] + fyi_age_ratio_spring_all[date_mask] + yi_age_ratio_spring_all[date_mask]
@@ -785,7 +864,9 @@ def combined_atm_corr():
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            # set colorbar label vertical ratio to 0.9
             cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Percentage (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_percentage_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -831,7 +912,8 @@ def combined_atm_corr():
                 # yi_age_ratio_spring_all[date_mask][i] = yi_age_ratio_nc[closest_index].copy()
                 # ice_ratio_spring_all[date_mask][i] = ice_ratio_nc[closest_index].copy()
                 # ow_ratio_spring_all[date_mask][i] = open_water_nc[closest_index].copy()
-                
+         
+               
         date_s_dt = datetime.datetime.strptime(str(date_s), '%Y%m%d')
         # find closest date in time_nc_dates
         time_diff = np.abs(np.array([(t - date_s_dt).days for t in time_nc_dates]))
@@ -858,17 +940,18 @@ def combined_atm_corr():
         lon_max = np.max(lon_all) + 2
         lat_min = np.min(lat_all) - 2
         lat_max = np.max(lat_all) + 2
-        fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+        fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
         # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
         c1 = ax.pcolormesh(nsidc_lon, nsidc_lat, ice_age_nc.reshape(nsidc_lon.shape), transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5)
-        c2 = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], c=ice_age_spring_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
+        # c2 = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], c=ice_age_spring_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
         ax.coastlines()
         ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
         ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
         cb = fig.colorbar(c1, ax=ax, label='Ice Age (years)')
+        fig.suptitle (f"{date_s}", fontsize=16)
         fig.savefig(f'./fig/ice_age/ice_age_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
         plt.close(fig)
-            
+         
     for date_s in sorted(set(dates_summer_all)):
         print(f"Processing ice age data for date: {date_s}")
         print(f"Ice age data file: {_fdir_general_}/ice_age/ECICE-IcetypesUncorrected-{date_s}.nc")
@@ -942,12 +1025,13 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), myi_age_ratio_nc.reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Conc (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -957,8 +1041,8 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt19h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt19h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -972,8 +1056,8 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37h_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -987,8 +1071,8 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
-            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37v_nc, transform=ccrs.PlateCarree(), cmap='coolwarm',)# vmin=255, vmax=285)
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), brt37v_nc, transform=ccrs.PlateCarree(), cmap='coolwarm', vmin=bt_min, vmax=bt_max)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
@@ -1002,12 +1086,69 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24,4),
+                                               subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax1.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb1 = fig.colorbar(c1, ax=ax1, label='Multi-year (%)')
+            ax1.set_title('Multi-year Ice Conc.')
+            
+            c2 = ax2.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb2 = fig.colorbar(c2, ax=ax2, label='First-year (%)')
+            ax2.set_title('First-year Ice Conc.')
+            
+            c3 = ax3.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb3 = fig.colorbar(c3, ax=ax3, label='Multi-year + First-year (%)')
+            ax3.set_title('Multi-year + First-year Ice Conc.')
+            
+            for ax in [ax1, ax2, ax3]:
+                ax.coastlines()
+                ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+                ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            fig.suptitle (f"{date_s}", fontsize=16)
+            fig.savefig(f'./fig/ice_age/myi_fyi_combined_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24,4),
+                                               subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            c1 = ax1.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb1 = fig.colorbar(c1, ax=ax1, label='Multi-year perc (%)')
+            ax1.set_title('Multi-year Ice Perc.')
+            
+            c2 = ax2.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (fyi_age_ratio_nc/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb2 = fig.colorbar(c2, ax=ax2, label='First-year perc (%)')
+            ax2.set_title('First-year Ice Perc.')
+            
+            c3 = ax3.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), ((myi_age_ratio_nc+fyi_age_ratio_nc)/ice_ratio_nc*100).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r', vmin=0, vmax=100)
+            cb3 = fig.colorbar(c3, ax=ax3, label='Multi-year + First-year perc (%)')
+            ax3.set_title('Multi-year + First-year Ice Perc.')
+            
+            for ax in [ax1, ax2, ax3]:
+                ax.coastlines()
+                ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
+                ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+            fig.suptitle (f"{date_s}", fontsize=16)
+            fig.savefig(f'./fig/ice_age/myi_fyi_combined_perc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            
+            plt.close('all')
+            central_lon = np.mean(lon_all)
+            lon_min = np.min(lon_all) - 2
+            lon_max = np.max(lon_all) + 2
+            lat_min = np.min(lat_all) - 2
+            lat_max = np.max(lat_all) + 2
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r',)# vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year + First-year (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_fyi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -1017,12 +1158,13 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             c1 = ax.pcolormesh(lon.reshape(lonlat_shape), lat.reshape(lonlat_shape), (myi_age_ratio_nc+fyi_age_ratio_nc+yi_age_ratio_nc).reshape(lonlat_shape), transform=ccrs.PlateCarree(), cmap='Blues_r',)# vmin=0, vmax=100)
             ax.coastlines()
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year + First-year + Young Ice Conc (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_fyi_yi_conc_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -1077,7 +1219,7 @@ def combined_atm_corr():
             lon_max = np.max(lon_all) + 2
             lat_min = np.min(lat_all) - 2
             lat_max = np.max(lat_all) + 2
-            fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+            fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
             # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
             myi_fyi_yi_total = ice_ratio_nc
             myi_fyi_yi_total_flight = myi_age_ratio_summer_all[date_mask] + fyi_age_ratio_summer_all[date_mask] + yi_age_ratio_summer_all[date_mask]
@@ -1089,6 +1231,7 @@ def combined_atm_corr():
             ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
             ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
             cb = fig.colorbar(c1, ax=ax, label='Multi-year Ice Percentage (%)')
+            fig.suptitle (f"{date_s}", fontsize=16)
             fig.savefig(f'./fig/ice_age/myi_percentage_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             
@@ -1161,14 +1304,15 @@ def combined_atm_corr():
         lon_max = np.max(lon_all) + 2
         lat_min = np.min(lat_all) - 2
         lat_max = np.max(lat_all) + 2
-        fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
+        fig, ax = plt.subplots(figsize=(8,4), subplot_kw={'projection': ccrs.NorthPolarStereo(central_longitude=central_lon)})
         # myi_fyi_yi_total = myi_age_ratio_nc + fyi_age_ratio_nc + yi_age_ratio_nc
         c1 = ax.pcolormesh(nsidc_lon, nsidc_lat, ice_age_nc.reshape(nsidc_lon.shape), transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5)
-        c2 = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], c=ice_age_summer_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
+        # c2 = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], c=ice_age_summer_all[date_mask], transform=ccrs.PlateCarree(), cmap='jet', vmin=0, vmax=5, edgecolors='k')
         ax.coastlines()
         ax.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='lightgray')
         ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
         cb = fig.colorbar(c1, ax=ax, label='Ice Age (years)')
+        fig.suptitle (f"{date_s}", fontsize=16)
         fig.savefig(f'./fig/ice_age/ice_age_{date_s}_collocate.png', dpi=300, bbox_inches='tight')
         plt.close(fig)
                 
@@ -1238,6 +1382,35 @@ def combined_atm_corr():
     with open(combined_output_file, 'wb') as f:
         pickle.dump(output_all_dict, f)
     print(f"Combined surface albedo data saved to {combined_output_file}")
+    
+    output_alb_all_dict = {
+        'time_springl': time_spring_all,
+        'lon_spring': lon_all_spring,
+        'lat_spring': lat_all_spring,
+        'alt_spring': alt_all_spring,
+        'dates_spring': dates_spring_all,
+        'wvl_spring': wvl_spring,
+        'alb_atm_corr_spring': alb_iter2_all_spring,
+        'broadband_alb_alb_tm_corr_spring': broadband_alb_iter2_all_spring,
+        
+        
+        
+        'time_summer_all': time_summer_all,
+        'lon_summer': lon_all_summer,
+        'lat_summer': lat_all_summer,
+        'alt_summer': alt_all_summer,
+        'dates_summer': dates_summer_all,
+        'wvl_summer': wvl_summer,
+        'alb_atm_corr_summer': alb_iter2_all_summer,
+        'broadband_alb_alb_tm_corr_summer': broadband_alb_iter2_all_summer,
+    }
+    
+    combined_output_alb_file = f'{output_dir}/alb_atm_corr_combined_spring_summer.h5'
+    with h5py.File(combined_output_alb_file, 'w') as hf:
+        for key, value in output_alb_all_dict.items():
+            hf.create_dataset(key, data=value)
+    print(f"Combined surface albedo HDF5 data saved to {combined_output_alb_file}")
+    
 
     plt.close('all')
     fig, ax = plt.subplots(figsize=(8,6))
@@ -1595,7 +1768,7 @@ def combined_atm_corr():
     plt.close(fig)
     
     
-    sys.exit()
+    # sys.exit()
     
     """
     for date in sorted((set(dates_spring_all))):
@@ -2133,7 +2306,7 @@ def combined_atm_corr():
     # add coastlines and land features for context
     for ax1 in [ax11, ax21]:
         # add coastlines and land features for context
-        ax1.coastlines(resolution='50m', linewidth=0.8)
+        ax1.coastlines(resolution='10m', linewidth=0.8)
         ax1.add_feature(cartopy.feature.LAND, facecolor="#8e8e8e", zorder=0)
         ax1.add_feature(cartopy.feature.OCEAN, facecolor="#8e8e8e", zorder=0)
 

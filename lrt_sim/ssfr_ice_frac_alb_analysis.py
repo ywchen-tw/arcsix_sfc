@@ -686,7 +686,7 @@ def combined_atm_corr():
     ax.set_xlabel('Date and Case', fontsize=14)
     ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
     ax.tick_params(labelsize=12)
-    ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit', fontsize=13)
+    # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit', fontsize=13)
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_fit_summary.png', bbox_inches='tight', dpi=150)
     # plt.show()
     plt.close(fig)
@@ -699,10 +699,25 @@ def combined_atm_corr():
                 yerr=broadband_alb_date_cond_unc, 
                 fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#label='Data Points with Uncertainty')
     ax.scatter(myi_ratio_date_cond, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+    sample_weights = 1.0 / (np.array(broadband_alb_date_cond_unc) + 1e-6)**2
+    X = sm.add_constant(myi_ratio_date_cond)
+    y = np.array(broadband_alb_date_cond)
+
+    mod_wls = sm.WLS(y, X )#weights=sample_weights)
+    res_wls = mod_wls.fit()
+    slope = res_wls.params[1]
+    intercept = res_wls.params[0]
+    r_value = res_wls.rsquared
+    x_fit = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 100)
+    y_fit = intercept + slope * x_fit
+    p_values = res_wls.pvalues
+    ax.plot(x_fit, y_fit, color='orange', linestyle='--', label='Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+
+    ax.legend(fontsize=12)
     ax.set_xlabel('Mean Multi-year Sea Ice Ratio', fontsize=14)
     ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
     ax.tick_params(labelsize=12)
-    ax.set_title('Broadband Albedo at Ice Fraction = 1.0 vs. Mean MYI Ratio', fontsize=13)
+    # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 vs. Mean MYI Ratio', fontsize=13)
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio.png', bbox_inches='tight', dpi=150)
     # plt.show()
     plt.close(fig)
