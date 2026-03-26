@@ -173,6 +173,7 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
                      config: Optional[FlightConfig] = None,
                      rsp_plot=False,
                      aviris_id=None,
+                     gs_half_width=1,
                             ):
     log = logging.getLogger("atm corr spiral plot")
     log.info("Starting processing for %s", date.strftime("%Y%m%d"))
@@ -285,25 +286,66 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     _aviris_tree = cKDTree(np.column_stack([aviris_rad_lon.ravel(), aviris_rad_lat.ravel()]))
     _r_rsp = rsp_rad_all[:, int(_gs_rsp_wvl_ind)]
 
-    _corr_cache: dict = {}
-    _rmse_cache: dict = {}
+    _gs_nr, _gs_nc = _aviris_shape
 
-    def _eval_corr(d_lon, d_lat):
-        _key = (round(float(d_lon), 8), round(float(d_lat), 8))
-        if _key in _corr_cache:
-            return _corr_cache[_key], _rmse_cache[_key]
-        _shifted = np.column_stack([rsp_lon_all[:, 0] + d_lon, rsp_lat_all[:, 0] + d_lat])
-        _, _flat_idxs = _aviris_tree.query(_shifted)
+    def _eval_corr(d_lons, d_lats):
+        """Evaluate correlation and RMSE for an array of (d_lon, d_lat) offset pairs.
+
+        d_lons, d_lats: 1-D arrays of shape (N,)
+        Returns corr_arr (N,), rmse_arr (N,)
+        """
+        d_lons = np.asarray(d_lons, dtype=float).ravel()
+        d_lats = np.asarray(d_lats, dtype=float).ravel()
+        N = len(d_lons)
+        n_t = rsp_lon_all.shape[0]
+        _rsp_lon0 = rsp_lon_all[:, 0]   # (n_t,)
+        _rsp_lat0 = rsp_lat_all[:, 0]   # (n_t,)
+
+        # Build shifted query points for all offsets at once: (N*n_t, 2)
+        _shifted_lon = (_rsp_lon0[np.newaxis, :] + d_lons[:, np.newaxis]).ravel()
+        _shifted_lat = (_rsp_lat0[np.newaxis, :] + d_lats[:, np.newaxis]).ravel()
+        _, _flat_idxs = _aviris_tree.query(np.column_stack([_shifted_lon, _shifted_lat]))
         _ni, _nj = np.unravel_index(_flat_idxs, _aviris_shape)
-        _a = _aviris_rad_555[_ni, _nj]
-        _vm = ~np.isnan(_a) & ~np.isnan(_r_rsp)
-        _c = np.corrcoef(_a[_vm], _r_rsp[_vm])[0, 1] if np.sum(_vm) > 1 else -np.inf
-        _rmse = np.sqrt(np.nanmean((_a[_vm] - _r_rsp[_vm])**2)) if np.sum(_vm) > 1 else np.inf
-        _corr_cache[_key] = _c
-        _rmse_cache[_key] = _rmse
-        return _c, _rmse
 
-    print("Coarse-to-fine search for best lon/lat offset (555 nm, 3x3)...")
+        # Average over (2*gs_half_width+1)^2 window around each nearest pixel
+        _a_sum = np.zeros(N * n_t, dtype=float)
+        _a_cnt = np.zeros(N * n_t, dtype=int)
+        for _di in range(-gs_half_width, gs_half_width + 1):
+            for _dj in range(-gs_half_width, gs_half_width + 1):
+                _wi = np.clip(_ni + _di, 0, _gs_nr - 1)
+                _wj = np.clip(_nj + _dj, 0, _gs_nc - 1)
+                _v = _aviris_rad_555[_wi, _wj]
+                _ok = ~np.isnan(_v)
+                _a_sum[_ok] += _v[_ok]
+                _a_cnt[_ok] += 1
+        _a = np.where(_a_cnt > 0, _a_sum / _a_cnt, np.nan).reshape(N, n_t)  # (N, n_t)
+
+        # Vectorized correlation and RMSE across all N offsets simultaneously
+        _r = _r_rsp[np.newaxis, :]                                 # (1, n_t)
+        _valid = ~np.isnan(_a) & ~np.isnan(_r)                    # (N, n_t)
+        n_valid = _valid.sum(axis=1).astype(float)                 # (N,)
+        n_safe = np.where(n_valid > 1, n_valid, 1.0)
+
+        _a_v = np.where(_valid, _a, 0.0)
+        _r_v = np.where(_valid, np.broadcast_to(_r, _a.shape), 0.0)
+        _a_mean = _a_v.sum(axis=1) / n_safe                        # (N,)
+        _r_mean = _r_v.sum(axis=1) / n_safe                        # (N,)
+
+        _da = np.where(_valid, _a - _a_mean[:, np.newaxis], 0.0)
+        _dr = np.where(_valid, _r - _r_mean[:, np.newaxis], 0.0)
+        _cov   = (_da * _dr).sum(axis=1) / n_safe
+        _var_a = (_da ** 2).sum(axis=1) / n_safe
+        _var_r = (_dr ** 2).sum(axis=1) / n_safe
+        _denom = np.sqrt(_var_a * _var_r)
+        corr_arr = np.where((n_valid > 1) & (_denom > 0), _cov / _denom, -np.inf)
+
+        _diff2 = np.where(_valid, (_a - _r) ** 2, 0.0)
+        rmse_arr = np.where(n_valid > 1, np.sqrt(_diff2.sum(axis=1) / n_safe), np.inf)
+
+        return corr_arr, rmse_arr
+
+    _win = 2 * gs_half_width + 1
+    print(f"Grid search for best lon/lat offset (555 nm, {_win}x{_win} window)...")
     # The search starts with a relatively large span (e.g., ±0.015°) and iteratively narrows down to a finer span (e.g., ±0.0001°) around the best offset found in the previous iteration. 
     # The steps are designed to be denser near the center to efficiently find the optimal offset.
     # ------------------------------------------------------------------------------
@@ -313,17 +355,15 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     # _span = 0.015
     # _min_step = 0.0001
     # while _span >= _min_step:
-    #     _pts_lon = np.array([-_span, -_span/3, -_span/3*2, 0.0, _span/3, _span/3*2, _span])
-    #     _pts_lat = _pts_lon * _cos_lat
-    #     _best_corr = -np.inf
-    #     _best_d_lon, _best_d_lat = _center_lon, _center_lat
-    #     for _d_lon in _center_lon + _pts_lon:
-    #         for _d_lat in _center_lat + _pts_lat:
-    #             _c, _rmse = _eval_corr(_d_lon, _d_lat)
-    #             if _c > _best_corr:
-    #                 _best_corr = _c
-    #                 _best_rmse = _rmse
-    #                 _best_d_lon, _best_d_lat = _d_lon, _d_lat
+    #     _pts_lon = _center_lon + np.array([-_span, -_span*2/3, -_span/3, 0.0, _span/3, _span*2/3, _span])
+    #     _pts_lat = _center_lat + (_pts_lon - _center_lon) * _cos_lat
+    #     _lon_grid, _lat_grid = np.meshgrid(_pts_lon, _pts_lat, indexing='ij')
+    #     _corr_grid, _rmse_grid = _eval_corr(_lon_grid.ravel(), _lat_grid.ravel())
+    #     _corr_grid = _corr_grid.reshape(len(_pts_lon), len(_pts_lat))
+    #     _rmse_grid = _rmse_grid.reshape(len(_pts_lon), len(_pts_lat))
+    #     _bi, _bj = np.unravel_index(np.argmax(_corr_grid), _corr_grid.shape)
+    #     _best_d_lon, _best_d_lat = float(_pts_lon[_bi]), float(_pts_lat[_bj])
+    #     _best_corr, _best_rmse = float(_corr_grid[_bi, _bj]), float(_rmse_grid[_bi, _bj])
     #     print(f"  span={_span:.4f} -> best d_lon={_best_d_lon:.4f}, d_lat={_best_d_lat:.4f}, corr={_best_corr:.4f}, rmse={_best_rmse:.4f}")
     #     _center_lon, _center_lat = _best_d_lon, _best_d_lat
     #     _span *= 0.5
@@ -333,22 +373,19 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     # Optionally, a grid search around the original points found could be used instead of the above iterative refinement, but it would be more computationally expensive and less elegant.
     # ------------------------------------------------------------------------------
     _cos_lat = np.cos(np.deg2rad(np.nanmean(rsp_lat_all[:, 0])))  # equalize lon/lat steps in physical distance
-    _pts_lon = np.arange(-0.015, 0.0151, 0.0001)   # ±0.02° at 0.0005° steps
+    _pts_lon = np.arange(-0.015, 0.0151, 0.0001 )   # ±0.02° at 0.0005° steps
     _pts_lat = _pts_lon * _cos_lat
-    _best_d_lon, _best_d_lat, _best_corr, _best_rmse = 0.0, 0.0, -np.inf, np.inf
-    _grid_corr = np.full((len(_pts_lon), len(_pts_lat)), np.nan)
-    _grid_rmse = np.full((len(_pts_lon), len(_pts_lat)), np.nan)
-    for _i, _d_lon in enumerate(_pts_lon):
-        for _j, _d_lat in enumerate(_pts_lat):
-            _c, _rmse = _eval_corr(_d_lon, _d_lat)
-            _grid_corr[_i, _j] = _c
-            _grid_rmse[_i, _j] = _rmse
-            if _c > _best_corr:
-                _best_corr = _c
-                _best_rmse = _rmse
-                _best_d_lon, _best_d_lat = _d_lon, _d_lat
-    
-    
+    # Evaluate all (d_lon, d_lat) grid points in one batch call
+    _lon_grid, _lat_grid = np.meshgrid(_pts_lon, _pts_lat, indexing='ij')  # (n_lon, n_lat)
+    _all_corr, _all_rmse = _eval_corr(_lon_grid.ravel(), _lat_grid.ravel())
+    _grid_corr = _all_corr.reshape(len(_pts_lon), len(_pts_lat))
+    _grid_rmse = _all_rmse.reshape(len(_pts_lon), len(_pts_lat))
+    _best_flat = int(np.argmax(_grid_corr))
+    _bi, _bj = np.unravel_index(_best_flat, _grid_corr.shape)
+    _best_d_lon, _best_d_lat = float(_pts_lon[_bi]), float(_pts_lat[_bj])
+    _best_corr, _best_rmse = float(_grid_corr[_bi, _bj]), float(_grid_rmse[_bi, _bj])
+    print(f"Best offset: d_lon={_best_d_lon:.4f}, d_lat={_best_d_lat:.4f}, corr={_best_corr:.4f}, rmse={_best_rmse:.4f}")
+
     # 2-panel diagnostic: correlation and RMSE over the lon/lat offset grid
     plt.close('all')
     # _grid_corr[i, j] has axis-0=lon, axis-1=lat; transpose so rows=lat (y) and cols=lon (x)
@@ -370,7 +407,7 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     ax_r.set_title('RMSE vs offset (555 nm)')
     ax_r.legend(fontsize=9)
 
-    fig.suptitle(f'Grid-search offset landscape {date_s}', fontsize=14)
+    fig.suptitle(f'Grid-search offset landscape {date_s} for 3x3 AVIRIS pixels', fontsize=14)
     fig.tight_layout()
     savefig(fig, date_s, case_tag, 'offset_grid_search_corr_rmse')
     plt.close('all')
@@ -550,7 +587,10 @@ def atm_corr_plot(date=datetime.datetime(2024, 5, 31),
     ax.errorbar(rsp_wvl_arr, np.nanmean(rsp_rad_all, axis=0), yerr=np.nanstd(rsp_rad_all, axis=0), fmt='o', color='c', label='RSP Nadir Radiance')
     ax.set_xlabel('Wavelength (nm)', fontsize=14)
     ax.set_ylabel('Radiance (W m$^{-2}$ sr$^{-1}$ nm$^{-1}$)', fontsize=14)
-    ax.set_title(f'Average Spectrum Comparison {date_s}', fontsize=12)
+    _rsp_t0 = np.nanmin(rsp_time_all)
+    _rsp_t1 = np.nanmax(rsp_time_all)
+    _fmt_t = lambda h: str(datetime.timedelta(hours=float(h))).split('.')[0]
+    ax.set_title(f'Average Spectrum Comparison {date_s}  RSP: {_fmt_t(_rsp_t0)}–{_fmt_t(_rsp_t1)} UTC', fontsize=12)
     ax.legend(fontsize=10)
     xmin, xmax = aviris_rad_wvl[0], aviris_rad_wvl[-1]
     ax.set_xlim(xmin, xmax)

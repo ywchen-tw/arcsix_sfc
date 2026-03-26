@@ -82,30 +82,11 @@ from util import *
 # mpl.use('Agg')
 
 
-import er3t
-
 
 _mission_      = 'arcsix'
 _platform_     = 'p3b'
 
-_hsk_          = 'hsk'
-_alp_          = 'alp'
-_spns_         = 'spns-a'
-_ssfr1_        = 'ssfr-a'
-_ssfr2_        = 'ssfr-b'
-_cam_          = 'nac'
 
-# _fdir_main_       = 'data/%s/flt-vid' % _mission_
-_fdir_main_       = 'data/flt-vid'
-_fdir_sat_img_    = 'data/%s/sat-img' % _mission_
-_fdir_sat_data_   = 'data/%s/sat' % _mission_
-_fdir_cam_img_    = 'data/%s/2024-Spring/p3' % _mission_
-_wavelength_      = 555.0
-
-_fdir_sat_img_vn_ = 'data/%s/sat-img-vn' % _mission_
-
-_preferred_region_ = 'ca_archipelago'
-_aspect_ = 'equal'
 
 if platform.system() == 'Darwin':
     _fdir_data_ = '/Volumes/argus/field/%s/processed' % _mission_
@@ -116,47 +97,6 @@ elif platform.system() == 'Linux':
     _fdir_data_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data/processed"
     _fdir_general_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data"
     _fdir_tmp_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/tmp"
-_fdir_tmp_graph_ = 'tmp-graph_flt-vid'
-
-_title_extra_ = 'ARCSIX RF#1'
-
-_tmhr_range_ = {
-        '20240517': [19.20, 23.00],
-        '20240521': [14.80, 17.50],
-        }
-
-# dates for ARCSIX-1
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates1_ = [
-        datetime.datetime(2024, 5, 28),
-        datetime.datetime(2024, 5, 30),
-        datetime.datetime(2024, 5, 31),
-        datetime.datetime(2024, 6,  3),
-        datetime.datetime(2024, 6,  5),
-        datetime.datetime(2024, 6,  6),
-        datetime.datetime(2024, 6,  7),
-        datetime.datetime(2024, 6, 10),
-        datetime.datetime(2024, 6, 11),
-        datetime.datetime(2024, 6, 13),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-# dates for ARCSIX-2
-#╭────────────────────────────────────────────────────────────────────────────╮#
-_dates2_ = [
-        datetime.datetime(2024, 7, 25),
-        datetime.datetime(2024, 7, 29),
-        datetime.datetime(2024, 7, 30),
-        datetime.datetime(2024, 8,  1),
-        datetime.datetime(2024, 8,  2),
-        datetime.datetime(2024, 8,  7),
-        datetime.datetime(2024, 8,  8),
-        datetime.datetime(2024, 8,  9),
-        datetime.datetime(2024, 8,  15),
-    ]
-#╰────────────────────────────────────────────────────────────────────────────╯#
-
-_dates_ = _dates1_
 
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -241,6 +181,31 @@ def ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, wvl, up_dn_ratio, color_se
     fig.tight_layout()
     fig.savefig('fig/%s/%s_%s_ssfr_up_dn_ratio_comparison%s.png' % (date_s, date_s, case_tag, file_suffix), bbox_inches='tight', dpi=150)
 
+def weighted_broadband_alb(alb, toa, wvl):
+    """TOA-weighted broadband albedo via trapezoidal integration.
+
+    alb, toa : (..., N_wvl) arrays on the same wavelength grid
+    wvl      : (N_wvl,) wavelength axis in nm
+    """
+    return np.trapz(alb * toa, x=wvl, axis=-1) / np.trapz(toa, x=wvl, axis=-1)
+
+
+def fill_nan_ffill_bfill(arr, limit=2):
+    """Fill NaNs in 1-D array using forward-then-backward fill, repeated until no NaNs remain."""
+    s = pd.Series(arr)
+    s = s.ffill(limit=limit).bfill(limit=limit)
+    while s.isna().any():
+        s = s.ffill(limit=limit).bfill(limit=limit)
+    return s.values
+
+
+# Per-date h2o_6_end overrides for gas_abs_masking / snowice_alb_fitting
+_DATE_H2O_6_END = {
+    '20240603': {'mask': 1650, 'fit': 1650},
+    '20240807': {'mask': 1550, 'fit': 1570},
+}
+
+
 def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
                         tmhr_ranges_select=[[14.10, 14.27]],
                         case_tag='default',
@@ -301,12 +266,13 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     wvl_solar = np.array(df_solor.iloc[:, 0])
     flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
     # interpolate to 1 nm grid
-    f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
+    solar_flux_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
     
     t_hsk = np.array(data_hsk["tmhr"])
     mistmatch_count = 0
     
     fdir_cld_obs_info = f'{_fdir_general_}/flt_cld_obs_info'
+    alb_wvl: np.ndarray  # assigned in first loop iteration via initiation block
     initiation = True
     for i in range(len(tmhr_ranges_select)):
         time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
@@ -362,15 +328,12 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
         if initiation:
             time_all = []
-            fdn_550_all = []
-            fup_550_all = []
-            fdn_1600_all = []
-            fup_1600_all = []
             fdn_all = []
             fup_all = []
             lon_all = []
             lat_all = []
             alt_all = []
+            sza_all = []
             kt19_sfc_T_all = []
             icing_all = []
             icing_pre_all = []
@@ -391,6 +354,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             lat_min_all = np.zeros(len(tmhr_ranges_select))
             lat_max_all = np.zeros(len(tmhr_ranges_select))
             alt_avg_all = np.zeros(len(tmhr_ranges_select))
+            cos_sza_avg_all = np.zeros(len(tmhr_ranges_select))
 
             
             flux_wvl = df_ori['wvl'].values
@@ -410,10 +374,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             toa_mean_all = np.zeros((len(tmhr_ranges_select), len(flux_wvl)))
             
             initiation = False
-            
-            
-            
-        
+
         if corr_factor.shape[0] != cld_leg['ssfr_zen'].shape[1]:
             print("Mismatch in shape between corr_factor and ssfr_zen, skipping this leg.")
             print("i:", i)
@@ -426,16 +387,11 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
 
         time_all.extend(cld_leg['time'])
         ssfr_wvl = cld_leg['ssfr_zen_wvl']
-        # ssfr_550_ind = np.argmin(np.abs(ssfr_wvl - 550))
-        # ssfr_1600_ind = np.argmin(np.abs(ssfr_wvl - 1600))
-        # fdn_550_all.extend(cld_leg['ssfr_zen'][:, ssfr_550_ind])
-        # fup_550_all.extend(cld_leg['ssfr_nad'][:, ssfr_550_ind])
-        # fdn_1600_all.extend(cld_leg['ssfr_zen'][:, ssfr_1600_ind])
-        # fup_1600_all.extend(cld_leg['ssfr_nad'][:, ssfr_1600_ind])
         
         lon_all.extend(cld_leg['lon'])
         lat_all.extend(cld_leg['lat'])
         alt_all.extend(cld_leg['alt'])
+        sza_all.extend(cld_leg['sza'])
         fdn_all.extend(cld_leg['ssfr_zen'])
         fup_all.extend(cld_leg['ssfr_nad'])
         kt19_sfc_T_all.extend(cld_leg['kt19_sfc_T'])
@@ -445,9 +401,6 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         icing_all.extend(leg_icing_all)
         icing_pre_all.extend(leg_icing_pre_all)
         
-        # print("i:", i)
-        # print("alb_ratio['alb'] shape:", alb_ratio['alb'].shape)
-        # print("alb_ratio_all shape:", alb_ratio_all.shape)
         alb_ratio_all[i, :] = alb_ratio['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
         alb1_all[i, :] = alb_1['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
         alb2_all[i, :] = alb_2['alb'].values[1:-1]  # skip the first value at 348 nm and last value at 2050 nm
@@ -460,70 +413,16 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         lat_min_all[i] = leg_lat_all.min()
         lat_max_all[i] = leg_lat_all.max()
         alt_avg_all[i] = alt_avg.copy()
+        cos_sza_avg_all[i] = np.cos(np.deg2rad(np.nanmean(cld_leg['sza'])))
         
         ssfr_fup_mean_all[i, :] = df_ori['ssfr_fup_mean'].values
         ssfr_fdn_mean_all[i, :] = df_ori['ssfr_fdn_mean'].values
         ssfr_fup_std_all[i, :] = df_ori['ssfr_fup_std'].values
         ssfr_fdn_std_all[i, :] = df_ori['ssfr_fdn_std'].values
-        # simu_fup_mean_all_iter0[i, :] = df_ori['simu_fup_mean'].values
-        # simu_fdn_mean_all_iter0[i, :] = df_ori['simu_fdn_mean'].values
-        # simu_fup_mean_all_iter1[i, :] = df_upd1['simu_fup_mean'].values
-        # simu_fdn_mean_all_iter1[i, :] = df_upd1['simu_fdn_mean'].values
-        # simu_fup_mean_all_iter2[i, :] = df_upd2['simu_fup_mean'].values
-        # simu_fdn_mean_all_iter2[i, :] = df_upd2['simu_fdn_mean'].values
-        # simu_fup_toa_mean_all_iter0[i, :] = df_ori['simu_fup_toa_mean'].values
-        # simu_fup_toa_mean_all_iter1[i, :] = df_upd1['simu_fup_toa_mean'].values
-        # simu_fup_toa_mean_all_iter2[i, :] = df_upd2['simu_fup_toa_mean'].values
         toa_mean_all[i, :] = df_ori['toa_mean'].values
         
         
         print(f"date_s: {date_s}, time: {time_start:.3f}-{time_end:.3f}, alt_avg: {alt_avg:.2f} km")
-        
-        
-        # if np.all(np.isnan((cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :])):
-        #     continue
-        # alb_corr = copy.deepcopy((cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :])
-        # alb_corr[alb_corr < 0] = 0
-        # alb_corr[alb_corr > 1] = 1
-        
-        # if np.any(np.isnan(alb_corr)):
-        #     s = pd.Series(alb_corr)
-        #     s_mask = np.isnan(alb_corr)
-        #     # Fills NaN with the value immediately preceding it
-        #     s_ffill = s.fillna(method='ffill', limit=2)
-        #     s_ffill = s_ffill.fillna(method='bfill', limit=2)
-        #     while np.any(np.isnan(s_ffill)):
-        #         s_ffill = s_ffill.fillna(method='ffill', limit=2)
-        #         s_ffill = s_ffill.fillna(method='bfill', limit=2)
-                
-        #     alb_corr[s_mask] = s_ffill[s_mask]
-        
-        # alb_corr = alb_corr * corr_factor
-        # fdn_up_ratio_all_corr_test = alb_corr.copy()
-        # fdn_up_ratio_all_corr_test[fdn_up_ratio_all_corr_test < 0] = 0
-        # fdn_up_ratio_all_corr_test[fdn_up_ratio_all_corr_test > 1] = 1
-                    
-        # alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=cld_leg['alt'][0])
-        # alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
-        
-        # fdn_up_ratio_all_corr_fit_test = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
-        # print("fdn_up_ratio_all_corr_test shape:", fdn_up_ratio_all_corr_test.shape)
-        # print("cld_leg['ssfr_toa'] shape:", cld_leg['ssfr_toa'].shape)
-
-        # broadband_alb_iter1_test = np.sum(fdn_up_ratio_all_corr_fit_test * cld_leg['ssfr_toa'][0, :]) / np.sum(cld_leg['ssfr_toa'][0, :])
-           
-        # plt.close('all')
-        # fig, ax = plt.subplots(figsize=(8, 6))
-        # # ax.plot(alb_wvl, (cld_leg['ssfr_zen']/cld_leg['ssfr_nad'])[0, :], '-', color='r', label='Original albedo')
-        # ax.plot(alb_wvl, fdn_up_ratio_all_corr_fit_test, '-', color='b', label='Corrected albedo (iter 1)')
-        # ax.set_xlabel('Wavelength (nm)', fontsize=14)
-        # ax.set_ylabel('Surface Albedo', fontsize=14)
-        # ax.set_title(f'Surface Albedo after Atmospheric Correction {date_s} {case_tag}, broadband alb: {broadband_alb_iter1_test:.3f}', fontsize=13)
-        # fig.suptitle(f'Flight leg at Z={alt_avg_all[0]:.2f} km, lon={lon_avg_all[0]:.2f}, lat={lat_avg_all[0]:.2f}', fontsize=12, y=0.98)
-        # fig.tight_layout()
-        # plt.show()
-        # sys.exit()
-    
 
         # find the modis location closest to the flight leg center
         if modis_alb_file is not None:
@@ -534,15 +433,11 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     
     print(f"Total mismatch count: {mistmatch_count}")
     
-    time_all = np.array(time_all)
-    # fdn_550_all = np.array(fdn_550_all)
-    # fup_550_all = np.array(fup_550_all)
-    # fdn_1600_all = np.array(fdn_1600_all)
-    # fup_1600_all = np.array(fup_1600_all)
-    
+    time_all = np.array(time_all)    
     lon_all = np.array(lon_all)
     lat_all = np.array(lat_all)
     alt_all = np.array(alt_all)
+    sza_all = np.array(sza_all)
     fdn_all = np.array(fdn_all)
     fup_all = np.array(fup_all)
     toa_expand_all = np.array(toa_expand_all)
@@ -552,14 +447,6 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     icing_pre_all = np.array(icing_pre_all)
     kt19_sfc_T_all = np.array(kt19_sfc_T_all)
 
-    # print("lon avg all mean:", lon_avg_all.mean())
-    # print("lat avg all mean:", lat_avg_all.mean())
-    # print("fdn_all shape:", fdn_all.shape)
-    # print("fup_all shape:", fup_all.shape)
-    # print("fdn_550_all shape:", fdn_550_all.shape)
-    # print("fup_dn_ratio_all_corr shape:", fdn_up_ratio_all_corr.shape)
-    # print("correction_factor_all shape:", correction_factor_all.shape)
-    # sys.exit()
     
     fdn_up_ratio_all_corr = np.full(fdn_up_ratio_all.shape, np.nan)
     fdn_up_ratio_all_corr_fit = np.full(fdn_up_ratio_all.shape, np.nan)
@@ -626,16 +513,8 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
             continue
         
         if np.any(np.isnan(alb_corr)):
-            s = pd.Series(alb_corr)
             s_mask = np.isnan(alb_corr)
-            # Fills NaN with the value immediately preceding it
-            s_ffill = s.fillna(method='ffill', limit=2)
-            s_ffill = s_ffill.fillna(method='bfill', limit=2)
-            while np.any(np.isnan(s_ffill)):
-                s_ffill = s_ffill.fillna(method='ffill', limit=2)
-                s_ffill = s_ffill.fillna(method='bfill', limit=2)
-                
-            alb_corr[s_mask] = s_ffill[s_mask]
+            alb_corr[s_mask] = fill_nan_ffill_bfill(alb_corr)[s_mask]
         
         alb_corr = alb_corr * correction_factor_all[i, :]
         alb_corr = np.clip(alb_corr, 0, 1)
@@ -656,21 +535,11 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         
         fdn_up_ratio_all_corr[i, :] = alb_corr.copy()
         
-        if date_s not in ['20240603', '20240807']:
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i])
-            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky)
-            # start_wvl = alb_wvl[wvl1450_ind:wvl1520_ind][np.argmin(fdn_up_ratio_all_corr_fit[i, wvl1450_ind:wvl1520_ind])]
-            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
-        elif date_s == '20240603':
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1650) # extend h2o_6 to 1600 nm for this date
-            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky, h2o_6_end=1650)
-            # start_wvl = 1640
-            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
-        elif date_s == '20240807':
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], h2o_6_end=1550) # extend h2o_4 to 1600 nm for this date
-            fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky, h2o_6_end=1570)  
-            # start_wvl = 1560
-            # start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
+        h2o_override = _DATE_H2O_6_END.get(date_s, {})
+        mask_kwargs = {'h2o_6_end': h2o_override['mask']} if 'mask' in h2o_override else {}
+        fit_kwargs  = {'h2o_6_end': h2o_override['fit']}  if 'fit'  in h2o_override else {}
+        alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_all[i], **mask_kwargs)
+        fdn_up_ratio_all_corr_fit[i, :] = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_all[i], clear_sky=clear_sky, **fit_kwargs)
         start_wvl = alb_wvl[wvl1450_ind:wvl1520_ind][np.argmin(fdn_up_ratio_all_corr_fit[i, wvl1450_ind:wvl1520_ind])]
         start_ind = np.argmin(np.abs(alb_wvl - start_wvl))+1
         end_wvl = alb_wvl[wvl1800_ind:][np.argmax(fdn_up_ratio_all_corr_fit[i, wvl1800_ind:])]
@@ -757,46 +626,74 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         if np.all(alb_ratio_all[i, :] == 0):
             select[i] = False
             
-    for data_arr in [alb_ratio_all, alb1_all, alb2_all, p3_ratio1_all, p3_ratio2_all, 
-                     lon_avg_all, lat_avg_all, lon_min_all, lon_max_all, lat_min_all, lat_max_all, alt_avg_all,
-                     ssfr_fup_mean_all, ssfr_fdn_mean_all, ssfr_fup_std_all, ssfr_fdn_std_all, 
-                     simu_fup_mean_all_iter0, simu_fdn_mean_all_iter0,
-                     simu_fup_mean_all_iter1, simu_fdn_mean_all_iter1,
-                     simu_fup_mean_all_iter2, simu_fdn_mean_all_iter2, 
-                     simu_fup_toa_mean_all_iter0, simu_fup_toa_mean_all_iter1, simu_fup_toa_mean_all_iter2, toa_mean_all]:
-        data_arr = data_arr[select]
-        
-    broadband_alb_iter0 = np.sum(alb_ratio_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
-    broadband_alb_iter1 = np.sum(alb1_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
-    broadband_alb_iter2 = np.sum(alb2_all * toa_mean_all, axis=1) / np.sum(toa_mean_all, axis=1)
-    broadband_alb_iter1_all = np.sum(fdn_up_ratio_all_corr * toa_expand_all, axis=1) / np.sum(toa_expand_all, axis=1)
-    broadband_alb_iter2_all = np.sum(fdn_up_ratio_all_corr_fit * toa_expand_all, axis=1) / np.sum(toa_expand_all, axis=1)
+    alb_ratio_all = alb_ratio_all[select]
+    alb1_all = alb1_all[select]
+    alb2_all = alb2_all[select]
+    p3_ratio1_all = p3_ratio1_all[select]
+    p3_ratio2_all = p3_ratio2_all[select]
+    lon_avg_all = lon_avg_all[select]
+    lat_avg_all = lat_avg_all[select]
+    lon_min_all = lon_min_all[select]
+    lon_max_all = lon_max_all[select]
+    lat_min_all = lat_min_all[select]
+    lat_max_all = lat_max_all[select]
+    alt_avg_all = alt_avg_all[select]
+    ssfr_fup_mean_all = ssfr_fup_mean_all[select]
+    ssfr_fdn_mean_all = ssfr_fdn_mean_all[select]
+    ssfr_fup_std_all = ssfr_fup_std_all[select]
+    ssfr_fdn_std_all = ssfr_fdn_std_all[select]
+    simu_fup_mean_all_iter0 = simu_fup_mean_all_iter0[select]
+    simu_fdn_mean_all_iter0 = simu_fdn_mean_all_iter0[select]
+    simu_fup_mean_all_iter1 = simu_fup_mean_all_iter1[select]
+    simu_fdn_mean_all_iter1 = simu_fdn_mean_all_iter1[select]
+    simu_fup_mean_all_iter2 = simu_fup_mean_all_iter2[select]
+    simu_fdn_mean_all_iter2 = simu_fdn_mean_all_iter2[select]
+    simu_fup_toa_mean_all_iter0 = simu_fup_toa_mean_all_iter0[select]
+    simu_fup_toa_mean_all_iter1 = simu_fup_toa_mean_all_iter1[select]
+    simu_fup_toa_mean_all_iter2 = simu_fup_toa_mean_all_iter2[select]
+    toa_mean_all = toa_mean_all[select]
+
+    broadband_alb_iter0     = weighted_broadband_alb(alb_ratio_all,          toa_mean_all,   alb_wvl)
+    broadband_alb_iter1     = weighted_broadband_alb(alb1_all,                toa_mean_all,   alb_wvl)
+    broadband_alb_iter2     = weighted_broadband_alb(alb2_all,                toa_mean_all,   alb_wvl)
+    broadband_alb_iter1_all = weighted_broadband_alb(fdn_up_ratio_all_corr,   toa_expand_all, alb_wvl)
+    broadband_alb_iter2_all = weighted_broadband_alb(fdn_up_ratio_all_corr_fit, toa_expand_all, alb_wvl)
 
     gas_mask = np.isfinite(gas_abs_masking(alb_wvl, np.ones_like(alb_wvl, dtype=float), alt=1))
-    # broadband_alb_iter0_filter = np.sum(alb_ratio_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
-    # broadband_alb_iter1_filter = np.sum(alb1_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
-    # broadband_alb_iter2_filter = np.sum(alb2_all[:, gas_mask] * toa_mean_all[:, gas_mask], axis=1) / np.sum(toa_mean_all[:, gas_mask], axis=1)
-    # broadband_alb_iter1_all_filter = np.sum(fdn_up_ratio_all_corr[:, gas_mask] * toa_expand_all[:, gas_mask], axis=1) / np.sum(toa_expand_all[:, gas_mask], axis=1)
-    # broadband_alb_iter2_all_filter = np.sum(fdn_up_ratio_all_corr_fit[:, gas_mask] * toa_expand_all[:, gas_mask], axis=1) / np.sum(toa_expand_all[:, gas_mask], axis=1)
-
-    broadband_alb_iter0_filter = np.trapz(alb_ratio_all[:, gas_mask] * toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
-    broadband_alb_iter1_filter = np.trapz(alb1_all[:, gas_mask] * toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
-    broadband_alb_iter2_filter = np.trapz(alb2_all[:, gas_mask] * toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_mean_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
-    broadband_alb_iter1_all_filter = np.trapz(fdn_up_ratio_all_corr[:, gas_mask] * toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
-    broadband_alb_iter2_all_filter = np.trapz(fdn_up_ratio_all_corr_fit[:, gas_mask] * toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1) / np.trapz(toa_expand_all[:, gas_mask], x=alb_wvl[gas_mask], axis=1)
+    wvl_g = alb_wvl[gas_mask]
+    broadband_alb_iter0_filter     = weighted_broadband_alb(alb_ratio_all[:, gas_mask],            toa_mean_all[:, gas_mask],   wvl_g)
+    broadband_alb_iter1_filter     = weighted_broadband_alb(alb1_all[:, gas_mask],                 toa_mean_all[:, gas_mask],   wvl_g)
+    broadband_alb_iter2_filter     = weighted_broadband_alb(alb2_all[:, gas_mask],                 toa_mean_all[:, gas_mask],   wvl_g)
+    broadband_alb_iter1_all_filter = weighted_broadband_alb(fdn_up_ratio_all_corr[:, gas_mask],    toa_expand_all[:, gas_mask], wvl_g)
+    broadband_alb_iter2_all_filter = weighted_broadband_alb(fdn_up_ratio_all_corr_fit[:, gas_mask], toa_expand_all[:, gas_mask], wvl_g)
     
     
-    ext_wvl, _ = alb_extention(alb_wvl, fdn_up_ratio_all_corr_fit[0, :], clear_sky=clear_sky)
-    alb_iter2_ext_all = np.zeros((len(tmhr_ranges_select), len(ext_wvl)))
-    broadband_alb_iter2_ext_all = np.zeros(len(tmhr_ranges_select))
+    
+    j_ind = 0
+    while j_ind < len(fdn_up_ratio_all_corr_fit):
+        if not np.all(np.isnan(fdn_up_ratio_all_corr_fit[j_ind, :])):
+            ext_wvl, _ = alb_extention(alb_wvl, fdn_up_ratio_all_corr_fit[j_ind, :], clear_sky=clear_sky)
+            break
+        j_ind += 1
+    toa_ext_expand_all = np.zeros((len(fdn_up_ratio_all_corr_fit), len(ext_wvl)))
+    # print("ext_wvl shape:", ext_wvl.shape)
+    toa_ext_wvl = solar_flux_interp(ext_wvl)
+    # print("toa_ext_wvl shape:", toa_ext_wvl.shape)
+    alb_iter2_ext_all = np.zeros((len(fdn_up_ratio_all_corr_fit), len(ext_wvl)))
+    broadband_alb_iter2_ext_all = np.zeros(len(fdn_up_ratio_all_corr_fit))
     for j in range(len(fdn_up_ratio_all_corr_fit)):
         alb_j = np.clip(fdn_up_ratio_all_corr_fit[j, :], 0.0, 1.0)
+        toa_cos_sza_j = toa_ext_wvl * np.cos(np.deg2rad(sza_all[j]))
+        toa_ext_expand_all[j, :] = toa_cos_sza_j.copy()
         if np.all(np.isnan(alb_j)):
-            alb_iter2_ext_all[j, :] = np.nan
-            continue
-        _, ext_alb_j = alb_extention(alb_wvl, alb_j, clear_sky=clear_sky)
-        alb_iter2_ext_all[j, :] = ext_alb_j.copy()
-        broadband_alb_iter2_ext_all[j] = np.trapz(ext_alb_j * toa_expand_all[j, :], x=ext_wvl) / np.trapz(toa_expand_all[j, :], x=ext_wvl)
+            broadband_alb_iter2_ext_all[j] = np.nan
+        else:    
+            _, ext_alb_j = alb_extention(alb_wvl, alb_j, clear_sky=clear_sky)
+            alb_iter2_ext_all[j, :] = ext_alb_j.copy()
+            
+            broadband_alb_iter2_ext_all[j] = np.trapz(ext_alb_j * toa_cos_sza_j, x=ext_wvl) / np.trapz(toa_cos_sza_j, x=ext_wvl)
+     
+        
     
     
     # plt.close('all')
@@ -928,6 +825,7 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
         'lon_all': lon_all,
         'lat_all': lat_all,
         'alt_all': alt_all,
+        'sza_all': sza_all,
         'kt19_sfc_T_all': kt19_sfc_T_all,
         'fdn_all': fdn_all,
         'fup_all': fup_all,

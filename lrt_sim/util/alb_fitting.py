@@ -482,7 +482,9 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
         obs_albedo=long_wvl_alb
     )
     
+
     interp_ori_spec_alb = np.interp(alb_wvl_ext, ori_spec_wvl, ori_spec_alb)
+
     
     long_fit_alb_max = np.nanmax(best_fit_spectrum)
     long_fit_alb_max_wvl = long_wvl[np.argmax(best_fit_spectrum)]
