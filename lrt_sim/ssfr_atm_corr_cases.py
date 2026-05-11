@@ -1,0 +1,128 @@
+"""Runnable SSFR atmospheric-correction cases.
+
+Keep case selection here so the main correction module can stay focused on the
+workflow implementation.
+"""
+
+import os
+import sys
+import datetime
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+try:
+    from .ssfr_atm_corr_case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
+    from .ssfr_atm_corr_settings import _fdir_data_, _fdir_general_
+except ImportError:
+    from ssfr_atm_corr_case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
+    from ssfr_atm_corr_settings import _fdir_data_, _fdir_general_
+
+from util import FlightConfig
+
+
+DEFAULT_CASE_ID = 'case_029'
+
+CASE_ID_LIST = [
+    'case_001', 'case_002', 'case_003', 'case_004', 'case_005',
+    'case_006', 'case_007', 'case_008', 'case_009', 'case_010',
+    'case_011', 'case_012', 'case_013', 'case_021', 'case_022',
+    'case_023', 'case_024', 'case_025', 'case_026', 'case_027',
+    'case_028', 'case_029', 'case_030', 'case_031', 'case_034',
+    'case_035', 'case_036', 'case_037', 'case_038', 'case_040',
+    'case_041', 'case_042', 'case_043', 'case_047', 'case_050',
+    'case_051', 'case_052', 'case_053', 'case_054', 'case_055',
+    'case_056', 'case_057', 'case_058', 'case_061', 'case_062',
+    'case_063', 'case_067', 'case_069',
+]
+
+SPIRAL_CASE_ID_LIST = [
+    'spiral_001', 'spiral_002', 'spiral_003', 'spiral_004', 'spiral_005',
+]
+
+
+def make_default_config():
+    return FlightConfig(
+        mission='ARCSIX',
+        platform='P3B',
+        data_root=_fdir_data_,
+        root_mac=_fdir_general_,
+        root_linux='/pl/active/vikas-arcsix/yuch8913/arcsix/data',
+    )
+
+
+def run_cases(
+    flt_trk_atm_corr,
+    case_id=DEFAULT_CASE_ID,
+    case_ids=None,
+    overwrite_lrt=True,
+    iterations=range(3),
+):
+    """Run one or more surface-albedo atmospheric-correction catalog cases."""
+    os.makedirs('./fig', exist_ok=True)
+    config = make_default_config()
+
+    if case_ids is None:
+        case_ids = [case_id]
+
+    # IMPORTANT: run arcsix_gas_insitu.py first to generate gas files for each date.
+    for selected_case_id in case_ids:
+        run_catalog_case(
+            flt_trk_atm_corr,
+            config,
+            selected_case_id,
+            overwrite_lrt=overwrite_lrt,
+            iterations=iterations,
+        )
+
+
+def run_spiral_cases(atm_corr_spiral_plot, spiral_case_ids=None):
+    """Run one or more legacy spiral-plot catalog cases."""
+    os.makedirs('./fig', exist_ok=True)
+    config = make_default_config()
+
+    if spiral_case_ids is None:
+        spiral_case_ids = SPIRAL_CASE_ID_LIST
+
+    spiral_cases = {case['id']: case for case in SPIRAL_CASE_CATALOG}
+    for spiral_case_id in spiral_case_ids:
+        case = spiral_cases[spiral_case_id]
+        year, month, day = [int(part) for part in case['date'].split('-')]
+        atm_corr_spiral_plot(
+            date=datetime.datetime(year, month, day),
+            tmhr_ranges_select=case['tmhr_ranges_select'],
+            case_tag=case['case_tag'],
+            config=config,
+        )
+
+
+if __name__ == '__main__':
+    try:
+        from .ssfr_atm_corr import flt_trk_atm_corr
+        from .ssfr_atm_corr_plot import atm_corr_spiral_plot
+    except ImportError:
+        from ssfr_atm_corr import flt_trk_atm_corr
+        from ssfr_atm_corr_plot import atm_corr_spiral_plot
+
+    RUN_TRACK_CASES = True
+    RUN_SPIRAL_CASES = False
+
+    TRACK_CASE_IDS = [DEFAULT_CASE_ID]
+    SPIRAL_CASE_IDS = SPIRAL_CASE_ID_LIST
+    ITERATIONS = range(3)
+    OVERWRITE_LRT = True
+
+    if RUN_TRACK_CASES:
+        run_cases(
+            flt_trk_atm_corr,
+            case_ids=TRACK_CASE_IDS,
+            overwrite_lrt=OVERWRITE_LRT,
+            iterations=ITERATIONS,
+        )
+
+    if RUN_SPIRAL_CASES:
+        run_spiral_cases(
+            atm_corr_spiral_plot,
+            spiral_case_ids=SPIRAL_CASE_IDS,
+        )

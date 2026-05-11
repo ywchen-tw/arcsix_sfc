@@ -994,6 +994,235 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
     
+    
+    
+    plt.close('all')
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 4))
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i],)# label=f'Albedo-{i+1}')
+        if i == 2:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]-3
+            real_cond_color = color_series[i] 
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
+            
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
+            # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
+            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            ax1.arrow(start_cwp, start_Fnet, 
+                      end_cwp - start_cwp, end_Fnet - start_Fnet,
+                      head_width=2, head_length=2, 
+                      lw=1.5,
+                      fc='k', ec='k', linestyle='-')
+            
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    xmin, xmax = 0, 200
+    ymin, ymax = -65, 30
+    ax1.set_xlim(xmin, xmax)
+    ax1.set_ylim(ymin, ymax)
+    ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    # fill the y>0 with light red color, and y<0 with light blue color, make the color transparent and zorder to be 0
+    ax1.fill_between([xmin, xmax], 0, ymax, color='lightcoral', alpha=0.5, zorder=0)
+    ax1.fill_between([xmin, xmax], ymin, 0, color='lightblue', alpha=0.5, zorder=0)
+    
+    
+    fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_upper.png', dpi=300, bbox_inches='tight')
+    
+    
+    plt.close('all')
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 4))
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i],)# label=f'Albedo-{i+1}')
+        if i == 2:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]-3 +3 -4
+            real_cond_color = color_series[i] 
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
+            
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
+            # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4 -4 +2
+            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            # ax1.arrow(start_cwp, start_Fnet, 
+            #           end_cwp - start_cwp, end_Fnet - start_Fnet,
+            #           head_width=2, head_length=2, 
+            #           lw=1.5,
+            #           fc='k', ec='k', linestyle='-')
+            ax1.arrow(end_cwp, end_Fnet, 
+                      - end_cwp + start_cwp, - end_Fnet + start_Fnet,
+                      head_width=2, head_length=2, 
+                      lw=2,
+                      fc='k', ec='k', linestyle='-')
+            
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    xmin, xmax = 0, 200
+    ymin, ymax = -65, 30
+    ax1.set_xlim(xmin, xmax)
+    ax1.set_ylim(ymin, ymax)
+    # ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    # fill the y>0 with light red color, and y<0 with light blue color, make the color transparent and zorder to be 0
+    ax1.fill_between([xmin, xmax], 0, ymax, color='lightcoral', alpha=0.5, zorder=0)
+    ax1.fill_between([xmin, xmax], ymin, 0, color='lightblue', alpha=0.5, zorder=0)
+    
+    
+    fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_upper_1.png', dpi=300, bbox_inches='tight')
+    
+    
+    plt.close('all')
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 4))
+    for i in range(5):
+        broadband_alb_i = broadband_alb_all[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i],)# label=f'Albedo-{i+1}')
+        if i == 2:
+            # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            # ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]-3
+            real_cond_color = color_series[i] 
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
+            
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
+            # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
+            # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+            # ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
+            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            # ax1.arrow(start_cwp, start_Fnet, 
+            #           end_cwp - start_cwp, end_Fnet - start_Fnet,
+            #           head_width=2, head_length=2, 
+            #           lw=1.5,
+            #           fc='k', ec='k', linestyle='-')
+            
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    xmin, xmax = 0, 200
+    ymin, ymax = -65, 30
+    ax1.set_xlim(xmin, xmax)
+    ax1.set_ylim(ymin, ymax)
+    # ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    # fill the y>0 with light red color, and y<0 with light blue color, make the color transparent and zorder to be 0
+    ax1.fill_between([xmin, xmax], 0, ymax, color='lightcoral', alpha=0.5, zorder=0)
+    ax1.fill_between([xmin, xmax], ymin, 0, color='lightblue', alpha=0.5, zorder=0)
+    
+    
+    fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_upper_2.png', dpi=300, bbox_inches='tight')
+    
+    plt.close('all')
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 4))
+    for i in [3]:
+        broadband_alb_i = broadband_alb_all[i]
+        df_select_mask = sza_real_df_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_all_i = sza_real_df_all.loc[df_select_mask, :]
+        df_real_mask = sza_real_df_real_all['broadband_alb'].values==broadband_alb_i
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[df_real_mask, :]
+        
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i],)# label=f'Albedo-{i+1}')
+        if i == 2:
+            # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            # ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR extended albedo={broadband_alb_all[i]:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]-3
+            real_cond_color = color_series[i] 
+            print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
+            
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
+            # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
+            # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+            # ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_all[i]:.3f}')
+
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
+            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            # ax1.arrow(start_cwp, start_Fnet, 
+            #           end_cwp - start_cwp, end_Fnet - start_Fnet,
+            #           head_width=2, head_length=2, 
+            #           lw=1.5,
+            #           fc='k', ec='k', linestyle='-')
+            
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
+                   fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', 
+                   fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    xmin, xmax = 0, 200
+    ymin, ymax = -65, 30
+    ax1.set_xlim(xmin, xmax)
+    ax1.set_ylim(ymin, ymax)
+    # ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    # fill the y>0 with light red color, and y<0 with light blue color, make the color transparent and zorder to be 0
+    ax1.fill_between([xmin, cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655]], 0, ymax, color='lightcoral', alpha=0.5, zorder=0)
+    ax1.fill_between([cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], xmax], ymin, 0, color='lightblue', alpha=0.5, zorder=0)
+    
+    
+    fig.savefig(f'fig/{date_s}/surface_net_cre_vs_lwp_5_alb_{date_s}_{case_tag}_upper_3.png', dpi=300, bbox_inches='tight')
+    
     plt.close('all')
     fig, ax3 = plt.subplots(figsize=(7, 8))
     # sza_select = 61.46

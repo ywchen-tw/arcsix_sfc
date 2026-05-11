@@ -126,7 +126,43 @@ def pri_response_ori(fig_dir):
     fig.savefig(os.path.join(fig_dir, 'pri_response_ori.png'), dpi=300, bbox_inches='tight')
     
     
+def pri_response_ori2(fig_dir):
+    
+    nad_file = '../data/ssfr_cal/2024-03-29_lamp-1324|2024-03-29_lamp-150c_after-pri|2025-02-18_lamp-150c_post|2025-10-27_processed-for-arcsix|rad-resp|lasp|ssfr-a|nad|si-080|in-250|lamp-adjust.h5'
+    zen_file = '../data/ssfr_cal/2024-03-29_lamp-1324|2024-03-29_lamp-150c_after-pri|2025-02-18_lamp-150c_post|2025-10-27_processed-for-arcsix|rad-resp|lasp|ssfr-a|zen|si-080|in-250|lamp-adjust.h5'
+    
+    with h5py.File(nad_file, 'r') as f:
+        nad_si_wvl = f['raw/si/wvl'][:]
+        nad_si_pri_resp = f['raw/si/pri_resp'][:]
+        nad_in_wvl = f['raw/in/wvl'][:]
+        nad_in_pri_resp = f['raw/in/pri_resp'][:]
         
+    with h5py.File(zen_file, 'r') as f:
+        zen_si_wvl = f['raw/si/wvl'][:]
+        zen_si_pri_resp = f['raw/si/pri_resp'][:]
+        zen_in_wvl = f['raw/in/wvl'][:]
+        zen_in_pri_resp = f['raw/in/pri_resp'][:]
+    
+    labelsize = 12
+    legendsize = 10
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(6, 4))
+    linewidth = 1.0
+    lin_args = {'linewidth': linewidth}
+    ax.plot(nad_si_wvl, nad_si_pri_resp, label=r'$R_{nad, Si}^{pri\,(ori)}$', color='blue', **lin_args)
+    ax.plot(zen_si_wvl, zen_si_pri_resp, label=r'$R_{zen, Si}^{pri\,(ori)}$', color='orange', **lin_args)
+    ax.plot(nad_in_wvl, nad_in_pri_resp, label=r'$R_{nad, IR}^{pri\,(ori)}$', color='green', **lin_args)
+    ax.plot(zen_in_wvl, zen_in_pri_resp, label=r'$R_{zen, IR}^{pri\,(ori)}$', color='red', **lin_args)
+    ax.legend(fontsize=legendsize, ncol=4, loc='center left', bbox_to_anchor=(0.0, -0.225))
+    ymin, ymax = ax.get_ylim()
+    ax.set_ylim(0, ymax)
+    xmin = min(nad_si_wvl.min(), zen_si_wvl.min())
+    xmax = max(nad_in_wvl.max(), zen_in_wvl.max())
+    ax.set_xlim(xmin, xmax)
+    
+    ax.set_xlabel('Wavelength [nm]', fontsize=labelsize)
+    ax.set_ylabel('Primary Response\n[counts / ($\mathrm{W\,m^{-2}\,sr^{-1}\,nm^{-1}}$)]', fontsize=labelsize)
+    fig.savefig(os.path.join(fig_dir, 'pri_response_ori_2.png'), dpi=300, bbox_inches='tight')      
 
 
 
@@ -138,4 +174,5 @@ if __name__ == '__main__':
     dir_fig = './fig/SI'
     os.makedirs(dir_fig, exist_ok=True)
     
-    pri_response_ori(dir_fig)
+    # pri_response_ori(dir_fig)
+    pri_response_ori2(dir_fig)

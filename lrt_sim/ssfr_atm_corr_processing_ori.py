@@ -81,26 +81,124 @@ from pyproj import Transformer
 from util import *
 # mpl.use('Agg')
 
-try:
-    from .ssfr_atm_corr_settings import *
-    from .ssfr_atm_corr_product_helpers import (
-        fill_nan_ffill_bfill,
-        ssfr_alb_plot,
-        ssfr_up_dn_ratio_plot,
-        weighted_broadband_alb,
-    )
-    from .ssfr_atm_corr_setup import split_tmhr_ranges
-except ImportError:
-    from ssfr_atm_corr_settings import *
-    from ssfr_atm_corr_product_helpers import (
-        fill_nan_ffill_bfill,
-        ssfr_alb_plot,
-        ssfr_up_dn_ratio_plot,
-        weighted_broadband_alb,
-    )
-    from ssfr_atm_corr_setup import split_tmhr_ranges
+
+
+_mission_      = 'arcsix'
+_platform_     = 'p3b'
+
+
+
+if platform.system() == 'Darwin':
+    _fdir_data_ = '/Volumes/argus/field/%s/processed' % _mission_
+    _fdir_data_ = '../data/processed' 
+    _fdir_general_ = '../data'
+    _fdir_tmp_ = './tmp'
+elif platform.system() == 'Linux':
+    _fdir_data_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data/processed"
+    _fdir_general_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data"
+    _fdir_tmp_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/tmp"
+
+
+o2a_1_start, o2a_1_end = 748, 780
+h2o_1_start, h2o_1_end = 672, 706
+h2o_2_start, h2o_2_end = 705, 746
+h2o_3_start, h2o_3_end = 884, 996
+h2o_4_start, h2o_4_end = 1084, 1175
+h2o_5_start, h2o_5_end = 1230, 1286
+h2o_6_start, h2o_6_end = 1290, 1509
+h2o_7_start, h2o_7_end = 1748, 2050
+h2o_8_start, h2o_8_end = 801, 843
+final_start, final_end = 2110, 2200
+
+gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h2o_2_end),
+                (h2o_3_start, h2o_3_end), (h2o_4_start, h2o_4_end), (h2o_5_start, h2o_5_end),
+                (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (h2o_8_start, h2o_8_end),
+                (final_start, final_end)]
 
  
+def ssfr_alb_plot(date_s, tmhr_ranges_select, wvl, alb, color_series, 
+                   alt_avg_all,
+                   modis_bands_nm, modis_alb_legs, modis_alb_file,
+                   case_tag,
+                   ylabel='SSFR upward/downward ratio',
+                   title='SSFR measurement',
+                   suptitle='SSFR upward/downward ratio Comparison',
+                   file_description='', 
+                   lon_avg_all=None,
+                   lat_avg_all=None,
+                   aviris_file=None,
+                   aviris_closest=False,
+                   aviris_reflectance_wvl=None,
+                   aviris_reflectance_spectrum=None,
+                   aviris_reflectance_spectrum_unc=None
+                   ):
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    if aviris_file is not None:
+        aviris_label = 'AVIRIS Reflectance' if ((aviris_file is not None) and (aviris_closest)) else 'All AVIRIS mean'
+        ax.scatter(aviris_reflectance_wvl, aviris_reflectance_spectrum, s=5, c='m', label=aviris_label, alpha=0.7) if ((aviris_file is not None)) else None
+        ax.fill_between(aviris_reflectance_wvl, aviris_reflectance_spectrum-aviris_reflectance_spectrum_unc, aviris_reflectance_spectrum+aviris_reflectance_spectrum_unc, color='m', alpha=0.3) if aviris_file is not None else None
+        if modis_alb_file is not None:
+            ax.scatter(modis_bands_nm, modis_alb_legs, s=50, c='g', marker='*', label='MODIS Albedo', edgecolors='k')
+
+    for i in range(len(tmhr_ranges_select)):
+        if lon_avg_all is not None and lat_avg_all is not None:
+            ax.plot(wvl, alb[i, :], '-', color=color_series[i], label='Z=%.2fkm, lon:%.2f, lat: %.2f' % (alt_avg_all[i], lon_avg_all[i], lat_avg_all[i]))
+        else:
+            ax.plot(wvl, alb[i, :], '-', color=color_series[i], label='Z=%.2fkm' % (alt_avg_all[i]))
+        if aviris_file is None and modis_alb_file is not None:
+            ax.scatter(modis_bands_nm, modis_alb_legs[i], s=50, color=color_series[i], marker='*', edgecolors='k')
+    for band in gas_bands:
+        ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+    
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    # plt.grid(True)
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title(title, fontsize=13)
+    fig.suptitle(suptitle, fontsize=16, y=0.98)
+    fig.tight_layout()
+    fig.savefig('fig/%s/%s_%s_%s_comparison.png' % (date_s, date_s, case_tag, file_description), bbox_inches='tight', dpi=150)
+
+ 
+
+def ssfr_up_dn_ratio_plot(date_s, tmhr_ranges_select, wvl, up_dn_ratio, color_series, alt_avg_all, case_tag,
+                          albedo_used='albedo used: SSFR upward/downward ratio',
+                          file_suffix=''):
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    for i in range(len(tmhr_ranges_select)):
+        ax.plot(wvl, up_dn_ratio[i, :], '-', color=color_series[i], label='Z=%.2fkm' % (alt_avg_all[i]))
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('SSFR upward/downward ratio', fontsize=14)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title(albedo_used, fontsize=13)
+    fig.suptitle(f'P3 level upward/downward ratio Comparison {date_s}', fontsize=16, y=0.98)
+    fig.tight_layout()
+    fig.savefig('fig/%s/%s_%s_ssfr_up_dn_ratio_comparison%s.png' % (date_s, date_s, case_tag, file_suffix), bbox_inches='tight', dpi=150)
+
+def weighted_broadband_alb(alb, toa, wvl):
+    """TOA-weighted broadband albedo via trapezoidal integration.
+
+    alb, toa : (..., N_wvl) arrays on the same wavelength grid
+    wvl      : (N_wvl,) wavelength axis in nm
+    """
+    return np.trapz(alb * toa, x=wvl, axis=-1) / np.trapz(toa, x=wvl, axis=-1)
+
+
+def fill_nan_ffill_bfill(arr, limit=2):
+    """Fill NaNs in 1-D array using forward-then-backward fill, repeated until no NaNs remain."""
+    s = pd.Series(arr)
+    s = s.ffill(limit=limit).bfill(limit=limit)
+    while s.isna().any():
+        s = s.ffill(limit=limit).bfill(limit=limit)
+    return s.values
+
+
 # Per-date h2o_6_end overrides for gas_abs_masking / snowice_alb_fitting
 _DATE_H2O_6_END = {
     '20240603': {'mask': 1650, 'fit': 1650},
@@ -123,7 +221,16 @@ def atm_corr_processing(date=datetime.datetime(2024, 5, 31),
     doy_s = date.timetuple().tm_yday
     print(f"Processing date: {date_s}, DOY: {doy_s}")
     
-    tmhr_ranges_select = split_tmhr_ranges(tmhr_ranges_select, simulation_interval)
+    if simulation_interval is not None:
+        # split tmhr_ranges_select into smaller intervals
+        tmhr_ranges_select_new = []
+        for lo, hi in tmhr_ranges_select:
+            t_start = lo
+            while t_start < hi and t_start < (hi - 0.0167/6):  # 10s
+                t_end = min(t_start + simulation_interval/60.0, hi)
+                tmhr_ranges_select_new.append([t_start, t_end])
+                t_start = t_end
+        tmhr_ranges_select = tmhr_ranges_select_new
 
     # 1) Load all instrument & satellite metadata
     data_hsk  = load_h5(config.hsk(date_s))

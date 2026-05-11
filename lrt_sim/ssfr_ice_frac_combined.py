@@ -139,10 +139,10 @@ gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h
 def combined_ice_frac():
     log = logging.getLogger("atm corr combined")
 
-    output_dir = f'{_fdir_general_}/ice_frac'
+    output_dir = f'{_fdir_general_}/cam_icefrac_rad'
     # glob all ice fraction files
     # cam_ice_fraction_20240603_144240_145205.nc
-    ice_frac_files = sorted(glob.glob(f'{output_dir}/cam_ice_fraction_*.nc'))
+    ice_frac_files = sorted(glob.glob(f'{output_dir}/cam_icefrac_rad_*.nc'))
     print(f"Found {len(ice_frac_files)} ice fraction files for combination.")
     
     # read each file and combine data into a larger dictionary
@@ -150,6 +150,8 @@ def combined_ice_frac():
     time_all = []
     ice_frac_all = []
     hdrf_thres_all = []
+    nad_hdrf_all = []
+    nad_rad_all = []
     
     for ice_frac_file in ice_frac_files:
         print(f"Processing surface albedo file: {ice_frac_file}")
@@ -158,22 +160,30 @@ def combined_ice_frac():
             time_s = nc['tmhr'][:]
             ice_frac = nc['ice_fraction'][:]
             hdrf_thres = nc['hdrf_threshold'][:]
+            nad_hdrf = nc['nadir_hdrf'][:]
+            nad_rad = nc['nadir_radiance'][:]
             
             date_all.extend([date_s]*len(time_s))
             time_all.extend(time_s.tolist())
             ice_frac_all.extend(ice_frac.tolist())
             hdrf_thres_all.extend([hdrf_thres]*len(time_s))
+            nad_hdrf_all.extend(nad_hdrf.tolist())
+            nad_rad_all.extend(nad_rad.tolist())
         
     date_all = np.array(date_all)
     time_all = np.array(time_all)
     ice_frac_all = np.array(ice_frac_all)
     hdrf_thres_all = np.array(hdrf_thres_all)
+    nad_hdrf_all = np.array(nad_hdrf_all)
+    nad_rad_all = np.array(nad_rad_all)
     
     output_all_dict = {
         'date': date_all,
         'time': time_all,
         'ice_frac': ice_frac_all,
         'hdrf_thres': hdrf_thres_all,
+        'nad_hdrf': nad_hdrf_all,
+        'nad_rad': nad_rad_all
     }
     
     combined_output_file = f'{output_dir}/ice_frac_all.pkl'

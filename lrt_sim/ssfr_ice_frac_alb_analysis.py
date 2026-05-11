@@ -177,12 +177,14 @@ def combined_atm_corr():
     }
     
     # load ice fraction data
-    file = f'{_fdir_general_}/ice_frac/ice_frac_all.pkl'
+    file = f'{_fdir_general_}/cam_icefrac_rad/ice_frac_all.pkl'
     with open(file, 'rb') as f:
         ice_frac_data = pickle.load(f)
     ice_frac_date = ice_frac_data['date']
     ice_frac_time = ice_frac_data['time']
     ice_frac_values = ice_frac_data['ice_frac']
+    nad_hdrf_values = ice_frac_data['nad_hdrf']
+    nad_rad_values  = ice_frac_data['nad_rad']
 
     # kt19 and sza are stored directly in combined_data; loaded per-leg below
     
@@ -213,6 +215,9 @@ def combined_atm_corr():
     kt19_date_cond = []
     kt19_date_cond_upper = []
     kt19_date_cond_lower = []
+    kt19_high_hdrf_date_cond = []
+    kt19_high_hdrf_date_cond_upper = []
+    kt19_high_hdrf_date_cond_lower = []
     brt19h, brt37h, brt37v = [], [], []
     brt19h_upper, brt37h_upper, brt37v_upper = [], [], []
     brt19h_lower, brt37h_lower, brt37v_lower = [], [], []
@@ -275,6 +280,9 @@ def combined_atm_corr():
         lst_lo.append(np.percentile(v, lo) if len(v) > 0 else np.nan)
         lst_hi.append(np.percentile(v, hi) if len(v) > 0 else np.nan)
 
+    # best time-shift results: {(date_key, case_tag): {'shift_s': int, 'r': float}}
+    kt19_hdrf_best_shift = {}
+
     for date_key in ice_frac_time_offset.keys():
         # camera ice fraction for this date (shared by clear/cloudy)
         cam_time_date      = ice_frac_time[ice_frac_date == int(date_key)]
@@ -302,6 +310,9 @@ def combined_atm_corr():
             ice_ratio_selected_all = combined_data[f'ice_ratio_{sfx}_all'][final_mask]
             ice_age_selected_all = combined_data[f'ice_age_{sfx}_all'][final_mask]
             kt19_selected_all    = combined_data[f'kt19_sfc_T_{sfx}_all'][final_mask]
+            n_pts = int(np.sum(final_mask))
+            nad_hdrf_selected_all = combined_data[f'nad_hdrf_{sfx}_all'][final_mask] if f'nad_hdrf_{sfx}_all' in combined_data else np.full(n_pts, np.nan)
+            nad_rad_selected_all  = combined_data[f'nad_rad_{sfx}_all'][final_mask]  if f'nad_rad_{sfx}_all'  in combined_data else np.full(n_pts, np.nan)
             sza_selected_all     = combined_data[f'sza_{sfx}_all'][final_mask]
             brt19h_selected_all  = combined_data[f'brt19h_{sfx}_all'][final_mask]
             brt37h_selected_all  = combined_data[f'brt37h_{sfx}_all'][final_mask]
@@ -335,6 +346,8 @@ def combined_atm_corr():
             ice_age_selected_all   = ice_age_selected_all[alt_mask]
             myi_fyi_selected_all   = myi_fyi_selected_all[alt_mask]
             kt19_selected_all      = kt19_selected_all[alt_mask]
+            nad_hdrf_selected_all  = nad_hdrf_selected_all[alt_mask]
+            nad_rad_selected_all   = nad_rad_selected_all[alt_mask]
             brt19h_selected_all    = brt19h_selected_all[alt_mask]
             brt37h_selected_all    = brt37h_selected_all[alt_mask]
             brt37v_selected_all    = brt37v_selected_all[alt_mask]
@@ -388,6 +401,8 @@ def combined_atm_corr():
             ice_ratio_cam_time     = np.where(m, ice_ratio_selected_all[closest_idx],      np.nan)
             ice_age_cam_time       = np.where(m, ice_age_selected_all[closest_idx],        np.nan)
             kt19_cam_time          = np.where(m, kt19_selected_all[closest_idx],           np.nan)
+            nad_hdrf_cam_time      = np.where(m, nad_hdrf_selected_all[closest_idx],       np.nan)
+            nad_rad_cam_time       = np.where(m, nad_rad_selected_all[closest_idx],        np.nan)
             brt19h_cam_time        = np.where(m, brt19h_selected_all[closest_idx],          np.nan)
             brt37h_cam_time        = np.where(m, brt37h_selected_all[closest_idx],          np.nan)
             brt37v_cam_time        = np.where(m, brt37v_selected_all[closest_idx],          np.nan)
@@ -515,6 +530,127 @@ def combined_atm_corr():
                               ice_age_date_cond_upper, ice_age_v)
                 ice_age_over1_date_cond.append(np.nansum(ice_age_v >= 1) / len(ice_age_v))
                 ice_age_over2_date_cond.append(np.nansum(ice_age_v >= 2) / len(ice_age_v))
+                
+                # plot kt19 hist
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.hist(kt19_v, bins=101, color='steelblue', edgecolor='black', alpha=0.7)
+                ax.set_xlabel('KT19 Surface Temperature (°C)', fontsize=12)
+                ax.set_ylabel('Frequency', fontsize=12)
+                ax.set_title(f'KT19 Surface Temperature Distribution\nDate: {date_key}, Case: {case_tag}', fontsize=13)
+                plt.tight_layout()
+                plt.savefig(f'{fig_dir}/kt19_hist_{date_key}_{case_tag}.png', dpi=300)
+                
+                # plot scatter
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(6, 4))
+                sc = ax.scatter(cam_ice_fraction, kt19_cam_time, c='steelblue', alpha=0.6)
+                ax.set_xlabel('Camera Ice Fraction', fontsize=12)
+                ax.set_ylabel('KT19 Surface Temperature (°C)', fontsize=12)
+                ax.set_title(f'KT19 Surface Temperature vs Camera Ice Fraction\nDate: {date_key}, Case: {case_tag}', fontsize=13)
+                plt.tight_layout()
+                plt.savefig(f'{fig_dir}/kt19_cam_time_vs_ice_fraction_scatter_{date_key}_{case_tag}.png', dpi=300)
+                
+                # plot kt19 time series ve nad_hdrf
+                plt.close('all')
+                fig, ax1 = plt.subplots(figsize=(10, 5))
+                ax2 = ax1.twinx()
+                ax1.plot(time_selected_all, nad_hdrf_selected_all, color='skyblue', label='NAD HDRF', alpha=0.75, linewidth=2)
+                ax2.plot(time_selected_all, kt19_selected_all, color='coral', label='KT19 Surface Temperature', alpha=0.75, linewidth=1.5)
+                ax1.set_xlabel('Time (UTC)', fontsize=14)
+                ax1.set_ylabel('NAD HDRF', fontsize=14)
+                ax2.set_ylabel('KT19 Surface Temperature (°C)', fontsize=14)
+                lns = [ax1.lines[0], ax2.lines[0]]
+                labs = [l.get_label() for l in lns]
+                ax1.legend(lns, labs, fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+                ax1.tick_params(labelsize=12)
+                ax1.set_title('KT19 Surface Temperature and NAD HDRF Time Series', fontsize=13)
+                plt.tight_layout()
+                plt.savefig(f'{fig_dir}/kt19_time_series_{date_key}_{case_tag}.png', dpi=300)
+
+                # --- find best time shift maximising KT19 vs NAD-HDRF Pearson correlation ---
+                valid_both = ~np.isnan(nad_hdrf_selected_all) & ~np.isnan(kt19_selected_all)
+                if np.sum(valid_both) > 10:
+                    t_v      = time_selected_all[valid_both]
+                    hdrf_v   = nad_hdrf_selected_all[valid_both]
+                    kt19_v2  = kt19_selected_all[valid_both]
+
+                    hdrf_interp = interp1d(t_v, hdrf_v, bounds_error=False, fill_value=np.nan)
+
+                    shifts_s = np.arange(-3, 3.0001, 0.01)              # -5 … +5 s in 1-s steps
+                    shifts_h = shifts_s / 3600.0
+
+                    corrs = np.full(len(shifts_s), np.nan)
+                    for si, dt in enumerate(shifts_h):
+                        hdrf_shifted = hdrf_interp(t_v - dt)    # shift hdrf by dt hours
+                        ok = ~np.isnan(hdrf_shifted)
+                        if np.sum(ok) > 10:
+                            corrs[si] = np.corrcoef(kt19_v2[ok], hdrf_shifted[ok])[0, 1]
+
+                    best_idx     = np.nanargmin(np.array(corrs))   # high HDRF ↔ low KT19 → negative r
+                    best_shift_s = float(shifts_s[best_idx])
+                    best_corr    = corrs[best_idx]
+                    kt19_hdrf_best_shift[(date_key, case_tag)] = {'shift_s': best_shift_s, 'r': float(best_corr)}
+                    print(f"  [{date_key} {case_tag}] best shift: {best_shift_s:+.2f}s, r={best_corr:.3f}")
+
+                    # Re-derive kt19_cam_time using the corrected time offset.
+                    # best_shift_s was applied to HDRF (hdrf sampled at t - dt), so KT19
+                    # leads HDRF by best_shift_s seconds.  To look up KT19 values at the
+                    # camera time grid we query at  cam_time - best_shift_s/3600  (reverse sign).
+                    cam_time_kt19_corr = cam_time - best_shift_s / 3600.0
+                    ins_corr    = np.searchsorted(t_sorted, cam_time_kt19_corr)
+                    idx_lo_corr = np.clip(ins_corr - 1, 0, len(t_sorted) - 1)
+                    idx_hi_corr = np.clip(ins_corr,     0, len(t_sorted) - 1)
+                    diff_lo_corr = np.abs(t_sorted[idx_lo_corr] - cam_time_kt19_corr)
+                    diff_hi_corr = np.abs(t_sorted[idx_hi_corr] - cam_time_kt19_corr)
+                    closest_idx_corr = sort_order[np.where(diff_lo_corr <= diff_hi_corr, idx_lo_corr, idx_hi_corr)]
+                    within_1s_corr   = np.minimum(diff_lo_corr, diff_hi_corr) <= (1 / 3600)
+                    kt19_cam_time    = np.where(within_1s_corr, kt19_selected_all[closest_idx_corr], np.nan)
+                    kt19_v           = kt19_cam_time[valid_mask]
+                    print(f"  [{date_key} {case_tag}] kt19_cam_time re-derived with shift {-best_shift_s:+.2f}s applied to KT19 lookup")
+
+                    # plot correlation vs shift
+                    plt.close('all')
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    ax.plot(shifts_s, corrs, color='steelblue', linewidth=1.5)
+                    ax.axvline(best_shift_s, color='red', linestyle='--',
+                               label=f'Best: {best_shift_s:+.2f}s  (r={best_corr:.3f})')
+                    ax.set_xlabel('Time shift applied to NAD HDRF (s)', fontsize=13)
+                    ax.set_ylabel('Pearson r  (KT19 vs NAD HDRF)', fontsize=13)
+                    ax.set_title(f'Cross-correlation: KT19 vs NAD HDRF\n{date_key} — {case_tag}', fontsize=13)
+                    ax.legend(fontsize=11)
+                    plt.tight_layout()
+                    plt.savefig(f'{fig_dir}/kt19_hdrf_timeshift_{date_key}_{case_tag}.png', dpi=300)
+                    plt.close('all')
+
+                    # plot aligned time series with best shift applied
+                    hdrf_aligned = hdrf_interp(t_v - best_shift_s / 3600.0)
+                    plt.close('all')
+                    fig, ax1 = plt.subplots(figsize=(10, 5))
+                    ax2 = ax1.twinx()
+                    ax1.plot(t_v, hdrf_aligned, color='skyblue',
+                             label=f'NAD HDRF (shifted {best_shift_s:+.2f}s)', alpha=0.75, linewidth=2)
+                    ax2.plot(t_v, kt19_v2, color='coral',
+                             label='KT19 Surface Temperature', alpha=0.75, linewidth=1.5)
+                    ax1.set_xlabel('Time (UTC)', fontsize=14)
+                    ax1.set_ylabel('NAD HDRF', fontsize=14)
+                    ax2.set_ylabel('KT19 Surface Temperature (°C)', fontsize=14)
+                    lns2 = [ax1.lines[0], ax2.lines[0]]
+                    ax1.legend(lns2, [l.get_label() for l in lns2], fontsize=10)
+                    ax1.set_title(
+                        f'KT19 & NAD HDRF — best shift = {best_shift_s:+.2f}s  (r={best_corr:.3f})\n{date_key} — {case_tag}',
+                        fontsize=13)
+                    plt.tight_layout()
+                    plt.savefig(f'{fig_dir}/kt19_hdrf_aligned_{date_key}_{case_tag}.png', dpi=300)
+                    plt.close('all')
+
+                # continue
+                
+                nad_hdrf_thres = 0.4
+                kt19_v_thres = kt19_cam_time[valid_mask & (nad_hdrf_cam_time >= nad_hdrf_thres)]
+                
+                # _append_stats
+                _append_stats(kt19_high_hdrf_date_cond,  kt19_high_hdrf_date_cond_lower,  kt19_high_hdrf_date_cond_upper,  kt19_v_thres)
                 _append_stats(kt19_date_cond,  kt19_date_cond_lower,  kt19_date_cond_upper,  kt19_v)
                 _append_stats(brt19h, brt19h_lower, brt19h_upper, brt19h_v)
                 _append_stats(brt37h, brt37h_lower, brt37h_upper, brt37h_v)
@@ -671,10 +807,19 @@ def combined_atm_corr():
             
 
     
+    # --- print best KT19 vs NAD-HDRF time-shift summary (like ice_frac_time_offset) ---
+    print("\nkt19_hdrf_best_shift = {")
+    for (dk, ct), v in kt19_hdrf_best_shift.items():
+        shift_s = v['shift_s']
+        r       = v['r']
+        sign    = '+' if shift_s >= 0 else '-'
+        print(f"    ('{dk}', '{ct}'): {sign}{abs(shift_s):.2f}/3600,  # r={r:.3f}")
+    print("}")
+
     plt.close('all')
     fig, ax = plt.subplots(figsize=(10, 6))
     colors = ['blue' if 'clear' in dc else 'gray' for dc in date_conditions]
-    ax.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, 
+    ax.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond,
                 yerr=broadband_alb_date_cond_unc,
                 fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
     ax.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
@@ -696,15 +841,18 @@ def combined_atm_corr():
         (alb_1240_date_cond, alb_1240_date_cond_upper, alb_1240_date_cond_lower,
          '1240 nm', 'arcsix_albedo_1240nm_ice_frac_fit_summary.png'),
     ]:
+        if len(alb_vals) == 0:
+            continue
         alb_unc = [(u - l) / 2 for u, l in zip(alb_upper, alb_lower)]
+        alb_colors = colors[:len(alb_vals)]
         plt.close('all')
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.errorbar(np.arange(len(alb_vals)), alb_vals,
                     yerr=alb_unc,
                     fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)
-        ax.scatter(np.arange(len(alb_vals)), alb_vals, c=colors, alpha=0.8, s=50, zorder=2)
+        ax.scatter(np.arange(len(alb_vals)), alb_vals, c=alb_colors, alpha=0.8, s=50, zorder=2)
         ax.set_xticks(np.arange(len(alb_vals)))
-        ax.set_xticklabels(date_conditions, rotation=45, ha='right')
+        ax.set_xticklabels(date_conditions[:len(alb_vals)], rotation=45, ha='right')
         ax.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
                            mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
         ax.set_xlabel('Date and Case', fontsize=14)
@@ -723,6 +871,8 @@ def combined_atm_corr():
         (alb_1700_date_cond, alb_1700_date_cond_upper, alb_1700_date_cond_lower,
          '1700 nm', 'arcsix_albedo_broadband_vs_1700nm_sif1.png'),
     ]:
+        if len(alb_vals) == 0:
+            continue
         x_arr = np.array(alb_vals)
         x_lo  = np.array(alb_lower)
         x_hi  = np.array(alb_upper)
@@ -733,7 +883,7 @@ def combined_atm_corr():
                     xerr=[x_arr - x_lo, x_hi - x_arr],
                     yerr=bb_unc,
                     fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)
-        ax.scatter(x_arr, bb_arr, c=colors, alpha=0.8, s=60, zorder=2)
+        ax.scatter(x_arr, bb_arr, c=colors[:len(x_arr)], alpha=0.8, s=60, zorder=2)
         legend_handles = [mpatches.Patch(color='blue', label='Clear'),
                           mpatches.Patch(color='gray', label='Cloudy')]
         if finite.sum() >= 3:
@@ -861,8 +1011,12 @@ def combined_atm_corr():
         y_arr = np.array(y_vals)
         y_unc_arr = np.array(y_unc)
 
+        if len(x_arr) == 0 or len(y_arr) == 0:
+            print(f"No data to plot {xlabel}. Skipping.")
+            return
+
         # keep only finite pairs
-        finite_mask = np.isfinite(x_arr) & np.isfinite(y_arr)
+        finite_mask = np.isfinite(x_arr) & np.isfinite(y_arr[:len(x_arr)])
         if finite_mask.sum() < 3:
             print(f"Not enough valid points to plot {xlabel}. Skipping.")
             return
@@ -997,6 +1151,14 @@ def combined_atm_corr():
         savename='arcsix_albedo_broadband_vs_kt19.png',
         fig_dir=fig_dir,
     )
+    _plot_alb_vs_var(
+        kt19_high_hdrf_date_cond, kt19_high_hdrf_date_cond_lower, kt19_high_hdrf_date_cond_upper,
+        broadband_alb_date_cond, broadband_alb_date_cond_unc, colors,
+        xlabel='Median KT-19 Surface Temperature over ice ($^o$C)',
+        savename='arcsix_albedo_broadband_vs_kt19_thres.png',
+        fig_dir=fig_dir,
+    )
+    
     _plot_alb_vs_var1var2(kt19_date_cond, kt19_date_cond_lower, kt19_date_cond_upper,
                           myi_ratio_date_cond, myi_lower, myi_upper,
                           broadband_alb_date_cond, broadband_alb_date_cond_unc,
