@@ -184,6 +184,30 @@ def run_uvspec_inits(inits):
         iterator = inits
 
     for init in iterator:
+        for filename in (init.input_file, init.output_file):
+            parent = os.path.dirname(filename)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
+        with open(init.input_file, 'w') as f:
+            for key, value in init.input_dict.items():
+                if key not in init.mute_list:
+                    f.write('%-20s %s\n' % (key, value))
+
+            if init.input_dict_extra is not None:
+                for key, value in init.input_dict_extra.items():
+                    if key not in init.mute_list:
+                        key_write = key[:key.index('_add')] if '_add' in key else key
+                        f.write('%-20s %s\n' % (key_write, value))
+
+            f.write('quiet')
+
         command = f'{init.executable_file} < {init.input_file} > {init.output_file}'
         print(f'Run command: {command}')
-        subprocess.run(command, shell=True, check=True)
+        with open(init.input_file, 'r') as stdin, open(init.output_file, 'w') as stdout:
+            subprocess.run(
+                [init.executable_file],
+                stdin=stdin,
+                stdout=stdout,
+                check=True,
+            )
