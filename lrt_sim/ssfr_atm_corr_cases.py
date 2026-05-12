@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     TRACK_CASE_IDS = [DEFAULT_CASE_ID]
     SPIRAL_CASE_IDS = SPIRAL_CASE_ID_LIST
-    ITERATIONS = range(3)
+    ITERATIONS = range(5)
     OVERWRITE_LRT = True
 
     if RUN_TRACK_CASES:

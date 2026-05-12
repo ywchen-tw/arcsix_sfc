@@ -647,7 +647,15 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 # plt.show()
             # sys.exit()
         
-            
+            fup_total_rmse, fup_average_rmse, fup_relative_rmse = flux_rmse_metrics(
+                fup_mean,
+                Fup_p3_mean_interp,
+            )
+            fdn_total_rmse, fdn_average_rmse, fdn_relative_rmse = flux_rmse_metrics(
+                fdn_mean,
+                Fdn_p3_mean_interp,
+            )
+
             output_dict = {
                 'wvl': cld_leg['ssfr_zen_wvl'],
                 'ssfr_fup_mean': fup_mean,
@@ -663,6 +671,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 'simu_fup_toa_mean': Fup_toa_mean_interp,
                 'toa_mean': toa_mean,
                 'corr_factor': (corr_dn/corr_up),
+                'fup_total_rmse': fup_total_rmse,
+                'fup_average_rmse': fup_average_rmse,
+                'fup_relative_rmse': fup_relative_rmse,
+                'fdn_total_rmse': fdn_total_rmse,
+                'fdn_average_rmse': fdn_average_rmse,
+                'fdn_relative_rmse': fdn_relative_rmse,
             }
             
             output_df = pd.DataFrame(output_dict)
@@ -700,6 +714,24 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                 )
                 #\----------------------------------------------------------------------------/#
                 del alb_avg_update3, alb_avg_update4
+            if iter >= 2:
+                alb_wvl_extend = np.concatenate(([348.0], alb_wvl, [2050.0]))
+                alb_ice_fit_extend = np.concatenate(([alb_ice_fit[0]], alb_ice_fit, [alb_ice_fit[-1]]))
+
+                alb_avg_update5 = alb_ice_fit_extend.copy()
+                alb_avg_update5_nonnan_first_ind = np.where(~np.isnan(alb_avg_update5))[0][0]
+                alb_avg_update5[:alb_avg_update5_nonnan_first_ind] = alb_avg_update5[alb_avg_update5_nonnan_first_ind]
+                alb_avg_update5_nonnan_last_ind = np.where(~np.isnan(alb_avg_update5))[0][-1]
+                alb_avg_update5[alb_avg_update5_nonnan_last_ind:] = alb_avg_update5[alb_avg_update5_nonnan_last_ind]
+                next_iter = iter + 1
+                write_2col_file(filename=os.path.join(f'{_fdir_general_}/sfc_alb', f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{next_iter}.dat'),
+                                wvl=alb_wvl_extend,
+                                val=alb_avg_update5,
+                                header=(f'# SSFR atmospheric corrected sfc albedo {date_s} with iter {iter} simulation smooth fitting\n'
+                                        '# wavelength (nm)      albedo (unitless)\n'
+                                        )
+                                )
+                del alb_avg_update5, next_iter
             if iter > 0:
                 # write out the new simulated p3 level upward to downward ratio
                 #/----------------------------------------------------------------------------\#
@@ -724,6 +756,8 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             del Fdn_sfc_direct_mean_interp, Fdn_sfc_diff_mean_interp
             del Fup_p3_mean_interp, Fdn_p3_mean_interp
             del Fup_toa_mean_interp, Fdn_toa_mean_interp
+            del fup_total_rmse, fup_average_rmse, fup_relative_rmse
+            del fdn_total_rmse, fdn_average_rmse, fdn_relative_rmse
             del fup_mean, fdn_mean, fup_std, fdn_std
             del toa_mean
             del alb_avg, alb_ice_fit
@@ -737,6 +771,22 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
 def exp_decay(x, a, b, c):
     return a * np.exp(-b * x) + c
+
+
+def flux_rmse_metrics(obs, sim):
+    """Return total, average, and relative RMSE for matching spectral flux arrays."""
+    obs = np.asarray(obs, dtype=float)
+    sim = np.asarray(sim, dtype=float)
+    valid = np.isfinite(obs) & np.isfinite(sim)
+    if not np.any(valid):
+        return np.nan, np.nan, np.nan
+
+    diff = sim[valid] - obs[valid]
+    total_rmse = np.sqrt(np.sum(diff**2))
+    average_rmse = np.sqrt(np.mean(diff**2))
+    obs_sum = np.sum(obs[valid])
+    relative_rmse = total_rmse / obs_sum if obs_sum != 0 else np.nan
+    return total_rmse, average_rmse, relative_rmse
 
 
 if __name__ == '__main__':
