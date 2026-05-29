@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 
 try:
-    from .ssfr_atm_corr_settings import gas_bands
+    from .ssfr_atm_corr.settings import gas_bands
 except ImportError:
-    from ssfr_atm_corr_settings import gas_bands
+    from ssfr_atm_corr.settings import gas_bands
 
 
 def ssfr_alb_plot(date_s, tmhr_ranges_select, wvl, alb, color_series,

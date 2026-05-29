@@ -550,6 +550,28 @@ def combined_atm_corr():
                 ax.set_title(f'KT19 Surface Temperature vs Camera Ice Fraction\nDate: {date_key}, Case: {case_tag}', fontsize=13)
                 plt.tight_layout()
                 plt.savefig(f'{fig_dir}/kt19_cam_time_vs_ice_fraction_scatter_{date_key}_{case_tag}.png', dpi=300)
+
+                # plot KT-19 vs nadir radiance for this flight
+                kt19_nad_rad_valid = np.isfinite(kt19_cam_time) & np.isfinite(nad_rad_cam_time)
+                if np.sum(kt19_nad_rad_valid) > 2:
+                    x_kr = kt19_cam_time[kt19_nad_rad_valid]
+                    y_kr = nad_rad_cam_time[kt19_nad_rad_valid]
+                    res_kr = linregress(x_kr, y_kr)
+                    x_line = np.linspace(np.nanmin(x_kr) * 0.97, np.nanmax(x_kr) * 1.03, 100)
+                    y_line = res_kr.intercept + res_kr.slope * x_line
+
+                    plt.close('all')
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    ax.scatter(x_kr, y_kr, c='steelblue', alpha=0.6)
+                    ax.plot(x_line, y_line, color='orange', linestyle='--',
+                            label=r'$\mathrm{R^2}$=%.3f, p=%.2e'
+                                  % (res_kr.rvalue**2, res_kr.pvalue))
+                    ax.legend(fontsize=10)
+                    ax.set_xlabel('KT19 Surface Temperature (°C)', fontsize=12)
+                    ax.set_ylabel('Nadir Radiance', fontsize=12)
+                    ax.set_title(f'KT19 Surface Temperature vs Nadir Radiance\nDate: {date_key}, Case: {case_tag}', fontsize=13)
+                    plt.tight_layout()
+                    plt.savefig(f'{fig_dir}/kt19_vs_nad_rad_scatter_{date_key}_{case_tag}.png', dpi=300)
                 
                 # plot kt19 time series ve nad_hdrf
                 plt.close('all')
@@ -1158,7 +1180,7 @@ def combined_atm_corr():
         savename='arcsix_albedo_broadband_vs_kt19_thres.png',
         fig_dir=fig_dir,
     )
-    
+
     _plot_alb_vs_var1var2(kt19_date_cond, kt19_date_cond_lower, kt19_date_cond_upper,
                           myi_ratio_date_cond, myi_lower, myi_upper,
                           broadband_alb_date_cond, broadband_alb_date_cond_unc,

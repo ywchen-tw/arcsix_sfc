@@ -7,19 +7,18 @@ workflow implementation.
 import os
 import sys
 import datetime
+from pathlib import Path
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-try:
-    from .ssfr_atm_corr_case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
-    from .ssfr_atm_corr_settings import _fdir_data_, _fdir_general_
-except ImportError:
-    from ssfr_atm_corr_case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
-    from ssfr_atm_corr_settings import _fdir_data_, _fdir_general_
-
-from util import FlightConfig
+if __package__:
+    from .case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
+    from .settings import _fdir_data_, _fdir_general_
+else:
+    from case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
+    from settings import _fdir_data_, _fdir_general_
 
 
 DEFAULT_CASE_ID = 'case_029'
@@ -43,6 +42,11 @@ SPIRAL_CASE_ID_LIST = [
 
 
 def make_default_config():
+    if __package__:
+        from ..util import FlightConfig
+    else:
+        from util import FlightConfig
+
     return FlightConfig(
         mission='ARCSIX',
         platform='P3B',
@@ -58,6 +62,11 @@ def run_cases(
     case_ids=None,
     overwrite_lrt=True,
     iterations=range(3),
+    closure_check=True,
+    closure_thresholds=None,
+    min_closure_iteration=2,
+    max_additional_iterations=5,
+    run_final_sim=True,
 ):
     """Run one or more surface-albedo atmospheric-correction catalog cases."""
     os.makedirs('./fig', exist_ok=True)
@@ -74,6 +83,11 @@ def run_cases(
             selected_case_id,
             overwrite_lrt=overwrite_lrt,
             iterations=iterations,
+            closure_check=closure_check,
+            closure_thresholds=closure_thresholds,
+            min_closure_iteration=min_closure_iteration,
+            max_additional_iterations=max_additional_iterations,
+            run_final_sim=run_final_sim,
         )
 
 
@@ -98,22 +112,20 @@ def run_spiral_cases(atm_corr_spiral_plot, spiral_case_ids=None):
 
 
 if __name__ == '__main__':
-    try:
-        from .ssfr_atm_corr import flt_trk_atm_corr
-        from .ssfr_atm_corr_plot import atm_corr_spiral_plot
-    except ImportError:
-        from ssfr_atm_corr import flt_trk_atm_corr
-        from ssfr_atm_corr_plot import atm_corr_spiral_plot
-
     RUN_TRACK_CASES = True
     RUN_SPIRAL_CASES = False
 
     TRACK_CASE_IDS = [DEFAULT_CASE_ID]
     SPIRAL_CASE_IDS = SPIRAL_CASE_ID_LIST
-    ITERATIONS = range(5)
+    ITERATIONS = range(8)
     OVERWRITE_LRT = True
 
     if RUN_TRACK_CASES:
+        if __package__:
+            from .workflow import flt_trk_atm_corr
+        else:
+            from workflow import flt_trk_atm_corr
+
         run_cases(
             flt_trk_atm_corr,
             case_ids=TRACK_CASE_IDS,
@@ -122,6 +134,11 @@ if __name__ == '__main__':
         )
 
     if RUN_SPIRAL_CASES:
+        if __package__:
+            from ..ssfr_atm_corr_plot import atm_corr_spiral_plot
+        else:
+            from lrt_sim.ssfr_atm_corr_plot import atm_corr_spiral_plot
+
         run_spiral_cases(
             atm_corr_spiral_plot,
             spiral_case_ids=SPIRAL_CASE_IDS,

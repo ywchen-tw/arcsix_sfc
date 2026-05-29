@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 try:
-    from .ssfr_atm_corr_helpers import ssfr_flags
+    from .helpers import ssfr_flags
 except ImportError:
-    from ssfr_atm_corr_helpers import ssfr_flags
+    from helpers import ssfr_flags
 
 
 def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0):

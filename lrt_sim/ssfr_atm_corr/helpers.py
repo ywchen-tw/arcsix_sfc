@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 try:
-    from .ssfr_atm_corr_settings import (
+    from .settings import (
         final_end,
         final_start,
         h2o_1_end,
@@ -29,7 +29,7 @@ try:
         o2a_1_start,
     )
 except ImportError:
-    from ssfr_atm_corr_settings import (
+    from settings import (
         final_end,
         final_start,
         h2o_1_end,

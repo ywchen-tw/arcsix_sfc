@@ -1,4 +1,4 @@
-"""Recovered date/time cases from the original ssfr_atm_corr.py main block.
+"""Recovered date/time cases from the original SSFR atmospheric-correction script.
 
 Most of these calls were commented out in the original script. This catalog keeps
 the date, time-window, and case metadata available without bloating the driver.
@@ -7,6 +7,21 @@ the original call; the full recovered call is preserved in ``original_call``.
 """
 
 import datetime
+import glob
+import os
+
+if __package__:
+    from .settings import _fdir_general_
+else:
+    from settings import _fdir_general_
+
+
+DEFAULT_CLOSURE_THRESHOLDS = {
+    'fdn_abs_broadband_bias': 0.05,
+    'fdn_flux_weighted_relative_rmse': 0.05,
+    'fup_abs_broadband_bias': 0.05,
+    'fup_flux_weighted_relative_rmse': 0.08,
+}
 
 CASE_CATALOG = [{'id': 'case_001',
   'date': '2024-05-31',
@@ -2620,12 +2635,89 @@ def get_case(case_id):
     raise KeyError(case_id)
 
 
-def run_catalog_case(flt_trk_atm_corr, config, case_id, overwrite_lrt=True, iterations=range(3)):
+def iteration_closure_check(output_files, thresholds=None):
+    """Return True when every leg output meets flux-closure thresholds."""
+    import pandas as pd
+
+    if thresholds is None:
+        thresholds = DEFAULT_CLOSURE_THRESHOLDS
+    if not output_files:
+        return False
+
+    required_columns = [
+        'fdn_broadband_bias',
+        'fdn_flux_weighted_relative_rmse',
+        'fup_broadband_bias',
+        'fup_flux_weighted_relative_rmse',
+    ]
+    for output_file in output_files:
+        data = pd.read_csv(output_file)
+        missing_columns = [column for column in required_columns if column not in data]
+        if missing_columns:
+            return False
+
+        metrics = data.iloc[0]
+        checks = [
+            abs(metrics['fdn_broadband_bias']) <= thresholds['fdn_abs_broadband_bias'],
+            metrics['fdn_flux_weighted_relative_rmse'] <= thresholds['fdn_flux_weighted_relative_rmse'],
+            abs(metrics['fup_broadband_bias']) <= thresholds['fup_abs_broadband_bias'],
+            metrics['fup_flux_weighted_relative_rmse'] <= thresholds['fup_flux_weighted_relative_rmse'],
+        ]
+        if not all(checks):
+            return False
+
+    return True
+
+
+def iteration_output_files(case, date_s, iter):
+    """Return simulation CSV files generated for one catalog iteration."""
+    sky_tag = 'clear' if case['clear_sky'] else 'sat_cloud'
+    output_dir = os.path.join(_fdir_general_, 'lrt', f"{date_s}_{case['case_tag']}_{sky_tag}")
+    output_pattern = os.path.join(output_dir, f'ssfr_simu_flux_{date_s}_*_iteration_{iter}.csv')
+    return glob.glob(output_pattern)
+
+
+def run_catalog_case(
+    flt_trk_atm_corr,
+    config,
+    case_id,
+    overwrite_lrt=True,
+    iterations=range(3),
+    closure_check=True,
+    closure_thresholds=None,
+    min_closure_iteration=2,
+    max_additional_iterations=5,
+    run_final_sim=True,
+):
     """Run a catalog case that does not require custom levels."""
     case = get_case(case_id)
     if case['has_custom_levels']:
         raise ValueError(f"{case_id} used custom levels in the original script; see case['original_call'].")
     year, month, day = [int(part) for part in case['date'].split('-')]
+    date_s = f'{year:04d}{month:02d}{day:02d}'
+
+    def run_final_iteration(iter, final_status):
+        if not run_final_sim:
+            return
+        flt_trk_atm_corr(
+            date=datetime.datetime(year, month, day),
+            tmhr_ranges_select=case['tmhr_ranges_select'],
+            case_tag=case['case_tag'],
+            config=config,
+            simulation_interval=case['simulation_interval'],
+            clear_sky=case['clear_sky'],
+            overwrite_lrt=overwrite_lrt,
+            manual_cloud=case['manual_cloud'],
+            manual_cloud_cer=case['manual_cloud_cer'] or 0.0,
+            manual_cloud_cwp=case['manual_cloud_cwp'] or 0.0,
+            manual_cloud_cth=case['manual_cloud_cth'] or 0.0,
+            manual_cloud_cbh=case['manual_cloud_cbh'] or 0.0,
+            manual_cloud_cot=case['manual_cloud_cot'] or 0.0,
+            iter=iter,
+            final_sim=True,
+            final_status=final_status,
+        )
+
     for iter in iterations:
         flt_trk_atm_corr(
             date=datetime.datetime(year, month, day),
@@ -2643,3 +2735,22 @@ def run_catalog_case(flt_trk_atm_corr, config, case_id, overwrite_lrt=True, iter
             manual_cloud_cot=case['manual_cloud_cot'] or 0.0,
             iter=iter,
         )
+        if closure_check and iter >= min_closure_iteration:
+            output_files = iteration_output_files(case, date_s, iter)
+            if iteration_closure_check(output_files, thresholds=closure_thresholds):
+                print(f'{case_id}: iteration {iter} meets closure criteria; stopping further iterations.')
+                run_final_iteration(iter, final_status='closure_passed')
+                break
+
+            additional_iterations = iter - min_closure_iteration
+            max_iterations_reached = (
+                max_additional_iterations is not None
+                and additional_iterations >= max_additional_iterations
+            )
+            if max_iterations_reached:
+                print(
+                    f'{case_id}: iteration {iter} reached the max additional iteration limit '
+                    f'({max_additional_iterations}) without closure; using this iteration for final output.'
+                )
+                run_final_iteration(iter, final_status='max_additional_iterations')
+                break

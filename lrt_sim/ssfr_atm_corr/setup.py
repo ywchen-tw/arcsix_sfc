@@ -9,12 +9,15 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 
-from util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
+if __package__:
+    from ..util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
+else:
+    from util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
 
 try:
-    from .ssfr_atm_corr_helpers import write_2col_file
+    from .helpers import write_2col_file
 except ImportError:
-    from ssfr_atm_corr_helpers import write_2col_file
+    from helpers import write_2col_file
 
 
 def split_tmhr_ranges(tmhr_ranges_select, simulation_interval):
@@ -76,6 +79,45 @@ def lrt_wavelength_grid(clear_sky):
     if platform.system() == 'Linux':
         return np.arange(350, 2000.1, 1.0)
     return np.arange(350, 2000.1, 2.5)
+
+
+def lrt_final_sw_wavelength_grid():
+    if platform.system() == 'Darwin':
+        return np.arange(300, 4000.1, 10.0)
+    if platform.system() == 'Linux':
+        return np.arange(300, 4000.1, 2.5)
+    return np.arange(300, 4000.1, 10.0)
+
+
+def write_final_sw_support_files():
+    """Write support files for the final 300-4000 nm spectral SW run."""
+    final_wvl = lrt_final_sw_wavelength_grid()
+    write_2col_file(
+        'wvl_grid_final_sw.dat',
+        final_wvl,
+        np.zeros_like(final_wvl),
+        header=('# SSFR final SW wavelength grid file\n'
+                '# wavelength (nm)\n'),
+    )
+
+    df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep=r'\s+', header=None)
+    wvl_solar = np.array(df_solor.iloc[:, 0])
+    flux_solar = np.array(df_solor.iloc[:, 1])
+
+    f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
+    wvl_solar_interp = np.arange(250, 4550.1, 1.0)
+    flux_solar_interp = f_interp(wvl_solar_interp)
+    mask = wvl_solar_interp <= 4500
+
+    write_2col_file(
+        'arcsix_ssfr_solar_flux_raw_final.dat',
+        wvl_solar_interp[mask],
+        flux_solar_interp[mask],
+        header=('# SSFR final SW solar flux without slit function convolution\n'
+                '# wavelength (nm)      flux (mW/m^2/nm)\n'),
+    )
+
+    return final_wvl
 
 
 def write_ssfr_support_files(iter, clear_sky):

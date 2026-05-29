@@ -85,30 +85,35 @@ import er3t
 
 # from util.util import *
 # from util.arcsix_atm import prepare_atmospheric_profile
-from util import *
+if __package__:
+    from ..util import *
+else:
+    from util import *
 
 try:
-    from .ssfr_atm_corr_settings import *
-    from .ssfr_atm_corr_helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
-    from .ssfr_atm_corr_qc_plotting import ssfr_time_series_plot
-    from .ssfr_atm_corr_setup import (
+    from .settings import *
+    from .helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
+    from .qc_plotting import ssfr_time_series_plot
+    from .setup import (
         default_atm_levels,
         load_cloud_observation_legs,
         load_nearest_dropsonde,
         run_uvspec_inits,
         split_tmhr_ranges,
+        write_final_sw_support_files,
         write_ssfr_support_files,
     )
 except ImportError:
-    from ssfr_atm_corr_settings import *
-    from ssfr_atm_corr_helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
-    from ssfr_atm_corr_qc_plotting import ssfr_time_series_plot
-    from ssfr_atm_corr_setup import (
+    from settings import *
+    from helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
+    from qc_plotting import ssfr_time_series_plot
+    from setup import (
         default_atm_levels,
         load_cloud_observation_legs,
         load_nearest_dropsonde,
         run_uvspec_inits,
         split_tmhr_ranges,
+        write_final_sw_support_files,
         write_ssfr_support_files,
     )
 
@@ -126,7 +131,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                      manual_cloud_cth=0.945,
                      manual_cloud_cbh=0.344,
                      manual_cloud_cot=6.26,
-                     iter=0
+                     iter=0,
+                     final_sim=False,
+                     final_status='closure_passed',
                     ):
     
     log = logging.getLogger("lrt")
@@ -163,7 +170,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     if levels is None:
         levels = default_atm_levels()
 
-    effective_wvl = write_ssfr_support_files(iter=iter, clear_sky=clear_sky)
+    if final_sim:
+        effective_wvl = write_final_sw_support_files()
+    else:
+        effective_wvl = write_ssfr_support_files(iter=iter, clear_sky=clear_sky)
             
 
     # read satellite granule
@@ -211,7 +221,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_sat_cloud'
             fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
             
-        output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
+        if final_sim:
+            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final.csv'
+        else:
+            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
 
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
@@ -313,7 +326,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 
                 lrt_cfg['atmosphere_file'] = os.path.join(zpt_filedir, f'atm_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat')
                 # lrt_cfg['atmosphere_file'] = lrt_cfg['atmosphere_file'].replace('afglus.dat', 'afglss.dat')
-                lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw.dat'
+                if final_sim:
+                    lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw_final.dat'
+                else:
+                    lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw.dat'
                 # lrt_cfg['solar_file'] = lrt_cfg['solar_file'].replace('kurudz_0.1nm.dat', 'kurudz_1.0nm.dat')
                 import platform
                 # run less streams on Mac for testing, higher resolution on Linux cluster
@@ -327,7 +343,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat',
                                     'mol_file': 'CH4 %s' % os.path.join(zpt_filedir, f'ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat'),
-                                    'wavelength_grid_file': 'wvl_grid_test.dat',
+                                    'wavelength_grid_file': 'wvl_grid_final_sw.dat' if final_sim else 'wvl_grid_test.dat',
                                     'atm_z_grid': atm_z_grid_str,
                                     # 'no_scattering':'mol',
                                     # 'no_absorption':'mol',
@@ -457,6 +473,51 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             flux_down_dir_results = np.array(flux_down_dir_results)
             flux_down_diff_results = np.array(flux_down_diff_results)
             flux_up_results = np.array(flux_up_results)
+
+            if final_sim:
+                fup_mean = np.nanmean(cld_leg['ssfr_nad'], axis=0)
+                fdn_mean = np.nanmean(cld_leg['ssfr_zen'], axis=0)
+                fup_std = np.nanstd(cld_leg['ssfr_nad'], axis=0)
+                fdn_std = np.nanstd(cld_leg['ssfr_zen'], axis=0)
+
+                f_ssfr_fup_mean = interp1d(cld_leg['ssfr_zen_wvl'], fup_mean, bounds_error=False, fill_value=np.nan)
+                f_ssfr_fdn_mean = interp1d(cld_leg['ssfr_zen_wvl'], fdn_mean, bounds_error=False, fill_value=np.nan)
+                f_ssfr_fup_std = interp1d(cld_leg['ssfr_zen_wvl'], fup_std, bounds_error=False, fill_value=np.nan)
+                f_ssfr_fdn_std = interp1d(cld_leg['ssfr_zen_wvl'], fdn_std, bounds_error=False, fill_value=np.nan)
+
+                output_dict = {
+                    'wvl': effective_wvl,
+                    'final_iter': np.full(effective_wvl.shape, iter, dtype=float),
+                    'final_status': np.full(effective_wvl.shape, final_status, dtype=object),
+                    'final_closure_met': np.full(effective_wvl.shape, final_status == 'closure_passed', dtype=bool),
+                    'time_start': np.full(effective_wvl.shape, time_start, dtype=float),
+                    'time_end': np.full(effective_wvl.shape, time_end, dtype=float),
+                    'alt_km': np.full(effective_wvl.shape, alt_avg, dtype=float),
+                    'sza': np.full(effective_wvl.shape, sza_avg, dtype=float),
+                    'ssfr_fup_mean': f_ssfr_fup_mean(effective_wvl),
+                    'ssfr_fdn_mean': f_ssfr_fdn_mean(effective_wvl),
+                    'ssfr_fup_std': f_ssfr_fup_std(effective_wvl),
+                    'ssfr_fdn_std': f_ssfr_fdn_std(effective_wvl),
+                    'simu_fup_sfc_final': np.nanmean(flux_up_results[:, :, 0], axis=0),
+                    'simu_fdn_sfc_final': np.nanmean(flux_down_results[:, :, 0], axis=0),
+                    'simu_fdn_sfc_direct_final': np.nanmean(flux_down_dir_results[:, :, 0], axis=0),
+                    'simu_fdn_sfc_diff_final': np.nanmean(flux_down_diff_results[:, :, 0], axis=0),
+                    'simu_fup_p3_final': np.nanmean(flux_up_results[:, :, 1], axis=0),
+                    'simu_fdn_p3_final': np.nanmean(flux_down_results[:, :, 1], axis=0),
+                    'simu_fdn_p3_direct_final': np.nanmean(flux_down_dir_results[:, :, 1], axis=0),
+                    'simu_fdn_p3_diff_final': np.nanmean(flux_down_diff_results[:, :, 1], axis=0),
+                    'simu_fup_toa_final': np.nanmean(flux_up_results[:, :, -1], axis=0),
+                    'simu_fdn_toa_final': np.nanmean(flux_down_results[:, :, -1], axis=0),
+                }
+                output_df = pd.DataFrame(output_dict)
+                output_df.to_csv(output_csv_name, index=False)
+                print(f"Saving final spectral simulation to {output_csv_name}")
+
+                del output_dict, output_df
+                del flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results
+                del fup_mean, fdn_mean, fup_std, fdn_std, cld_leg
+                gc.collect()
+                continue
             
             for flux_dn in [flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results]:
                 for iz in range(3):
@@ -647,11 +708,23 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 # plt.show()
             # sys.exit()
         
-            fup_total_rmse, fup_average_rmse, fup_relative_rmse = flux_rmse_metrics(
+            (
+                fup_total_rmse,
+                fup_average_rmse,
+                fup_relative_rmse,
+                fup_broadband_bias,
+                fup_flux_weighted_relative_rmse,
+            ) = flux_rmse_metrics(
                 fup_mean,
                 Fup_p3_mean_interp,
             )
-            fdn_total_rmse, fdn_average_rmse, fdn_relative_rmse = flux_rmse_metrics(
+            (
+                fdn_total_rmse,
+                fdn_average_rmse,
+                fdn_relative_rmse,
+                fdn_broadband_bias,
+                fdn_flux_weighted_relative_rmse,
+            ) = flux_rmse_metrics(
                 fdn_mean,
                 Fdn_p3_mean_interp,
             )
@@ -674,9 +747,13 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 'fup_total_rmse': fup_total_rmse,
                 'fup_average_rmse': fup_average_rmse,
                 'fup_relative_rmse': fup_relative_rmse,
+                'fup_broadband_bias': fup_broadband_bias,
+                'fup_flux_weighted_relative_rmse': fup_flux_weighted_relative_rmse,
                 'fdn_total_rmse': fdn_total_rmse,
                 'fdn_average_rmse': fdn_average_rmse,
                 'fdn_relative_rmse': fdn_relative_rmse,
+                'fdn_broadband_bias': fdn_broadband_bias,
+                'fdn_flux_weighted_relative_rmse': fdn_flux_weighted_relative_rmse,
             }
             
             output_df = pd.DataFrame(output_dict)
@@ -757,7 +834,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             del Fup_p3_mean_interp, Fdn_p3_mean_interp
             del Fup_toa_mean_interp, Fdn_toa_mean_interp
             del fup_total_rmse, fup_average_rmse, fup_relative_rmse
+            del fup_broadband_bias, fup_flux_weighted_relative_rmse
             del fdn_total_rmse, fdn_average_rmse, fdn_relative_rmse
+            del fdn_broadband_bias, fdn_flux_weighted_relative_rmse
             del fup_mean, fdn_mean, fup_std, fdn_std
             del toa_mean
             del alb_avg, alb_ice_fit
@@ -774,26 +853,48 @@ def exp_decay(x, a, b, c):
 
 
 def flux_rmse_metrics(obs, sim):
-    """Return total, average, and relative RMSE for matching spectral flux arrays."""
+    """Return RMSE plus energy-balance and flux-weighted relative diagnostics."""
     obs = np.asarray(obs, dtype=float)
     sim = np.asarray(sim, dtype=float)
     valid = np.isfinite(obs) & np.isfinite(sim)
     if not np.any(valid):
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
 
     diff = sim[valid] - obs[valid]
     total_rmse = np.sqrt(np.sum(diff**2))
     average_rmse = np.sqrt(np.mean(diff**2))
     obs_sum = np.sum(obs[valid])
     relative_rmse = total_rmse / obs_sum if obs_sum != 0 else np.nan
-    return total_rmse, average_rmse, relative_rmse
+    broadband_bias = np.sum(diff) / obs_sum if obs_sum != 0 else np.nan
+
+    weighted_valid = valid & (obs > 0)
+    if np.any(weighted_valid):
+        obs_weighted = obs[weighted_valid]
+        sim_weighted = sim[weighted_valid]
+        obs_weighted_sum = np.sum(obs_weighted)
+        if obs_weighted_sum != 0:
+            weights = obs_weighted / obs_weighted_sum
+            fractional_error = (sim_weighted - obs_weighted) / obs_weighted
+            flux_weighted_relative_rmse = np.sqrt(np.sum(weights * fractional_error**2))
+        else:
+            flux_weighted_relative_rmse = np.nan
+    else:
+        flux_weighted_relative_rmse = np.nan
+
+    return (
+        total_rmse,
+        average_rmse,
+        relative_rmse,
+        broadband_bias,
+        flux_weighted_relative_rmse,
+    )
 
 
 if __name__ == '__main__':
     try:
-        from .ssfr_atm_corr_cases import run_cases
+        from .runner import run_cases
     except ImportError:
-        from ssfr_atm_corr_cases import run_cases
+        from runner import run_cases
 
     CASE_ID = 'case_043'
     ITERATIONS = range(1)
