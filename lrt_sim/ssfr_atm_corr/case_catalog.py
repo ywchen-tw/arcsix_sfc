@@ -7,6 +7,7 @@ the original call; the full recovered call is preserved in ``original_call``.
 """
 
 import datetime
+import csv
 import glob
 import os
 
@@ -22,6 +23,69 @@ DEFAULT_CLOSURE_THRESHOLDS = {
     'fup_abs_broadband_bias': 0.05,
     'fup_flux_weighted_relative_rmse': 0.08,
 }
+
+
+def closure_metric_status(output_file, thresholds):
+    """Return closure-check details for one simulation CSV."""
+    try:
+        metrics = closure_metrics(output_file)
+    except ValueError as err:
+        return False, [str(err)]
+
+    checks = [(name, metrics[name], thresholds[name]) for name in metrics]
+    failed_checks = [
+        f'{name}={value:.5f} > {threshold:.5f}'
+        for name, value, threshold in checks
+        if value > threshold
+    ]
+    return len(failed_checks) == 0, failed_checks
+
+
+def closure_metrics(output_file):
+    """Return the closure metrics stored in one simulation CSV."""
+    required_columns = [
+        'fdn_broadband_bias',
+        'fdn_flux_weighted_relative_rmse',
+        'fup_broadband_bias',
+        'fup_flux_weighted_relative_rmse',
+    ]
+    with open(output_file, newline='') as f:
+        reader = csv.DictReader(f)
+        row = next(reader, None)
+
+    if row is None:
+        raise ValueError(f'{output_file} has no data rows')
+
+    missing_columns = [column for column in required_columns if column not in row]
+    if missing_columns:
+        raise ValueError(f'{output_file} missing columns: {", ".join(missing_columns)}')
+
+    return {
+        'fdn_abs_broadband_bias': abs(float(row['fdn_broadband_bias'])),
+        'fdn_flux_weighted_relative_rmse': float(row['fdn_flux_weighted_relative_rmse']),
+        'fup_abs_broadband_bias': abs(float(row['fup_broadband_bias'])),
+        'fup_flux_weighted_relative_rmse': float(row['fup_flux_weighted_relative_rmse']),
+    }
+
+
+def mean_closure_metrics(output_files):
+    """Return mean closure metrics across all simulation CSV files."""
+    metrics_by_file = [closure_metrics(output_file) for output_file in output_files]
+    return {
+        metric_name: sum(metrics[metric_name] for metrics in metrics_by_file) / len(metrics_by_file)
+        for metric_name in metrics_by_file[0]
+    }
+
+
+def mean_closure_metric_status(output_files, thresholds):
+    """Return whether mean closure metrics pass, plus failed mean checks."""
+    metrics = mean_closure_metrics(output_files)
+    failed_checks = [
+        f'mean_{name}={value:.5f} > {thresholds[name]:.5f}'
+        for name, value in metrics.items()
+        if value > thresholds[name]
+    ]
+    return len(failed_checks) == 0, failed_checks, metrics
 
 CASE_CATALOG = [{'id': 'case_001',
   'date': '2024-05-31',
@@ -2636,37 +2700,14 @@ def get_case(case_id):
 
 
 def iteration_closure_check(output_files, thresholds=None):
-    """Return True when every leg output meets flux-closure thresholds."""
-    import pandas as pd
-
+    """Return True when mean closure metrics meet flux-closure thresholds."""
     if thresholds is None:
         thresholds = DEFAULT_CLOSURE_THRESHOLDS
     if not output_files:
         return False
 
-    required_columns = [
-        'fdn_broadband_bias',
-        'fdn_flux_weighted_relative_rmse',
-        'fup_broadband_bias',
-        'fup_flux_weighted_relative_rmse',
-    ]
-    for output_file in output_files:
-        data = pd.read_csv(output_file)
-        missing_columns = [column for column in required_columns if column not in data]
-        if missing_columns:
-            return False
-
-        metrics = data.iloc[0]
-        checks = [
-            abs(metrics['fdn_broadband_bias']) <= thresholds['fdn_abs_broadband_bias'],
-            metrics['fdn_flux_weighted_relative_rmse'] <= thresholds['fdn_flux_weighted_relative_rmse'],
-            abs(metrics['fup_broadband_bias']) <= thresholds['fup_abs_broadband_bias'],
-            metrics['fup_flux_weighted_relative_rmse'] <= thresholds['fup_flux_weighted_relative_rmse'],
-        ]
-        if not all(checks):
-            return False
-
-    return True
+    passed, _, _ = mean_closure_metric_status(output_files, thresholds)
+    return passed
 
 
 def iteration_output_files(case, date_s, iter):
@@ -2750,10 +2791,31 @@ def run_catalog_case(
         )
         if closure_check and iter >= min_closure_iteration:
             output_files = iteration_output_files(case, date_s, iter)
+            thresholds = closure_thresholds or DEFAULT_CLOSURE_THRESHOLDS
+            print(f'{case_id}: closure check iteration {iter} found {len(output_files)} output file(s).')
             if iteration_closure_check(output_files, thresholds=closure_thresholds):
                 print(f'{case_id}: iteration {iter} meets closure criteria; stopping further iterations.')
                 run_final_iteration(iter, final_status='closure_passed')
                 break
+            if not output_files:
+                print(f'{case_id}: no iteration {iter} output files found for closure check.')
+            else:
+                _, failed_mean_checks, mean_metrics = mean_closure_metric_status(output_files, thresholds)
+                mean_metric_text = ', '.join(
+                    f'mean_{name}={value:.5f}' for name, value in mean_metrics.items()
+                )
+                print(f'{case_id}: closure mean metrics: {mean_metric_text}')
+                if failed_mean_checks:
+                    print(f'{case_id}: closure mean FAIL: {"; ".join(failed_mean_checks)}')
+                for output_file in output_files:
+                    passed, failed_checks = closure_metric_status(output_file, thresholds)
+                    if passed:
+                        print(f'{case_id}: closure PASS {os.path.basename(output_file)}')
+                    else:
+                        print(
+                            f'{case_id}: closure FAIL {os.path.basename(output_file)}: '
+                            f'{"; ".join(failed_checks)}'
+                        )
 
             additional_iterations = iter - min_closure_iteration
             max_iterations_reached = (
