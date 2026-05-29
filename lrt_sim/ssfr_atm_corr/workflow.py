@@ -45,6 +45,7 @@ if platform.system() == 'Linux':
 
 import glob
 import copy
+import shutil
 import time
 from collections import OrderedDict
 import datetime
@@ -249,12 +250,25 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_sat_cloud'
             
         if final_sim:
-            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final.csv'
+            output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final_extension.csv'
+            native_iteration_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
+            native_final_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final.csv'
         else:
             output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
 
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
+
+        if final_sim:
+            if os.path.exists(native_iteration_csv_name):
+                if not os.path.exists(native_final_csv_name) or overwrite_lrt:
+                    shutil.copy2(native_iteration_csv_name, native_final_csv_name)
+                    print(f"Saving SSFR-grid final simulation to {native_final_csv_name}")
+            else:
+                print(
+                    f"Warning: cannot create SSFR-grid final CSV because "
+                    f"{native_iteration_csv_name} does not exist."
+                )
 
         
         if not os.path.exists(output_csv_name) or overwrite_lrt:
@@ -569,7 +583,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 }
                 output_df = pd.DataFrame(output_dict)
                 output_df.to_csv(output_csv_name, index=False)
-                print(f"Saving final spectral simulation to {output_csv_name}")
+                print(f"Saving final extended spectral simulation to {output_csv_name}")
 
                 del output_dict, output_df
                 del flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results
