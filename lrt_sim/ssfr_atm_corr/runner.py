@@ -26,7 +26,7 @@ else:
     from settings import _fdir_data_, _fdir_general_
 
 
-DEFAULT_CASE_ID = 'case_057'
+DEFAULT_CASE_ID = 'case_062'
 
 CASE_ID_LIST = [
     'case_029', 'case_030', 'case_031', 'case_034',
