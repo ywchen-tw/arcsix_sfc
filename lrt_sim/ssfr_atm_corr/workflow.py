@@ -341,9 +341,29 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     lrt_cfg['number_of_streams'] = 8
                 lrt_cfg['mol_abs_param'] = 'reptran coarse'
                 # lrt_cfg['mol_abs_param'] = f'reptran medium'
+                albedo_file = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
+                final_alb_wvl = None
+                final_alb = None
+                if final_sim:
+                    alb_data = np.loadtxt(albedo_file, comments='#')
+                    alb_wvl_for_ext = alb_data[:, 0]
+                    alb_val_for_ext = alb_data[:, 1]
+                    final_alb_wvl, final_alb = alb_extention(alb_wvl_for_ext, alb_val_for_ext, clear_sky=clear_sky)
+                    final_alb = np.clip(final_alb, 0.0, 1.0)
+                    albedo_file = (
+                        f'{_fdir_general_}/sfc_alb/'
+                        f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}_final.dat'
+                    )
+                    write_2col_file(
+                        albedo_file,
+                        final_alb_wvl,
+                        final_alb,
+                        header=(f'# SSFR final extended sfc albedo {date_s} iteration {iter}\n'
+                                '# wavelength (nm)      albedo (unitless)\n'),
+                    )
                 input_dict_extra_general = {
                                     'crs_model': 'rayleigh Bodhaine29',
-                                    'albedo_file': f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat',
+                                    'albedo_file': albedo_file,
                                     'mol_file': 'CH4 %s' % os.path.join(zpt_filedir, f'ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat'),
                                     'wavelength_grid_file': 'wvl_grid_final_sw.dat' if final_sim else 'wvl_grid_test.dat',
                                     'atm_z_grid': atm_z_grid_str,
@@ -500,6 +520,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     'ssfr_fdn_mean': f_ssfr_fdn_mean(effective_wvl),
                     'ssfr_fup_std': f_ssfr_fup_std(effective_wvl),
                     'ssfr_fdn_std': f_ssfr_fdn_std(effective_wvl),
+                    'sfc_alb_final': np.interp(effective_wvl, final_alb_wvl, final_alb, left=np.nan, right=np.nan),
                     'simu_fup_sfc_final': np.nanmean(flux_up_results[:, :, 0], axis=0),
                     'simu_fdn_sfc_final': np.nanmean(flux_down_results[:, :, 0], axis=0),
                     'simu_fdn_sfc_direct_final': np.nanmean(flux_down_dir_results[:, :, 0], axis=0),

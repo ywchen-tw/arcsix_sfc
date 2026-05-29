@@ -2672,9 +2672,22 @@ def iteration_closure_check(output_files, thresholds=None):
 def iteration_output_files(case, date_s, iter):
     """Return simulation CSV files generated for one catalog iteration."""
     sky_tag = 'clear' if case['clear_sky'] else 'sat_cloud'
-    output_dir = os.path.join(_fdir_general_, 'lrt', f"{date_s}_{case['case_tag']}_{sky_tag}")
-    output_pattern = os.path.join(output_dir, f'ssfr_simu_flux_{date_s}_*_iteration_{iter}.csv')
-    return glob.glob(output_pattern)
+    output_patterns = [
+        os.path.join(
+            _fdir_general_,
+            'lrt',
+            f"{date_s}_{case['case_tag']}_{sky_tag}",
+            f'ssfr_simu_flux_{date_s}_*_iteration_{iter}.csv',
+        ),
+        os.path.join(
+            _fdir_general_,
+            f'ssfr_simu_flux_{date_s}_*_iteration_{iter}.csv',
+        ),
+    ]
+    output_files = []
+    for output_pattern in output_patterns:
+        output_files.extend(glob.glob(output_pattern))
+    return sorted(set(output_files))
 
 
 def run_catalog_case(
