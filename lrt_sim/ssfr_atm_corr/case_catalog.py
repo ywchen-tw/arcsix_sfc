@@ -9,6 +9,7 @@ the original call; the full recovered call is preserved in ``original_call``.
 import datetime
 import csv
 import glob
+import math
 import os
 
 if __package__:
@@ -103,20 +104,97 @@ def closure_metrics(output_file):
     ]
     with open(output_file, newline='') as f:
         reader = csv.DictReader(f)
-        row = next(reader, None)
+        rows = list(reader)
 
-    if row is None:
+    if not rows:
         raise ValueError(f'{output_file} has no data rows')
 
+    row = rows[0]
     missing_columns = [column for column in required_columns if column not in row]
     if missing_columns:
-        raise ValueError(f'{output_file} missing columns: {", ".join(missing_columns)}')
+        return reconstructed_closure_metrics(output_file, rows)
 
-    return {
+    metrics = {
         'fdn_abs_broadband_bias': abs(float(row['fdn_broadband_bias'])),
         'fdn_flux_weighted_relative_rmse': float(row['fdn_flux_weighted_relative_rmse']),
         'fup_abs_broadband_bias': abs(float(row['fup_broadband_bias'])),
         'fup_flux_weighted_relative_rmse': float(row['fup_flux_weighted_relative_rmse']),
+    }
+    invalid_metrics = [name for name, value in metrics.items() if not math.isfinite(value)]
+    if invalid_metrics:
+        raise ValueError(f'{output_file} has non-finite metrics: {", ".join(invalid_metrics)}')
+
+    return metrics
+
+
+def finite_csv_float(value):
+    """Return a finite float from a CSV value, or None."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return value
+
+
+def pair_closure_metrics(rows, output_file, obs_column, sim_column):
+    """Calculate broadband bias and flux-weighted relative RMSE from spectral rows."""
+    missing_columns = [
+        column for column in (obs_column, sim_column)
+        if column not in rows[0]
+    ]
+    if missing_columns:
+        raise ValueError(f'{output_file} missing columns: {", ".join(missing_columns)}')
+
+    pairs = []
+    for row in rows:
+        obs = finite_csv_float(row.get(obs_column))
+        sim = finite_csv_float(row.get(sim_column))
+        if obs is not None and sim is not None:
+            pairs.append((obs, sim))
+
+    if not pairs:
+        raise ValueError(f'{output_file} has no finite {obs_column}/{sim_column} pairs')
+
+    obs_sum = sum(obs for obs, _ in pairs)
+    if obs_sum == 0:
+        raise ValueError(f'{output_file} has zero {obs_column} sum')
+
+    broadband_bias = sum(sim - obs for obs, sim in pairs) / obs_sum
+    weighted_pairs = [(obs, sim) for obs, sim in pairs if obs > 0]
+    obs_weighted_sum = sum(obs for obs, _ in weighted_pairs)
+    if obs_weighted_sum == 0:
+        raise ValueError(f'{output_file} has no positive {obs_column} values for weighted RMSE')
+
+    flux_weighted_relative_rmse = math.sqrt(
+        sum(
+            (obs / obs_weighted_sum) * ((sim - obs) / obs)**2
+            for obs, sim in weighted_pairs
+        )
+    )
+    return broadband_bias, flux_weighted_relative_rmse
+
+
+def reconstructed_closure_metrics(output_file, rows):
+    """Reconstruct closure metrics from older simulation CSVs."""
+    fdn_broadband_bias, fdn_flux_weighted_relative_rmse = pair_closure_metrics(
+        rows,
+        output_file,
+        'ssfr_fdn_mean',
+        'simu_fdn_mean',
+    )
+    fup_broadband_bias, fup_flux_weighted_relative_rmse = pair_closure_metrics(
+        rows,
+        output_file,
+        'ssfr_fup_mean',
+        'simu_fup_mean',
+    )
+    return {
+        'fdn_abs_broadband_bias': abs(fdn_broadband_bias),
+        'fdn_flux_weighted_relative_rmse': fdn_flux_weighted_relative_rmse,
+        'fup_abs_broadband_bias': abs(fup_broadband_bias),
+        'fup_flux_weighted_relative_rmse': fup_flux_weighted_relative_rmse,
     }
 
 
@@ -131,12 +209,28 @@ def mean_closure_metrics(output_files):
 
 def mean_closure_metric_status(output_files, thresholds):
     """Return whether mean closure metrics pass, plus failed mean checks."""
-    metrics = mean_closure_metrics(output_files)
+    metrics_by_file = []
+    invalid_files = []
+    for output_file in output_files:
+        try:
+            metrics_by_file.append(closure_metrics(output_file))
+        except ValueError as err:
+            invalid_files.append(str(err))
+
+    if metrics_by_file:
+        metrics = {
+            metric_name: sum(metrics[metric_name] for metrics in metrics_by_file) / len(metrics_by_file)
+            for metric_name in metrics_by_file[0]
+        }
+    else:
+        metrics = {}
+
     failed_checks = [
         f'mean_{name}={value:.5f} > {thresholds[name]:.5f}'
         for name, value in metrics.items()
         if value > thresholds[name]
     ]
+    failed_checks.extend(invalid_files)
     return len(failed_checks) == 0, failed_checks, metrics
 
 ALL_CASE_CATALOG = [{'id': 'case_001',
