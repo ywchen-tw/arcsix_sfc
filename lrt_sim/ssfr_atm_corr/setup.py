@@ -4,15 +4,18 @@ import os
 import pickle
 import platform
 import subprocess
+import sys
+from pathlib import Path
+
+_LRT_SIM_ROOT = str(Path(__file__).resolve().parents[1])
+if _LRT_SIM_ROOT not in sys.path:
+    sys.path.insert(0, _LRT_SIM_ROOT)
 
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 
-if __package__:
-    from ..util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
-else:
-    from util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
+from util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
 
 try:
     from .helpers import write_2col_file

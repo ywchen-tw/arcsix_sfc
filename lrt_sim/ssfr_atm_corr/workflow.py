@@ -28,6 +28,11 @@ This code has been tested under:
 import os
 import sys
 import platform
+from pathlib import Path
+
+_LRT_SIM_ROOT = str(Path(__file__).resolve().parents[1])
+if _LRT_SIM_ROOT not in sys.path:
+    sys.path.insert(0, _LRT_SIM_ROOT)
 
 if platform.system() == 'Linux':
     # Define the path to your module directory
@@ -85,10 +90,7 @@ import er3t
 
 # from util.util import *
 # from util.arcsix_atm import prepare_atmospheric_profile
-if __package__:
-    from ..util import *
-else:
-    from util import *
+from util import *
 
 try:
     from .settings import *

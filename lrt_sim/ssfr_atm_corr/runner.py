@@ -9,9 +9,14 @@ import sys
 import datetime
 from pathlib import Path
 
-_REPO_ROOT = str(Path(__file__).resolve().parents[2])
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
+_THIS_FILE = Path(__file__).resolve()
+_LRT_SIM_ROOT = str(_THIS_FILE.parents[1])
+_REPO_ROOT = str(_THIS_FILE.parents[2])
+for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+_IN_LRT_SIM_PACKAGE = bool(__package__) and __package__.startswith('lrt_sim.')
 
 if __package__:
     from .case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
@@ -42,10 +47,7 @@ SPIRAL_CASE_ID_LIST = [
 
 
 def make_default_config():
-    if __package__:
-        from ..util import FlightConfig
-    else:
-        from util import FlightConfig
+    from util import FlightConfig
 
     return FlightConfig(
         mission='ARCSIX',
@@ -134,10 +136,10 @@ if __name__ == '__main__':
         )
 
     if RUN_SPIRAL_CASES:
-        if __package__:
+        if _IN_LRT_SIM_PACKAGE:
             from ..ssfr_atm_corr_plot import atm_corr_spiral_plot
         else:
-            from lrt_sim.ssfr_atm_corr_plot import atm_corr_spiral_plot
+            from ssfr_atm_corr_plot import atm_corr_spiral_plot
 
         run_spiral_cases(
             atm_corr_spiral_plot,
