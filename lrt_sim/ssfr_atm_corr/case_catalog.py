@@ -12,9 +12,9 @@ import glob
 import os
 
 if __package__:
-    from .settings import _fdir_general_
+    from .settings import _fdir_general_, _mission_, _platform_
 else:
-    from settings import _fdir_general_
+    from settings import _fdir_general_, _mission_, _platform_
 
 
 DEFAULT_CLOSURE_THRESHOLDS = {
@@ -23,6 +23,58 @@ DEFAULT_CLOSURE_THRESHOLDS = {
     'fup_abs_broadband_bias': 0.05,
     'fup_flux_weighted_relative_rmse': 0.08,
 }
+
+
+def cloud_observation_file(fdir_general, mission, platform_name, date_s, case_tag, time_start, time_end):
+    """Return the expected preprocessed cloud-observation file for one time window."""
+    return (
+        '%s/flt_cld_obs_info/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl'
+        % (
+            fdir_general,
+            mission.lower(),
+            platform_name.lower(),
+            date_s,
+            case_tag,
+            time_start,
+            time_end,
+        )
+    )
+
+
+def split_case_tmhr_ranges(tmhr_ranges_select, simulation_interval):
+    """Split selected time ranges using the same rule as the workflow setup."""
+    if simulation_interval is None:
+        return tmhr_ranges_select
+
+    split_ranges = []
+    for lo, hi in tmhr_ranges_select:
+        t_start = lo
+        while t_start < hi and t_start < (hi - 0.0167 / 6):
+            t_end = min(t_start + simulation_interval / 60.0, hi)
+            split_ranges.append([t_start, t_end])
+            t_start = t_end
+    return split_ranges
+
+
+def missing_cloud_observation_files(case, date_s):
+    """Return missing preprocessed cloud-observation files needed by a catalog case."""
+    tmhr_ranges_select = split_case_tmhr_ranges(
+        case['tmhr_ranges_select'],
+        case['simulation_interval'],
+    )
+    expected_files = [
+        cloud_observation_file(
+            _fdir_general_,
+            _mission_,
+            _platform_,
+            date_s,
+            case['case_tag'],
+            time_start,
+            time_end,
+        )
+        for time_start, time_end in tmhr_ranges_select
+    ]
+    return [fname for fname in expected_files if not os.path.exists(fname)]
 
 
 def closure_metric_status(output_file, thresholds):
@@ -87,7 +139,7 @@ def mean_closure_metric_status(output_files, thresholds):
     ]
     return len(failed_checks) == 0, failed_checks, metrics
 
-CASE_CATALOG = [{'id': 'case_001',
+ALL_CASE_CATALOG = [{'id': 'case_001',
   'date': '2024-05-31',
   'case_tag': 'clear_sky_track_1_atm_corr',
   'tmhr_ranges_select': [[15.689, 15.737],
@@ -2679,6 +2731,18 @@ SPIRAL_CASE_CATALOG = [{'id': 'spiral_001',
                    '                    )'}]
 
 
+PRE_SURFACE_ALBEDO_CASE_IDS = {
+    f'case_{case_number:03d}' for case_number in range(1, 29)
+}
+
+# Cases recovered from legacy/ssfr_atm_corr_ori.py before line 2100 are kept
+# above in ALL_CASE_CATALOG for reference, but they are not active here.
+CASE_CATALOG = [
+    case for case in ALL_CASE_CATALOG
+    if case['id'] not in PRE_SURFACE_ALBEDO_CASE_IDS
+]
+
+
 def cases_for_date(date_s):
     """Return flight-track catalog entries for a YYYYMMDD or YYYY-MM-DD date string."""
     normalized = date_s if '-' in date_s else f'{date_s[:4]}-{date_s[4:6]}-{date_s[6:8]}'
@@ -2742,6 +2806,7 @@ def run_catalog_case(
     min_closure_iteration=2,
     max_additional_iterations=5,
     run_final_sim=True,
+    skip_missing_cloud_observations=True,
 ):
     """Run a catalog case that does not require custom levels."""
     case = get_case(case_id)
@@ -2749,6 +2814,17 @@ def run_catalog_case(
         raise ValueError(f"{case_id} used custom levels in the original script; see case['original_call'].")
     year, month, day = [int(part) for part in case['date'].split('-')]
     date_s = f'{year:04d}{month:02d}{day:02d}'
+    missing_cloud_files = missing_cloud_observation_files(case, date_s)
+    if missing_cloud_files:
+        missing_text = '\n  '.join(missing_cloud_files)
+        message = (
+            f'{case_id}: missing {len(missing_cloud_files)} preprocessed cloud-observation file(s); '
+            f'this case cannot run until they are generated.\n  {missing_text}'
+        )
+        if skip_missing_cloud_observations:
+            print(f'{message}\n{case_id}: skipping case.')
+            return False
+        raise FileNotFoundError(message)
 
     def run_final_iteration(iter, final_status):
         if not run_final_sim:
@@ -2829,3 +2905,4 @@ def run_catalog_case(
                 )
                 run_final_iteration(iter, final_status='max_additional_iterations')
                 break
+    return True

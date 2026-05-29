@@ -26,14 +26,10 @@ else:
     from settings import _fdir_data_, _fdir_general_
 
 
-DEFAULT_CASE_ID = 'case_013'
+DEFAULT_CASE_ID = 'case_057'
 
 CASE_ID_LIST = [
-    'case_001', 'case_002', 'case_003', 'case_004', 'case_005',
-    'case_006', 'case_007', 'case_008', 'case_009', 'case_010',
-    'case_011', 'case_012', 'case_013', 'case_021', 'case_022',
-    'case_023', 'case_024', 'case_025', 'case_026', 'case_027',
-    'case_028', 'case_029', 'case_030', 'case_031', 'case_034',
+    'case_029', 'case_030', 'case_031', 'case_034',
     'case_035', 'case_036', 'case_037', 'case_038', 'case_040',
     'case_041', 'case_042', 'case_043', 'case_047', 'case_050',
     'case_051', 'case_052', 'case_053', 'case_054', 'case_055',
@@ -69,6 +65,7 @@ def run_cases(
     min_closure_iteration=2,
     max_additional_iterations=5,
     run_final_sim=True,
+    skip_missing_cloud_observations=True,
 ):
     """Run one or more surface-albedo atmospheric-correction catalog cases."""
     os.makedirs('./fig', exist_ok=True)
@@ -90,6 +87,7 @@ def run_cases(
             min_closure_iteration=min_closure_iteration,
             max_additional_iterations=max_additional_iterations,
             run_final_sim=run_final_sim,
+            skip_missing_cloud_observations=skip_missing_cloud_observations,
         )
 
 

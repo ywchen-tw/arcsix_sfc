@@ -22,12 +22,29 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     hsr_wvl = data_hsr1['wvl_dn_tot']
     hsr_ftot = data_hsr1['f_dn_tot']
     hsr_fdif = data_hsr1['f_dn_dif']
-    hsr_dif_ratio = hsr_fdif / hsr_ftot
+    hsr_dif_ratio = np.divide(
+        hsr_fdif,
+        hsr_ftot,
+        out=np.full_like(hsr_fdif, np.nan, dtype=float),
+        where=hsr_ftot != 0,
+    )
     hsr_550_ind = np.argmin(np.abs(hsr_wvl - 550))
     hsr_530_ind = np.argmin(np.abs(hsr_wvl - 530))
     hsr_570_ind = np.argmin(np.abs(hsr_wvl - 570))
-    hsr1_diff_ratio = data_hsr1["f_dn_dif"] / data_hsr1["f_dn_tot"]
-    hsr1_diff_ratio_530_570_mean = np.nanmean(hsr1_diff_ratio[:, hsr_530_ind:hsr_570_ind + 1], axis=1)
+    hsr1_diff_ratio = np.divide(
+        data_hsr1["f_dn_dif"],
+        data_hsr1["f_dn_tot"],
+        out=np.full_like(data_hsr1["f_dn_dif"], np.nan, dtype=float),
+        where=data_hsr1["f_dn_tot"] != 0,
+    )
+    hsr1_diff_ratio_530_570 = hsr1_diff_ratio[:, hsr_530_ind:hsr_570_ind + 1]
+    hsr1_diff_ratio_530_570_count = np.sum(~np.isnan(hsr1_diff_ratio_530_570), axis=1)
+    hsr1_diff_ratio_530_570_mean = np.divide(
+        np.nansum(hsr1_diff_ratio_530_570, axis=1),
+        hsr1_diff_ratio_530_570_count,
+        out=np.full(hsr1_diff_ratio_530_570_count.shape, np.nan, dtype=float),
+        where=hsr1_diff_ratio_530_570_count > 0,
+    )
 
     pitch_roll_mask = np.sqrt(pitch_ang**2 + roll_ang**2) < pitch_roll_thres
     pitch_ang_valid = pitch_ang.copy()
