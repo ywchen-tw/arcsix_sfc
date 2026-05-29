@@ -119,6 +119,31 @@ except ImportError:
         write_ssfr_support_files,
     )
 
+
+def read_uvspec_flux_output(init):
+    """Read a uvspec flux output file, inferring the actual wavelength grid."""
+    data = np.loadtxt(init.output_file)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    if data.shape[1] < 4:
+        raise ValueError(f'{init.output_file} has {data.shape[1]} columns; expected at least 4 flux columns.')
+
+    n_altitude = init.Ny
+    if data.shape[0] % n_altitude != 0:
+        raise ValueError(
+            f'{init.output_file} has {data.shape[0]} rows, which is not divisible by '
+            f'{n_altitude} output altitude(s).'
+        )
+
+    n_wavelength = data.shape[0] // n_altitude
+    data = data.reshape((n_wavelength, n_altitude, data.shape[1]))
+    wavelength = data[:, 0, 0]
+    f_down_direct = data[:, :, 1] / 1000.0
+    f_down_diffuse = data[:, :, 2] / 1000.0
+    f_up = data[:, :, 3] / 1000.0
+    return wavelength, f_down_direct + f_down_diffuse, f_down_direct, f_down_diffuse, f_up
+
+
 def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                      tmhr_ranges_select=[[14.10, 14.27]],
                      case_tag='default',
@@ -317,6 +342,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 flux_down_dir_results = []
                 flux_down_diff_results = []
                 flux_up_results = []
+                output_wvl_results = []
                 
                 flux_key = np.zeros_like(flux_output, dtype=object)
                 cloudy = 0
@@ -464,12 +490,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     print('Running libratran calculations ...')
                     run_uvspec_inits(inits_rad)
                     for i in range(len(inits_rad)):
-                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                        
-                        flux_down_results.append(np.squeeze(data.f_down))
-                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
-                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
-                        flux_up_results.append(np.squeeze(data.f_up))
+                        output_wvl, flux_down, flux_down_dir, flux_down_diff, flux_up = read_uvspec_flux_output(inits_rad[i])
+                        output_wvl_results.append(output_wvl)
+                        flux_down_results.append(flux_down)
+                        flux_down_dir_results.append(flux_down_dir)
+                        flux_down_diff_results.append(flux_down_diff)
+                        flux_up_results.append(flux_up)
             ##### run several libratran calculations one by one
             
             elif platform.system() == 'Linux':
@@ -477,12 +503,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     print('Running libratran calculations ...')
                     run_uvspec_inits(inits_rad)
                     for i in range(len(inits_rad)):
-                        data = er3t.rtm.lrt.lrt_read_uvspec_flx([inits_rad[i]])
-                        
-                        flux_down_results.append(np.squeeze(data.f_down))
-                        flux_down_dir_results.append(np.squeeze(data.f_down_direct))
-                        flux_down_diff_results.append(np.squeeze(data.f_down_diffuse))
-                        flux_up_results.append(np.squeeze(data.f_up))
+                        output_wvl, flux_down, flux_down_dir, flux_down_diff, flux_up = read_uvspec_flux_output(inits_rad[i])
+                        output_wvl_results.append(output_wvl)
+                        flux_down_results.append(flux_down)
+                        flux_down_dir_results.append(flux_down_dir)
+                        flux_down_diff_results.append(flux_down_diff)
+                        flux_up_results.append(flux_up)
             # #\----------------------------------------------------------------------------/#
             ###### delete input, output, cld txt files
             # for prefix in ['input', 'output', 'cld']:
@@ -490,6 +516,15 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             #         os.remove(filename)
             ###### delete atmospheric profile files for lw
 
+
+            if output_wvl_results:
+                output_wvl = output_wvl_results[0]
+                if output_wvl.size != effective_wvl.size or not np.allclose(output_wvl, effective_wvl):
+                    print(
+                        f'Using uvspec output wavelength grid ({output_wvl.size} points) '
+                        f'instead of requested grid ({effective_wvl.size} points).'
+                    )
+                    effective_wvl = output_wvl
 
             flux_down_results = np.array(flux_down_results)
             flux_down_dir_results = np.array(flux_down_dir_results)

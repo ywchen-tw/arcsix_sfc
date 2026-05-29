@@ -88,7 +88,7 @@ def lrt_final_sw_wavelength_grid():
     if platform.system() == 'Darwin':
         return np.arange(300, 4000.1, 10.0)
     if platform.system() == 'Linux':
-        return np.arange(300, 4000.1, 2.5)
+        return np.arange(300, 4000.1, 1.0)
     return np.arange(300, 4000.1, 10.0)
 
 
