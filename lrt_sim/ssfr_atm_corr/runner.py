@@ -83,6 +83,7 @@ def run_cases(
 
     # IMPORTANT: run arcsix_gas_insitu.py first to generate gas files for each date.
     for selected_case_id in case_ids:
+        print(f"Running track case: {selected_case_id}")
         run_catalog_case(
             flt_trk_atm_corr,
             config,
@@ -108,6 +109,7 @@ def run_spiral_cases(atm_corr_spiral_plot, spiral_case_ids=None):
 
     spiral_cases = {case['id']: case for case in SPIRAL_CASE_CATALOG}
     for spiral_case_id in spiral_case_ids:
+        print(f"Running spiral case: {spiral_case_id}")
         case = spiral_cases[spiral_case_id]
         year, month, day = [int(part) for part in case['date'].split('-')]
         date_s = f'{year:04d}{month:02d}{day:02d}'
@@ -203,6 +205,8 @@ def split_selected_case_ids(selected_case_ids):
 
 def main():
     args = parse_args()
+    print(f"Runner argv: {' '.join(sys.argv)}")
+    print(f"Parsed positional case_ids: {args.case_ids}")
 
     if args.all:
         selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
@@ -224,6 +228,10 @@ def main():
 
     track_case_ids, spiral_case_ids = split_selected_case_ids(selected_case_ids)
     overwrite_lrt = not args.no_overwrite_lrt
+    if track_case_ids:
+        print(f"Selected track case(s): {', '.join(track_case_ids)}")
+    if spiral_case_ids:
+        print(f"Selected spiral case(s): {', '.join(spiral_case_ids)}")
 
     if track_case_ids:
         if __package__:
