@@ -253,6 +253,8 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final_extension.csv'
             native_iteration_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
             native_final_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final.csv'
+            native_iteration_albedo_name = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
+            native_final_albedo_name = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_final.dat'
         else:
             output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
 
@@ -268,6 +270,15 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 print(
                     f"Warning: cannot create SSFR-grid final CSV because "
                     f"{native_iteration_csv_name} does not exist."
+                )
+            if os.path.exists(native_iteration_albedo_name):
+                if not os.path.exists(native_final_albedo_name) or overwrite_lrt:
+                    shutil.copy2(native_iteration_albedo_name, native_final_albedo_name)
+                    print(f"Saving SSFR-grid final albedo to {native_final_albedo_name}")
+            else:
+                print(
+                    f"Warning: cannot create SSFR-grid final albedo because "
+                    f"{native_iteration_albedo_name} does not exist."
                 )
 
         
@@ -393,7 +404,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     final_alb = np.clip(final_alb, 0.0, 1.0)
                     albedo_file = (
                         f'{_fdir_general_}/sfc_alb/'
-                        f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}_final.dat'
+                        f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_final_extension.dat'
                     )
                     write_2col_file(
                         albedo_file,

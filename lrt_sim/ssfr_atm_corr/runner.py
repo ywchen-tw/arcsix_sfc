@@ -16,8 +16,6 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-_IN_LRT_SIM_PACKAGE = bool(__package__) and __package__.startswith('lrt_sim.')
-
 if __package__:
     from .case_catalog import SPIRAL_CASE_CATALOG, run_catalog_case
     from .settings import _fdir_data_, _fdir_general_
@@ -26,7 +24,7 @@ else:
     from settings import _fdir_data_, _fdir_general_
 
 
-DEFAULT_CASE_ID = 'case_062'
+DEFAULT_CASE_ID = 'case_029'
 
 CASE_ID_LIST = [
     'case_029', 'case_030', 'case_031', 'case_034',
@@ -134,10 +132,10 @@ if __name__ == '__main__':
         )
 
     if RUN_SPIRAL_CASES:
-        if _IN_LRT_SIM_PACKAGE:
-            from ..ssfr_atm_corr_plot import atm_corr_spiral_plot
+        if __package__:
+            from .spiral import atm_corr_spiral_plot
         else:
-            from ssfr_atm_corr_plot import atm_corr_spiral_plot
+            from spiral import atm_corr_spiral_plot
 
         run_spiral_cases(
             atm_corr_spiral_plot,

@@ -81,24 +81,14 @@ from pyproj import Transformer
 from util import *
 # mpl.use('Agg')
 
-try:
-    from .ssfr_atm_corr.settings import *
-    from .ssfr_atm_corr_product_helpers import (
-        fill_nan_ffill_bfill,
-        ssfr_alb_plot,
-        ssfr_up_dn_ratio_plot,
-        weighted_broadband_alb,
-    )
-    from .ssfr_atm_corr.setup import split_tmhr_ranges
-except ImportError:
-    from ssfr_atm_corr.settings import *
-    from ssfr_atm_corr_product_helpers import (
-        fill_nan_ffill_bfill,
-        ssfr_alb_plot,
-        ssfr_up_dn_ratio_plot,
-        weighted_broadband_alb,
-    )
-    from ssfr_atm_corr.setup import split_tmhr_ranges
+from ssfr_atm_corr.settings import *
+from ssfr_atm_corr_product_helpers import (
+    fill_nan_ffill_bfill,
+    ssfr_alb_plot,
+    ssfr_up_dn_ratio_plot,
+    weighted_broadband_alb,
+)
+from ssfr_atm_corr.setup import split_tmhr_ranges
 
  
 # Per-date h2o_6_end overrides for gas_abs_masking / snowice_alb_fitting

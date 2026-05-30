@@ -24,11 +24,11 @@ lrt_sim/
     setup.py               # wavelength grids, support files, dropsonde/cloud loading
     helpers.py             # small math, IO, flags, masking, fitting helpers
     qc_plotting.py         # SSFR time-series and QC plots
-
-  ssfr_products/
-    __init__.py
-    processing.py          # atmospheric-correction product generation
-    product_helpers.py     # product-specific helpers
+    preprocess.py          # cloud-observation input-product generation
+    preprocess_runner.py   # run preprocessing for selected catalog cases
+    processing.py          # final/final_extension atmospheric-correction products
+    processing_runner.py   # run post-processing for selected catalog cases
+    spiral.py              # spiral-case plotting workflow
 
   ssfr_cre/
     __init__.py
@@ -66,7 +66,11 @@ lrt_sim/
 
   legacy/
     ssfr_atm_corr_ori.py
+    ssfr_atm_corr_plot.py
+    ssfr_atm_corr_processing.py
     ssfr_atm_corr_processing_ori.py
+    ssfr_atm_corr_product_helpers.py
+    ssfr_data_collect_ori.py
     # other historical scripts preserved for reference
 ```
 
@@ -84,7 +88,14 @@ ssfr_atm_corr_settings.py        -> ssfr_atm_corr/settings.py
 ssfr_atm_corr_setup.py           -> ssfr_atm_corr/setup.py
 ssfr_atm_corr_helpers.py         -> ssfr_atm_corr/helpers.py
 ssfr_atm_corr_qc_plotting.py     -> ssfr_atm_corr/qc_plotting.py
+ssfr_data_collect.py             -> ssfr_atm_corr/preprocess.py
+ssfr_atm_corr_processing.py      -> ssfr_atm_corr/processing.py
+ssfr_atm_corr_plot.py            -> ssfr_atm_corr/spiral.py
 ssfr_atm_corr_ori.py             -> legacy/ssfr_atm_corr_ori.py
+ssfr_data_collect_ori.py         -> legacy/ssfr_data_collect_ori.py
+ssfr_atm_corr_plot.py            -> legacy/ssfr_atm_corr_plot.py backup
+ssfr_atm_corr_processing.py      -> legacy/ssfr_atm_corr_processing.py backup
+ssfr_atm_corr_product_helpers.py -> legacy/ssfr_atm_corr_product_helpers.py
 ```
 
 Expected run command after Phase 1:
@@ -95,9 +106,14 @@ python3 -m lrt_sim.ssfr_atm_corr.runner
 
 ### Phase 2: Products And CRE
 
+Status: in progress. The active atmospheric-correction product builder now lives
+inside `ssfr_atm_corr/` because it depends directly on the catalog, final native
+SSFR-grid files, and final extended-grid files. The old product helper module is
+kept only with the legacy processing backup.
+
 ```text
-ssfr_atm_corr_processing.py          -> ssfr_products/processing.py
-ssfr_atm_corr_product_helpers.py     -> ssfr_products/product_helpers.py
+ssfr_atm_corr_processing.py          -> ssfr_atm_corr/processing.py
+ssfr_atm_corr_product_helpers.py     -> legacy/ssfr_atm_corr_product_helpers.py
 ssfr_atm_corr_processing_ori.py      -> legacy/ssfr_atm_corr_processing_ori.py
 ssfr_cre.py                         -> ssfr_cre/workflow.py
 ssfr_cre_plot.py                    -> ssfr_cre/plots.py
@@ -130,5 +146,8 @@ ssfr_SI_plot.py                     -> si_plots/plots.py
 ## Notes
 
 - `ssfr_atm_corr_ori.py` must be preserved as a backup.
+- Legacy atmospheric-correction processing and plotting scripts are preserved in
+  `legacy/`, while the active native/final-extension product path is under
+  `ssfr_atm_corr/`.
 - Avoid changing scientific logic during file moves.
 - Prefer compatibility import shims only if old run commands need to keep working temporarily.
