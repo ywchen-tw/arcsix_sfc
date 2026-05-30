@@ -6,7 +6,6 @@ workflow implementation.
 
 import os
 import sys
-import datetime
 import argparse
 from pathlib import Path
 
@@ -18,10 +17,10 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
         sys.path.insert(0, _path)
 
 if __package__:
-    from .case_catalog import SPIRAL_CASE_CATALOG, missing_spiral_cloud_observation_files, run_catalog_case
+    from .case_catalog import run_catalog_case
     from .settings import _fdir_data_, _fdir_general_
 else:
-    from case_catalog import SPIRAL_CASE_CATALOG, missing_spiral_cloud_observation_files, run_catalog_case
+    from case_catalog import run_catalog_case
     from settings import _fdir_data_, _fdir_general_
 
 
@@ -29,11 +28,10 @@ DEFAULT_CASE_ID = 'case_029'
 
 CLEAR_SKY_CASE_ID_LIST = [
     'case_029', 'case_030', 'case_031', 'case_034', 'case_035',
-    'case_036', 'case_037', 'case_038', 'case_040', 'case_041',
-    'case_042', 'case_043', 'case_047', 'case_050', 'case_051',
-    'case_052', 'case_053', 'case_054', 'case_055', 'case_056',
-    'case_057', 'case_058', 'case_061', 'case_062', 'case_063',
-    'case_067', 'case_069',
+    'case_036', 'case_038', 'case_041', 'case_042', 'case_043',
+    'case_047', 'case_051', 'case_052', 'case_054', 'case_055',
+    'case_056', 'case_057', 'case_058', 'case_061', 'case_062',
+    'case_063', 'case_067', 'case_069',
 ]
 
 CLOUDY_CASE_ID_LIST = [
@@ -42,11 +40,11 @@ CLOUDY_CASE_ID_LIST = [
     'case_064', 'case_065', 'case_066', 'case_068',
 ]
 
-CASE_ID_LIST = sorted(CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST)
-
 SPIRAL_CASE_ID_LIST = [
-    'spiral_001', 'spiral_002', 'spiral_003', 'spiral_004', 'spiral_005',
+    'case_037', 'case_040', 'case_050', 'case_053',
 ]
+
+CASE_ID_LIST = sorted(CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
 
 
 def make_default_config():
@@ -99,58 +97,25 @@ def run_cases(
         )
 
 
-def run_spiral_cases(atm_corr_spiral_plot, spiral_case_ids=None):
-    """Run one or more legacy spiral-plot catalog cases."""
-    os.makedirs('./fig', exist_ok=True)
-    config = make_default_config()
-
-    if spiral_case_ids is None:
-        spiral_case_ids = SPIRAL_CASE_ID_LIST
-
-    spiral_cases = {case['id']: case for case in SPIRAL_CASE_CATALOG}
-    for spiral_case_id in spiral_case_ids:
-        print(f"Running spiral case: {spiral_case_id}")
-        case = spiral_cases[spiral_case_id]
-        year, month, day = [int(part) for part in case['date'].split('-')]
-        date_s = f'{year:04d}{month:02d}{day:02d}'
-        missing_cloud_files = missing_spiral_cloud_observation_files(case, date_s)
-        if missing_cloud_files:
-            missing_text = '\n  '.join(missing_cloud_files)
-            raise FileNotFoundError(
-                f'{spiral_case_id}: missing {len(missing_cloud_files)} preprocessed spiral '
-                f'cloud-observation file(s). Run preprocessing first, for example:\n'
-                f'  python3 -m ssfr_atm_corr.preprocess_runner {spiral_case_id}\n'
-                f'or from repo root:\n'
-                f'  python3 -m lrt_sim.ssfr_atm_corr.preprocess_runner {spiral_case_id}\n'
-                f'  {missing_text}'
-            )
-        atm_corr_spiral_plot(
-            date=datetime.datetime(year, month, day),
-            tmhr_ranges_select=case['tmhr_ranges_select'],
-            case_tag=case['case_tag'],
-            config=config,
-        )
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Run SSFR atmospheric-correction catalog cases.')
     parser.add_argument(
         'case_ids',
         nargs='*',
         help=(
-            'Case IDs to run. Use case_### for track cases and spiral_### for spiral cases. '
+            'Case IDs to run. Use case_### catalog IDs. '
             f'Defaults to {DEFAULT_CASE_ID}.'
         ),
     )
     parser.add_argument(
         '--all',
         action='store_true',
-        help='Run all clear-sky, cloudy, and spiral cases.',
+        help='Run all clear-sky, cloudy, and spiral-like track cases.',
     )
     parser.add_argument(
         '--track-all',
         action='store_true',
-        help='Run all clear-sky and cloudy track cases.',
+        help='Run all track cases: clear-sky, cloudy, and spiral-like.',
     )
     parser.add_argument(
         '--clear-sky-all',
@@ -165,7 +130,7 @@ def parse_args():
     parser.add_argument(
         '--spiral-all',
         action='store_true',
-        help='Run all spiral cases.',
+        help='Run all spiral-like track cases.',
     )
     parser.add_argument(
         '--iterations',
@@ -182,25 +147,22 @@ def parse_args():
 
 
 def split_selected_case_ids(selected_case_ids):
-    """Split selected IDs into track and spiral case IDs."""
+    """Validate selected IDs and return track workflow case IDs."""
     track_case_ids = []
-    spiral_case_ids = []
     unknown_case_ids = []
 
     for case_id in selected_case_ids:
         if case_id in CASE_ID_LIST:
             track_case_ids.append(case_id)
-        elif case_id in SPIRAL_CASE_ID_LIST:
-            spiral_case_ids.append(case_id)
         else:
             unknown_case_ids.append(case_id)
 
     if unknown_case_ids:
-        valid_text = ', '.join(CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
+        valid_text = ', '.join(CASE_ID_LIST)
         unknown_text = ', '.join(unknown_case_ids)
         raise ValueError(f'Unknown case ID(s): {unknown_text}. Valid IDs: {valid_text}')
 
-    return track_case_ids, spiral_case_ids
+    return track_case_ids
 
 
 def main():
@@ -209,7 +171,7 @@ def main():
     print(f"Parsed positional case_ids: {args.case_ids}")
 
     if args.all:
-        selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
+        selected_case_ids = CASE_ID_LIST
     elif args.track_all or args.clear_sky_all or args.cloudy_all or args.spiral_all:
         selected_case_ids = []
         if args.track_all:
@@ -226,12 +188,10 @@ def main():
     else:
         selected_case_ids = [DEFAULT_CASE_ID]
 
-    track_case_ids, spiral_case_ids = split_selected_case_ids(selected_case_ids)
+    track_case_ids = split_selected_case_ids(selected_case_ids)
     overwrite_lrt = not args.no_overwrite_lrt
     if track_case_ids:
         print(f"Selected track case(s): {', '.join(track_case_ids)}")
-    if spiral_case_ids:
-        print(f"Selected spiral case(s): {', '.join(spiral_case_ids)}")
 
     if track_case_ids:
         if __package__:
@@ -245,18 +205,6 @@ def main():
             overwrite_lrt=overwrite_lrt,
             iterations=range(args.iterations),
         )
-
-    if spiral_case_ids:
-        if __package__:
-            from .spiral import atm_corr_spiral_plot
-        else:
-            from spiral import atm_corr_spiral_plot
-
-        run_spiral_cases(
-            atm_corr_spiral_plot,
-            spiral_case_ids=spiral_case_ids,
-        )
-
 
 if __name__ == '__main__':
     main()

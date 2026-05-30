@@ -33,9 +33,9 @@ else:
 def run_preprocess_cases(case_id=DEFAULT_CASE_ID, case_ids=None, overwrite=False, plot_qc=True):
     """Preprocess one or more catalog cases for atmospheric correction."""
     if __package__:
-        from .preprocess import make_default_config, preprocess_catalog_case, preprocess_spiral_catalog_case
+        from .preprocess import make_default_config, preprocess_catalog_case
     else:
-        from preprocess import make_default_config, preprocess_catalog_case, preprocess_spiral_catalog_case
+        from preprocess import make_default_config, preprocess_catalog_case
 
     os.makedirs('./fig', exist_ok=True)
     config = make_default_config()
@@ -50,15 +50,8 @@ def run_preprocess_cases(case_id=DEFAULT_CASE_ID, case_ids=None, overwrite=False
                 overwrite=overwrite,
                 plot_qc=plot_qc,
             )
-        elif selected_case_id in SPIRAL_CASE_ID_LIST:
-            preprocess_spiral_catalog_case(
-                config,
-                selected_case_id,
-                overwrite=overwrite,
-                plot_qc=plot_qc,
-            )
         else:
-            valid_text = ', '.join(CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
+            valid_text = ', '.join(CASE_ID_LIST)
             raise ValueError(f'Unknown case ID: {selected_case_id}. Valid IDs: {valid_text}')
 
 
@@ -72,12 +65,12 @@ def parse_args():
     parser.add_argument(
         '--all',
         action='store_true',
-        help='Preprocess all track and spiral case IDs.',
+        help='Preprocess all clear-sky, cloudy, and spiral-like track case IDs.',
     )
     parser.add_argument(
         '--track-all',
         action='store_true',
-        help='Preprocess all clear-sky and cloudy track case IDs.',
+        help='Preprocess all track cases: clear-sky, cloudy, and spiral-like.',
     )
     parser.add_argument(
         '--clear-sky-all',
@@ -92,7 +85,7 @@ def parse_args():
     parser.add_argument(
         '--spiral-all',
         action='store_true',
-        help='Preprocess all spiral case IDs.',
+        help='Preprocess all spiral-like track case IDs.',
     )
     parser.add_argument(
         '--overwrite',
@@ -110,7 +103,7 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     if args.all:
-        selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
+        selected_case_ids = CASE_ID_LIST
     elif args.track_all or args.clear_sky_all or args.cloudy_all or args.spiral_all:
         selected_case_ids = []
         if args.track_all:

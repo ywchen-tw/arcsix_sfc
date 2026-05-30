@@ -195,13 +195,27 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
     zpt_filedir = f'{_fdir_general_}/zpt/{date_s}'
     os.makedirs(zpt_filedir, exist_ok=True)
+    using_custom_levels = levels is not None
     if levels is None:
         levels = default_atm_levels()
+    levels = np.asarray(levels, dtype=float)
+    levels = np.unique(levels[np.isfinite(levels)])
+    if levels.ndim != 1 or levels.size == 0:
+        raise ValueError('Atmospheric levels must be a non-empty 1-D array.')
+    level_source = 'custom' if using_custom_levels else 'default'
+    print(
+        f'Using {level_source} atmospheric levels for {date_s}_{case_tag}: '
+        f'{levels.size} levels from {levels[0]:.3f} to {levels[-1]:.3f} km'
+    )
 
     if final_sim:
         effective_wvl = write_final_sw_support_files()
+        wavelength_grid_file = os.path.abspath('wvl_grid_final_sw.dat')
+        solar_file = os.path.abspath('arcsix_ssfr_solar_flux_raw_final.dat')
     else:
         effective_wvl = write_ssfr_support_files(iter=iter, clear_sky=clear_sky)
+        wavelength_grid_file = os.path.abspath('wvl_grid_test.dat')
+        solar_file = os.path.abspath('arcsix_ssfr_solar_flux_raw.dat')
             
 
     # read satellite granule
@@ -380,10 +394,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 
                 lrt_cfg['atmosphere_file'] = os.path.join(zpt_filedir, f'atm_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat')
                 # lrt_cfg['atmosphere_file'] = lrt_cfg['atmosphere_file'].replace('afglus.dat', 'afglss.dat')
-                if final_sim:
-                    lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw_final.dat'
-                else:
-                    lrt_cfg['solar_file'] = 'arcsix_ssfr_solar_flux_raw.dat'
+                lrt_cfg['solar_file'] = solar_file
                 # lrt_cfg['solar_file'] = lrt_cfg['solar_file'].replace('kurudz_0.1nm.dat', 'kurudz_1.0nm.dat')
                 import platform
                 # run less streams on Mac for testing, higher resolution on Linux cluster
@@ -417,7 +428,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': albedo_file,
                                     'mol_file': 'CH4 %s' % os.path.join(zpt_filedir, f'ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat'),
-                                    'wavelength_grid_file': 'wvl_grid_final_sw.dat' if final_sim else 'wvl_grid_test.dat',
+                                    'wavelength_grid_file': wavelength_grid_file,
                                     'atm_z_grid': atm_z_grid_str,
                                     # 'no_scattering':'mol',
                                     # 'no_absorption':'mol',
@@ -433,36 +444,79 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 flux_key_ix = []
                 output_list = []
                 
-                cot_x = np.nanmean(cld_leg['cot'])
-                cwp_x = np.nanmean(cld_leg['cwp'])
-                
                 if not clear_sky:
                     input_dict_extra = copy.deepcopy(input_dict_extra_general)
-                    if ((cot_x >= 0.1 and np.isfinite(cwp_x))):
-                        cloudy += 1
-
-                        cer_x = np.nanmean(cld_leg['cer'])
+                    if manual_cloud:
+                        cer_x = manual_cloud_cer
+                        cwp_x = manual_cloud_cwp
+                        cth_x = manual_cloud_cth
+                        cbh_x = manual_cloud_cbh
+                        cot_x = manual_cloud_cot
+                        cgt_x = cth_x - cbh_x
+                        cloud_source = 'manual'
+                    else:
+                        cot_x = np.nanmean(cld_leg['cot'])
                         cwp_x = np.nanmean(cld_leg['cwp'])
+                        cer_x = np.nanmean(cld_leg['cer'])
                         cth_x = np.nanmean(cld_leg['cth'])
                         cbh_x = np.nanmean(cld_leg['cbh'])
                         cgt_x = np.nanmean(cld_leg['cgt'])
-    
+                        cloud_source = 'satellite'
+
+                    has_cloud = (
+                        cot_x >= 0.1
+                        and np.isfinite(cwp_x)
+                        and np.isfinite(cth_x)
+                        and np.isfinite(cbh_x)
+                        and np.isfinite(cgt_x)
+                        and cgt_x > 0.0
+                    )
+                    if has_cloud:
                         cth_ind_cld = bisect.bisect_left(z_list, cth_x)
                         cbh_ind_cld = bisect.bisect_left(z_list, cbh_x)
-                        
-                        fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt'
-                        if os.path.exists(fname_cld):
-                            os.remove(fname_cld)
-                        cld_cfg = er3t.rtm.lrt.get_cld_cfg()
-                        cld_cfg['cloud_file'] = fname_cld
-                        cld_cfg['cloud_altitude'] = z_list[cbh_ind_cld:cth_ind_cld+1]
-                        cld_cfg['cloud_effective_radius']  = cer_x
-                        cld_cfg['liquid_water_content'] = cwp_x*1000/(cgt_x*1000) # convert kg/m^2 to g/m^3
-                        cld_cfg['cloud_optical_thickness'] = cot_x
+                        cloud_altitude = z_list[cbh_ind_cld:cth_ind_cld+1]
+                        if len(cloud_altitude) == 0:
+                            message = (
+                                f'No atmospheric levels selected for {cloud_source} cloud layer '
+                                f'{cbh_x:.3f}-{cth_x:.3f} km in leg {ileg+1}. '
+                                f'Check the custom levels for {date_s}_{case_tag}.'
+                            )
+                            if manual_cloud:
+                                raise ValueError(message)
+                            print(f'Warning: {message} Treating leg as clear.')
+                            cld_cfg = None
+                            dict_key = f'clear {alt_avg:.2f}'
+                            clear += 1
+                        else:
+                            fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt'
+                            if os.path.exists(fname_cld):
+                                os.remove(fname_cld)
+                            cld_cfg = er3t.rtm.lrt.get_cld_cfg()
+                            cloudy += 1
+                            cld_cfg['cloud_file'] = fname_cld
+                            cld_cfg['cloud_altitude'] = cloud_altitude
+                            cld_cfg['cloud_effective_radius']  = cer_x
+                            cld_cfg['liquid_water_content'] = cwp_x*1000/(cgt_x*1000) # convert kg/m^2 to g/m^3
+                            cld_cfg['cloud_optical_thickness'] = cot_x
 
-                        dict_key_arr = np.concatenate(([cld_cfg['cloud_optical_thickness']], [cld_cfg['cloud_effective_radius']], cld_cfg['cloud_altitude'], [alt_avg]))
-                        dict_key = '_'.join([f'{i:.3f}' for i in dict_key_arr])
+                            if manual_cloud:
+                                print(
+                                    f'Using manual cloud for leg {ileg+1}: '
+                                    f'CBH={cbh_x:.3f} km, CTH={cth_x:.3f} km, '
+                                    f'COT={cot_x:.3f}, CER={cer_x:.3f} um, '
+                                    f'CWP={cwp_x:.5f} kg/m^2, '
+                                    f'levels={cloud_altitude[0]:.3f}-{cloud_altitude[-1]:.3f} km '
+                                    f'({len(cloud_altitude)} points)'
+                                )
+
+                            dict_key_arr = np.concatenate(([cld_cfg['cloud_optical_thickness']], [cld_cfg['cloud_effective_radius']], cld_cfg['cloud_altitude'], [alt_avg]))
+                            dict_key = '_'.join([f'{i:.3f}' for i in dict_key_arr])
                     else:
+                        if manual_cloud:
+                            raise ValueError(
+                                f'Invalid manual cloud for leg {ileg+1}: '
+                                f'CBH={cbh_x}, CTH={cth_x}, COT={cot_x}, CWP={cwp_x}.'
+                            )
                         cld_cfg = None
                         dict_key = f'clear {alt_avg:.2f}'
                         clear += 1

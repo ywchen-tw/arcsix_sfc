@@ -23,6 +23,36 @@ except ImportError:
     from helpers import write_2col_file
 
 
+def write_1col_file(filename, values, header):
+    """Write one-column numeric data with a header."""
+    values = np.asarray(values, dtype=float)
+    with open(filename, 'w') as f:
+        f.write(header)
+        for value in values:
+            f.write(f'{value:11.3f}\n')
+
+
+def has_one_column_data_rows(filename):
+    """Return True when a text file has at least one one-column numeric data row."""
+    if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+        return False
+    found_data = False
+    with open(filename, 'r') as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            parts = stripped.split()
+            if len(parts) != 1:
+                return False
+            try:
+                float(parts[0])
+            except ValueError:
+                return False
+            found_data = True
+    return found_data
+
+
 def split_tmhr_ranges(tmhr_ranges_select, simulation_interval):
     """Split selected time ranges into shorter intervals."""
     if simulation_interval is None:
@@ -108,10 +138,9 @@ def lrt_final_sw_wavelength_grid():
 def write_final_sw_support_files():
     """Write support files for the final 300-4000 nm spectral SW run."""
     final_wvl = lrt_final_sw_wavelength_grid()
-    write_2col_file(
+    write_1col_file(
         'wvl_grid_final_sw.dat',
         final_wvl,
-        np.zeros_like(final_wvl),
         header=('# SSFR final SW wavelength grid file\n'
                 '# wavelength (nm)\n'),
     )
@@ -159,10 +188,16 @@ def write_ssfr_support_files(iter, clear_sky):
             header=('# SSFR InGaAs slit function\n'
                     '# wavelength (nm)      relative intensity\n'),
         )
-        write_2col_file(
+        write_1col_file(
             'wvl_grid_test.dat',
             xx_wvl_grid,
-            np.zeros_like(xx_wvl_grid),
+            header=('# SSFR Wavelength grid test file\n'
+                    '# wavelength (nm)\n'),
+        )
+    elif not has_one_column_data_rows('wvl_grid_test.dat'):
+        write_1col_file(
+            'wvl_grid_test.dat',
+            xx_wvl_grid,
             header=('# SSFR Wavelength grid test file\n'
                     '# wavelength (nm)\n'),
         )
