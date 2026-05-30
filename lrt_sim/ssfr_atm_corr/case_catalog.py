@@ -252,9 +252,10 @@ def mean_closure_metric_status(output_files, thresholds):
 ALL_CASE_CATALOG = [{'id': 'case_029',
   'date': '2024-05-28',
   'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [[15.610, 15.822],
-                                            [16.905, 17.404] 
-                                            ],
+  'tmhr_ranges_select': [
+                        [15.610, 15.822],
+                        [16.905, 17.404] 
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -265,29 +266,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 5, 28),\n'
-                   '                        tmhr_ranges_select=[[15.610, 15.822],\n'
-                   '                                            [16.905, 17.404] \n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+                    
  {'id': 'case_030',
   'date': '2024-05-31',
   'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [[13.839, 15.180],  # 5.6 km
-                                            ],
+  'tmhr_ranges_select': [
+                        [13.839, 15.180],  # 5.6 km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -298,29 +284,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),\n'
-                   '                        tmhr_ranges_select=[[13.839, 15.180],  # 5.6 km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,}
+ ,
  {'id': 'case_031',
   'date': '2024-05-31',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [16.905, 17.404] 
-                                            ],
+                        [16.905, 17.404] 
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -331,24 +302,8 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [16.905, 17.404] \n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_032',
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_1',
@@ -359,80 +314,43 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
-                                               np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 13.0,
-  'manual_cloud_cwp': 0.07781999999999999,
+  'manual_cloud_cwp': 0.07782,
   'manual_cloud_cwp_expr': '77.82 / 1000',
   'manual_cloud_cth': 1.93,
   'manual_cloud_cbh': 1.41,
-  'manual_cloud_cot': 21.27,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),\n'
-                   '                        tmhr_ranges_select=[[13.62, 13.75],  # 300m, cloudy, camera icing\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),\n'
-                   '                                               np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=13.0 ,\n'
-                   '                        manual_cloud_cwp=77.82/1000,\n'
-                   '                        manual_cloud_cth=1.93,\n'
-                   '                        manual_cloud_cbh=1.41,\n'
-                   '                        manual_cloud_cot=21.27,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 21.27,},
+ 
  {'id': 'case_033',
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_2',
-  'tmhr_ranges_select': [[14.711, 14.868],  # 300m, cloudy, camera icing
-                                            ],
+  'tmhr_ranges_select': [
+                        [14.711, 14.868],  # 300m, cloudy, camera icing
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 7.0,
   'manual_cloud_cwp': 0.11365,
   'manual_cloud_cwp_expr': '113.65 / 1000',
   'manual_cloud_cth': 1.91,
   'manual_cloud_cbh': 0.5,
-  'manual_cloud_cot': 24.31,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 3),\n'
-                   '                        tmhr_ranges_select=[[14.711, 14.868],  # 300m, cloudy, camera icing\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=7.0,\n'
-                   '                        manual_cloud_cwp=113.65/1000,\n'
-                   '                        manual_cloud_cth=1.91,\n'
-                   '                        manual_cloud_cbh=0.50,\n'
-                   '                        manual_cloud_cot=24.31,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 24.31,},
+ 
  {'id': 'case_034',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_1',
-  'tmhr_ranges_select': [[12.405, 13.812], # 5.7m,
-                                            ],
+  'tmhr_ranges_select': [
+                        [12.405, 13.812], # 5.7m,
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -443,29 +361,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),\n'
-                   '                        tmhr_ranges_select=[[12.405, 13.812], # 5.7m,\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_035',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [14.258, 15.036], # 100m
-                                            ],
+                        [14.258, 15.036], # 100m
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -476,30 +379,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [14.258, 15.036], # 100m\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_036',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_3',
   'tmhr_ranges_select': [
-                                            [15.535, 15.931], # 450m
-                                            ],
+                        [15.535, 15.931], # 450m
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -510,44 +397,28 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [15.535, 15.931], # 450m\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_3',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_037',
   'date': '2024-06-05',
   'case_tag': 'clear_sky_spiral_atm_corr',
   'tmhr_ranges_select': [
-                                            [13.7889, 13.8010],
-                                            [13.8350, 13.8395],
-                                            [13.8780, 13.8885],
-                                            [13.9240, 13.9255],
-                                            [13.9389, 13.9403],
-                                            [13.9540, 13.9715],
-                                            [13.9980, 14.0153],
-                                            [14.0417, 14.0575],
-                                            [14.0417, 14.0475],
-                                            [14.0560, 14.0590],
-                                            [14.0825, 14.0975],
-                                            [14.1264, 14.1525],
-                                            [14.1762, 14.1975],
-                                            [14.2194, 14.2420],
-                                            [14.2605, 14.2810]
-                                            ],
+                        [13.7889, 13.8010],
+                        [13.8350, 13.8395],
+                        [13.8780, 13.8885],
+                        [13.9240, 13.9255],
+                        [13.9389, 13.9403],
+                        [13.9540, 13.9715],
+                        [13.9980, 14.0153],
+                        [14.0417, 14.0575],
+                        [14.0417, 14.0475],
+                        [14.0560, 14.0590],
+                        [14.0825, 14.0975],
+                        [14.1264, 14.1525],
+                        [14.1762, 14.1975],
+                        [14.2194, 14.2420],
+                        [14.2605, 14.2810]
+                        ],
   'simulation_interval': None,
   'clear_sky': True,
   'manual_cloud': False,
@@ -558,45 +429,17 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 5),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [13.7889, 13.8010],\n'
-                   '                                            [13.8350, 13.8395],\n'
-                   '                                            [13.8780, 13.8885],\n'
-                   '                                            [13.9240, 13.9255],\n'
-                   '                                            [13.9389, 13.9403],\n'
-                   '                                            [13.9540, 13.9715],\n'
-                   '                                            [13.9980, 14.0153],\n'
-                   '                                            [14.0417, 14.0575],\n'
-                   '                                            [14.0417, 14.0475],\n'
-                   '                                            [14.0560, 14.0590],\n'
-                   '                                            [14.0825, 14.0975],\n'
-                   '                                            [14.1264, 14.1525],\n'
-                   '                                            [14.1762, 14.1975],\n'
-                   '                                            [14.2194, 14.2420],\n'
-                   '                                            [14.2605, 14.2810]\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_sky_spiral_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_038',
   'date': '2024-06-06',
   'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [[16.250, 16.325], # 100m, 
-                                            [16.375, 16.632], # 450m
-                                            [16.700, 16.794], # 100m
-                                            [16.850, 16.952], # 1.2km
-                                            ],
+  'tmhr_ranges_select': [
+                        [16.250, 16.325], # 100m, 
+                        [16.375, 16.632], # 450m
+                        [16.700, 16.794], # 100m
+                        [16.850, 16.952], # 1.2km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -607,79 +450,43 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 6),\n'
-                   '                        tmhr_ranges_select=[[16.250, 16.325], # 100m, \n'
-                   '                                            [16.375, 16.632], # 450m\n'
-                   '                                            [16.700, 16.794], # 100m\n'
-                   '                                            [16.850, 16.952], # 1.2km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_039',
   'date': '2024-06-07',
   'case_tag': 'cloudy_atm_corr',
-  'tmhr_ranges_select': [[15.319, 15.763], # 100m, cloudy
-                                            ],
+  'tmhr_ranges_select': [
+                        [15.319, 15.763], # 100m, cloudy
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 6.7,
   'manual_cloud_cwp': 0.02696,
   'manual_cloud_cwp_expr': '26.96 / 1000',
   'manual_cloud_cth': 0.43,
   'manual_cloud_cbh': 0.15,
-  'manual_cloud_cot': 6.02,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 7),\n'
-                   '                        tmhr_ranges_select=[[15.319, 15.763], # 100m, cloudy\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.43, 0.5, 0.6, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=6.7,\n'
-                   '                        manual_cloud_cwp=26.96/1000,\n'
-                   '                        manual_cloud_cth=0.43,\n'
-                   '                        manual_cloud_cbh=0.15,\n'
-                   '                        manual_cloud_cot=6.02,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 6.02,},
+ 
  {'id': 'case_040',
   'date': '2024-06-11',
   'case_tag': 'clear_sky_spiral_atm_corr',
-  'tmhr_ranges_select': [[14.5667, 14.5694],
-                                            [14.5986, 14.6097],
-                                            [14.6375, 14.6486], # cloud shadow
-                                            [14.6778, 14.6903],
-                                            [14.7208, 14.7403],
-                                            [14.7653, 14.7875],
-                                            [14.8125, 14.8278],
-                                            [14.8542, 14.8736],
-                                            [14.8986, 14.9389], # more cracks
-                                            ],
+  'tmhr_ranges_select': [
+                        [14.5667, 14.5694],
+                        [14.5986, 14.6097],
+                        [14.6375, 14.6486], # cloud shadow
+                        [14.6778, 14.6903],
+                        [14.7208, 14.7403],
+                        [14.7653, 14.7875],
+                        [14.8125, 14.8278],
+                        [14.8542, 14.8736],
+                        [14.8986, 14.9389], # more cracks
+                        ],
   'simulation_interval': None,
   'clear_sky': True,
   'manual_cloud': False,
@@ -690,38 +497,15 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),\n'
-                   '                        tmhr_ranges_select=[[14.5667, 14.5694],\n'
-                   '                                            [14.5986, 14.6097],\n'
-                   '                                            [14.6375, 14.6486], # cloud shadow\n'
-                   '                                            [14.6778, 14.6903],\n'
-                   '                                            [14.7208, 14.7403],\n'
-                   '                                            [14.7653, 14.7875],\n'
-                   '                                            [14.8125, 14.8278],\n'
-                   '                                            [14.8542, 14.8736],\n'
-                   '                                            [14.8986, 14.9389], # more cracks\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_sky_spiral_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=None,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_041',
   'date': '2024-06-11',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
-                                            [14.968, 15.229], # 100, clear, some cloud
-                                            [14.968, 15.347],
-                                            ],
+                        [14.968, 15.229], # 100, clear, some cloud
+                        [14.968, 15.347],
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -732,32 +516,15 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [14.968, 15.229], # 100, clear, some cloud\n'
-                   '                                            [14.968, 15.347],\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_042',
   'date': '2024-06-11',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [15.347, 15.813], # 100m
-                                            [15.813, 16.115], # 100-450m, clear, some cloud
-                                            ],
+                        [15.347, 15.813], # 100m
+                        [15.813, 16.115], # 100-450m, clear, some cloud
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -768,25 +535,8 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 11),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [15.347, 15.813], # 100m\n'
-                   '                                            [15.813, 16.115], # 100-450m, clear, some cloud\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_043',
   'date': '2024-06-13',
   'case_tag': 'clear_atm_corr_1',
@@ -802,148 +552,77 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),\n'
-                   '                        tmhr_ranges_select=[[13.704, 13.817], # 100-450m, clear, some cloud\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_044',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_1',
-  'tmhr_ranges_select': [[14.109, 14.140], # 100m, cloudy
-                                            ],
+  'tmhr_ranges_select': [
+                        [14.109, 14.140], # 100m, cloudy
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.4, 0.52, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 17.4,
-  'manual_cloud_cwp': 0.09051000000000001,
+  'manual_cloud_cwp': 0.09051,
   'manual_cloud_cwp_expr': '90.51 / 1000',
   'manual_cloud_cth': 0.52,
   'manual_cloud_cbh': 0.15,
-  'manual_cloud_cot': 7.82,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),\n'
-                   '                        tmhr_ranges_select=[[14.109, 14.140], # 100m, cloudy\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.4, 0.52, 0.6, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=17.4,\n'
-                   '                        manual_cloud_cwp=90.51/1000,\n'
-                   '                        manual_cloud_cth=0.52,\n'
-                   '                        manual_cloud_cbh=0.15,\n'
-                   '                        manual_cloud_cot=7.82,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 7.82,},
+ 
  {'id': 'case_045',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_2',
-  'tmhr_ranges_select': [[15.834, 15.883], # 100m, cloudy
-                                            ],
+  'tmhr_ranges_select': [
+                        [15.834, 15.883], # 100m, cloudy
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 22.4,
   'manual_cloud_cwp': 0.0356,
   'manual_cloud_cwp_expr': '35.6 / 1000',
   'manual_cloud_cth': 0.58,
   'manual_cloud_cbh': 0.28,
-  'manual_cloud_cot': 2.39,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),\n'
-                   '                        tmhr_ranges_select=[[15.834, 15.883], # 100m, cloudy\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.28, 0.3, 0.5, 0.58, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=22.4,\n'
-                   '                        manual_cloud_cwp=35.6/1000,\n'
-                   '                        manual_cloud_cth=0.58,\n'
-                   '                        manual_cloud_cbh=0.28,\n'
-                   '                        manual_cloud_cot=2.39,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 2.39,},
+ 
  {'id': 'case_046',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_3',
-  'tmhr_ranges_select': [[16.043, 16.067], # 100-200m, cloudy
-                                            ],
+  'tmhr_ranges_select': [
+                        [16.043, 16.067], # 100-200m, cloudy
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.38, 0.5, 0.68, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 8.9,
   'manual_cloud_cwp': 0.02129,
   'manual_cloud_cwp_expr': '21.29 / 1000',
   'manual_cloud_cth': 0.68,
   'manual_cloud_cbh': 0.38,
-  'manual_cloud_cot': 3.59,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),\n'
-                   '                        tmhr_ranges_select=[[16.043, 16.067], # 100-200m, cloudy\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_3',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.38, 0.5, 0.68, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=8.9,\n'
-                   '                        manual_cloud_cwp=21.29/1000,\n'
-                   '                        manual_cloud_cth=0.68,\n'
-                   '                        manual_cloud_cbh=0.38,\n'
-                   '                        manual_cloud_cot=3.59,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 3.59,},
+ 
  {'id': 'case_047',
   'date': '2024-06-13',
   'case_tag': 'clear_atm_corr_2',
-  'tmhr_ranges_select': [[16.550, 17.581], # 100-500m, clear
-                                            ],
+  'tmhr_ranges_select': [
+                        [16.550, 17.581], # 100-500m, clear
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -954,116 +633,63 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 6, 13),\n'
-                   '                        tmhr_ranges_select=[[16.550, 17.581], # 100-500m, clear\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_048',
   'date': '2024-07-25',
   'case_tag': 'cloudy_atm_corr',
-  'tmhr_ranges_select': [[15.094, 15.300], # 100m, some low clouds or fog below
-                                            ],
+  'tmhr_ranges_select': [
+                        [15.094, 15.300], # 100m, some low clouds or fog below
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 11.4,
   'manual_cloud_cwp': 0.00994,
   'manual_cloud_cwp_expr': '9.94 / 1000',
   'manual_cloud_cth': 0.3,
   'manual_cloud_cbh': 0.16,
-  'manual_cloud_cot': 1.31,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),\n'
-                   '                        tmhr_ranges_select=[[15.094, 15.300], # 100m, some low clouds or fog '
-                   'below\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=11.4,\n'
-                   '                        manual_cloud_cwp=9.94/1000,\n'
-                   '                        manual_cloud_cth=0.30,\n'
-                   '                        manual_cloud_cbh=0.16,\n'
-                   '                        manual_cloud_cot=1.31,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 1.31,},
+ 
  {'id': 'case_049',
   'date': '2024-07-25',
   'case_tag': 'cloudy_atm_corr_2',
-  'tmhr_ranges_select': [[15.881, 15.903], # 200-500m
-                                            ],
+  'tmhr_ranges_select': [
+                        [15.881, 15.903], # 200-500m
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': False,
   'manual_cloud': True,
   'has_custom_levels': True,
   'levels': np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0,]),
-                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
-                                               np.arange(5.0, 10.1, 2.5),
-                                               np.array([15, 20, 30., 40., 45.]))),
+                            np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
   'manual_cloud_cer': 11.4,
   'manual_cloud_cwp': 0.00994,
   'manual_cloud_cwp_expr': '9.94 / 1000',
   'manual_cloud_cth': 0.3,
   'manual_cloud_cbh': 0.16,
-  'manual_cloud_cot': 1.31,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 25),\n'
-                   '                        tmhr_ranges_select=[[15.881, 15.903], # 200-500m\n'
-                   '                                            ],\n'
-                   "                        case_tag='cloudy_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        levels=np.concatenate((np.array([0.0, 0.1, 0.16, 0.2, 0.3, 0.4, 0.6, 0.8, '
-                   '1.0,]),\n'
-                   '                                               np.array([1.5, 2.0, 2.5, 3.0, 4.0]), \n'
-                   '                                               np.arange(5.0, 10.1, 2.5),\n'
-                   '                                               np.array([15, 20, 30., 40., 45.]))),\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=False,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=True,\n'
-                   '                        manual_cloud_cer=11.4,\n'
-                   '                        manual_cloud_cwp=9.94/1000,\n'
-                   '                        manual_cloud_cth=0.30,\n'
-                   '                        manual_cloud_cbh=0.16,\n'
-                   '                        manual_cloud_cot=1.31,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 1.31,},
+ 
  {'id': 'case_050',
   'date': '2024-07-29',
   'case_tag': 'clear_sky_spiral_atm_corr',
-  'tmhr_ranges_select': [[13.442, 13.465],
-                                            [13.490, 13.514],
-                                            [13.536, 13.554],
-                                            [13.580, 13.611],
-                                            [13.639, 13.654],
-                                            [13.676, 13.707],
-                                            [13.733, 13.775],
-                                            [13.793, 13.836],
-                                            ],
+  'tmhr_ranges_select': [
+                        [13.442, 13.465],
+                        [13.490, 13.514],
+                        [13.536, 13.554],
+                        [13.580, 13.611],
+                        [13.639, 13.654],
+                        [13.676, 13.707],
+                        [13.733, 13.775],
+                        [13.793, 13.836],
+                        ],
   'simulation_interval': None,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1074,36 +700,15 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 29),\n'
-                   '                        tmhr_ranges_select=[[13.442, 13.465],\n'
-                   '                                            [13.490, 13.514],\n'
-                   '                                            [13.536, 13.554],\n'
-                   '                                            [13.580, 13.611],\n'
-                   '                                            [13.639, 13.654],\n'
-                   '                                            [13.676, 13.707],\n'
-                   '                                            [13.733, 13.775],\n'
-                   '                                            [13.793, 13.836],\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_sky_spiral_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=None,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_051',
   'date': '2024-07-29',
   'case_tag': 'clear_atm_corr_1',
-  'tmhr_ranges_select': [[13.939, 14.200], # 100m, clear
-                                            [14.438, 14.714], # 3.7km
-                                            ],
+  'tmhr_ranges_select': [
+                        [13.939, 14.200], # 100m, clear
+                        [14.438, 14.714], # 3.7km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1114,31 +719,15 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 29),\n'
-                   '                        tmhr_ranges_select=[[13.939, 14.200], # 100m, clear\n'
-                   '                                            [14.438, 14.714], # 3.7km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_052',
   'date': '2024-07-29',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [15.214, 15.804], # 1.3km
-                                            [16.176, 16.304], # 1.3km
-                                            ],
+                        [15.214, 15.804], # 1.3km
+                        [16.176, 16.304], # 1.3km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1149,39 +738,23 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 29),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [15.214, 15.804], # 1.3km\n'
-                   '                                            [16.176, 16.304], # 1.3km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_053',
   'date': '2024-07-30',
   'case_tag': 'clear_sky_spiral_atm_corr',
-  'tmhr_ranges_select': [[13.886, 13.908],
-                                            [13.934, 13.950],
-                                            [13.976, 14.000],
-                                            [14.031, 14.051],
-                                            [14.073, 14.096],
-                                            [14.115, 14.134],
-                                            [14.157, 14.179],
-                                            [14.202, 14.219],
-                                            [14.239, 14.254],
-                                            [14.275, 14.294],
-                                            ],
+  'tmhr_ranges_select': [
+                        [13.886, 13.908],
+                        [13.934, 13.950],
+                        [13.976, 14.000],
+                        [14.031, 14.051],
+                        [14.073, 14.096],
+                        [14.115, 14.134],
+                        [14.157, 14.179],
+                        [14.202, 14.219],
+                        [14.239, 14.254],
+                        [14.275, 14.294],
+                        ],
   'simulation_interval': None,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1192,38 +765,15 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 30),\n'
-                   '                        tmhr_ranges_select=[[13.886, 13.908],\n'
-                   '                                            [13.934, 13.950],\n'
-                   '                                            [13.976, 14.000],\n'
-                   '                                            [14.031, 14.051],\n'
-                   '                                            [14.073, 14.096],\n'
-                   '                                            [14.115, 14.134],\n'
-                   '                                            [14.157, 14.179],\n'
-                   '                                            [14.202, 14.219],\n'
-                   '                                            [14.239, 14.254],\n'
-                   '                                            [14.275, 14.294],\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_sky_spiral_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=None,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_054',
   'date': '2024-07-30',
   'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [[14.318, 14.936], # 100-450m, clear
-                                            [15.043, 15.140], # 1.5km
-                                            ],
+  'tmhr_ranges_select': [
+                        [14.318, 14.936], # 100-450m, clear
+                        [15.043, 15.140], # 1.5km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1234,29 +784,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 7, 30),\n'
-                   '                        tmhr_ranges_select=[[14.318, 14.936], # 100-450m, clear\n'
-                   '                                            [15.043, 15.140], # 1.5km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_055',
   'date': '2024-08-01',
   'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [[13.843, 14.361], # 100-450m, clear, some open ocean
-                                            ],
+  'tmhr_ranges_select': [
+                        [13.843, 14.361], # 100-450m, clear, some open ocean
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1267,29 +802,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),\n'
-                   '                        tmhr_ranges_select=[[13.843, 14.361], # 100-450m, clear, some open ocean\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_056',
   'date': '2024-08-01',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [14.739, 15.053], # 550m
-                                            ],
+                        [14.739, 15.053], # 550m
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1300,30 +820,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 8, 1),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [14.739, 15.053], # 550m\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_057',
   'date': '2024-08-02',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
-                                            [14.557, 15.100], # 100m
-                                            ],
+                        [14.557, 15.100], # 100m
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1334,30 +838,14 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 8, 2),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [14.557, 15.100], # 100m\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_1',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_058',
   'date': '2024-08-02',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
-                                            [15.244, 16.635], # 1km
-                                            ],
+                        [15.244, 16.635], # 1km
+                        ],
   'simulation_interval': 0.5,
   'clear_sky': True,
   'manual_cloud': False,
@@ -1368,24 +856,8 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cwp_expr': '0.0',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
-  'manual_cloud_cot': 0.0,
-  'original_call': 'flt_trk_atm_corr(date=datetime.datetime(2024, 8, 2),\n'
-                   '                        tmhr_ranges_select=[\n'
-                   '                                            [15.244, 16.635], # 1km\n'
-                   '                                            ],\n'
-                   "                        case_tag='clear_atm_corr_2',\n"
-                   '                        config=config,\n'
-                   '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
-                   '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
-                   '                        manual_cloud_cer=0.0,\n'
-                   '                        manual_cloud_cwp=0.0,\n'
-                   '                        manual_cloud_cth=0.0,\n'
-                   '                        manual_cloud_cbh=0.0,\n'
-                   '                        manual_cloud_cot=0.0,\n'
-                   '                        iter=iter,\n'
-                   '                        )'},
+  'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_059',
   'date': '2024-08-07',
   'case_tag': 'clear_atm_corr_1',
@@ -1405,6 +877,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.78,
   'manual_cloud_cbh': 0.69,
   'manual_cloud_cot': 1.59,},
+ 
  {'id': 'case_060',
   'date': '2024-08-07',
   'case_tag': 'cloudy_atm_corr_2',
@@ -1426,6 +899,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.96,
   'manual_cloud_cbh': 0.62,
   'manual_cloud_cot': 16.21,},
+ 
  {'id': 'case_061',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_1',
@@ -1443,6 +917,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
   'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_062',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_2',
@@ -1460,6 +935,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
   'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_063',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_3',
@@ -1477,6 +953,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
   'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_064',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_1',
@@ -1497,6 +974,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 1.98,
   'manual_cloud_cbh': 0.67,
   'manual_cloud_cot': 14.12,},
+ 
  {'id': 'case_065',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_2',
@@ -1517,6 +995,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 2.21,
   'manual_cloud_cbh': 1.81,
   'manual_cloud_cot': 12.41,},
+ 
  {'id': 'case_066',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_1',
@@ -1537,6 +1016,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.77,
   'manual_cloud_cbh': 0.34,
   'manual_cloud_cot': 13.93,},
+ 
  {'id': 'case_067',
   'date': '2024-08-09',
   'case_tag': 'clear_atm_corr',
@@ -1555,6 +1035,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.0,
   'manual_cloud_cbh': 0.0,
   'manual_cloud_cot': 0.0,},
+ 
  {'id': 'case_068',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_2',
@@ -1575,6 +1056,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cth': 0.62,
   'manual_cloud_cbh': 0.29,
   'manual_cloud_cot': 8.93,},
+ 
  {'id': 'case_069',
   'date': '2024-08-15',
   'case_tag': 'clear_atm_corr',
