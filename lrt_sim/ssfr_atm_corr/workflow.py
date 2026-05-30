@@ -773,24 +773,21 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_toa_dnflux_toa_ratio_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
 
             
-            if 1:#iter == 0:
-                fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
-                ax.plot(alb_wvl, alb_avg, label='SSFR upward/downward ratio')
-                ax.plot(alb_wvl, alb_corr, label='updated albedo (Odele)')
-                ax.plot(alb_wvl, alb_ice_fit, label='updated albedo (fit)')
-                # fill between wavelengths where T_total < 0.05
-                ax.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-                
-                ax.set_xlabel('Wavelength (nm)', fontsize=12)
-                ax.set_ylabel('Albedo', fontsize=12)
-                ax.set_ylim([-0.05, 1.05])
-                ax.set_xlim(cld_leg['ssfr_zen_wvl'][0], cld_leg['ssfr_zen_wvl'][-1])
-                ax.legend(fontsize=10)
-                ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km')
-                fig.tight_layout()
-                fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_albedo_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
-                # plt.show()
-            # sys.exit()
+            fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
+            ax.plot(alb_wvl, alb_avg, label='SSFR upward/downward ratio')
+            ax.plot(alb_wvl, alb_corr, label='updated albedo (Odele)')
+            ax.plot(alb_wvl, alb_ice_fit, label='updated albedo (fit)')
+            # fill between wavelengths where T_total < 0.05
+            ax.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(alb_corr_mask), color='gray', alpha=0.2, label='Mask Gas absorption bands')
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('Albedo', fontsize=12)
+            ax.set_ylim([-0.05, 1.05])
+            ax.set_xlim(cld_leg['ssfr_zen_wvl'][0], cld_leg['ssfr_zen_wvl'][-1])
+            ax.legend(fontsize=10)
+            ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km')
+            fig.tight_layout()
+            fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_albedo_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
+
         
             (
                 fup_total_rmse,
