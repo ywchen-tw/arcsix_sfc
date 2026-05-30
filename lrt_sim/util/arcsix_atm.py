@@ -167,8 +167,27 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
     
     mod_extent = [np.float64(i) for i in mod_extent]
     
-    aqua_time_tag = get_filename_tag(date, np.array(mod_extent[:2]), np.array(mod_extent[2:]), satID='aqua')
-    terra_time_tag = get_filename_tag(date, np.array(mod_extent[:2]), np.array(mod_extent[2:]), satID='terra')
+    def safe_get_filename_tag(sat_id):
+        try:
+            return get_filename_tag(
+                date,
+                np.array(mod_extent[:2]),
+                np.array(mod_extent[2:]),
+                satID=sat_id,
+            )
+        except Exception as err:
+            print(
+                f"Warning: MODIS {sat_id} filename-tag lookup failed for "
+                f"{date_s} extent={mod_extent}.\n"
+                f"  Error type: {type(err).__name__}\n"
+                f"  Error message: {err}\n"
+                f"  If this happens for both Aqua and Terra, check whether your "
+                f"Earthdata/LAADS token or login session has expired."
+            )
+            return None
+
+    aqua_time_tag = safe_get_filename_tag('aqua')
+    terra_time_tag = safe_get_filename_tag('terra')
     
     sat_time_tags, sat_time_tags_int, sat_id_list = [], [], []
     if aqua_time_tag is not None:
@@ -185,7 +204,10 @@ def prepare_atmospheric_profile(fdir_data, date_s, case_tag, ileg, date, time_st
     # find the closest overpass time
     time_diffs = [abs(int(t) - int(time_s)) for t in sat_time_tags_int]
     if len(time_diffs) == 0:
-        raise ValueError("No MODIS overpass found for the given date and extent")
+        raise ValueError(
+            f"No MODIS overpass found for {date_s} {case_tag} leg {ileg} "
+            f"time {time_start:.3f}-{time_end:.3f}h extent={mod_extent}"
+        )
     min_ind = np.argmin(time_diffs)
     satID = sat_id_list[min_ind]
     sat_time_tag_final = sat_time_tags[min_ind]

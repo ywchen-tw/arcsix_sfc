@@ -13,9 +13,21 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
         sys.path.insert(0, _path)
 
 if __package__:
-    from .runner import CASE_ID_LIST, DEFAULT_CASE_ID, SPIRAL_CASE_ID_LIST
+    from .runner import (
+        CASE_ID_LIST,
+        CLEAR_SKY_CASE_ID_LIST,
+        CLOUDY_CASE_ID_LIST,
+        DEFAULT_CASE_ID,
+        SPIRAL_CASE_ID_LIST,
+    )
 else:
-    from runner import CASE_ID_LIST, DEFAULT_CASE_ID, SPIRAL_CASE_ID_LIST
+    from runner import (
+        CASE_ID_LIST,
+        CLEAR_SKY_CASE_ID_LIST,
+        CLOUDY_CASE_ID_LIST,
+        DEFAULT_CASE_ID,
+        SPIRAL_CASE_ID_LIST,
+    )
 
 
 def run_preprocess_cases(case_id=DEFAULT_CASE_ID, case_ids=None, overwrite=False, plot_qc=True):
@@ -65,7 +77,17 @@ def parse_args():
     parser.add_argument(
         '--track-all',
         action='store_true',
-        help='Preprocess all track case IDs.',
+        help='Preprocess all clear-sky and cloudy track case IDs.',
+    )
+    parser.add_argument(
+        '--clear-sky-all',
+        action='store_true',
+        help='Preprocess all clear-sky track case IDs.',
+    )
+    parser.add_argument(
+        '--cloudy-all',
+        action='store_true',
+        help='Preprocess all cloudy track case IDs.',
     )
     parser.add_argument(
         '--spiral-all',
@@ -89,12 +111,17 @@ if __name__ == '__main__':
     args = parse_args()
     if args.all:
         selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
-    elif args.track_all or args.spiral_all:
+    elif args.track_all or args.clear_sky_all or args.cloudy_all or args.spiral_all:
         selected_case_ids = []
         if args.track_all:
             selected_case_ids.extend(CASE_ID_LIST)
+        if args.clear_sky_all:
+            selected_case_ids.extend(CLEAR_SKY_CASE_ID_LIST)
+        if args.cloudy_all:
+            selected_case_ids.extend(CLOUDY_CASE_ID_LIST)
         if args.spiral_all:
             selected_case_ids.extend(SPIRAL_CASE_ID_LIST)
+        selected_case_ids = list(dict.fromkeys(selected_case_ids))
     elif args.case_ids:
         selected_case_ids = args.case_ids
     else:
