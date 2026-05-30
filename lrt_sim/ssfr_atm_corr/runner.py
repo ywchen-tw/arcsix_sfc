@@ -26,14 +26,22 @@ else:
 
 DEFAULT_CASE_ID = 'case_029'
 
-CASE_ID_LIST = [
-    'case_029', 'case_030', 'case_031', 'case_034',
-    'case_035', 'case_036', 'case_037', 'case_038', 'case_040',
-    'case_041', 'case_042', 'case_043', 'case_047', 'case_050',
-    'case_051', 'case_052', 'case_053', 'case_054', 'case_055',
-    'case_056', 'case_057', 'case_058', 'case_061', 'case_062',
-    'case_063', 'case_067', 'case_069',
+DEFAULT_LEVEL_CASE_ID_LIST = [
+    'case_029', 'case_030', 'case_031', 'case_034', 'case_035',
+    'case_036', 'case_037', 'case_038', 'case_040', 'case_041',
+    'case_042', 'case_043', 'case_047', 'case_050', 'case_051',
+    'case_052', 'case_053', 'case_054', 'case_055', 'case_056',
+    'case_057', 'case_058', 'case_061', 'case_062', 'case_063',
+    'case_067', 'case_069',
 ]
+
+CUSTOM_LEVEL_CASE_ID_LIST = [
+    'case_032', 'case_033', 'case_039', 'case_044', 'case_045',
+    'case_046', 'case_048', 'case_049', 'case_059', 'case_060',
+    'case_064', 'case_065', 'case_066', 'case_068',
+]
+
+CASE_ID_LIST = sorted(DEFAULT_LEVEL_CASE_ID_LIST + CUSTOM_LEVEL_CASE_ID_LIST)
 
 SPIRAL_CASE_ID_LIST = [
     'spiral_001', 'spiral_002', 'spiral_003', 'spiral_004', 'spiral_005',

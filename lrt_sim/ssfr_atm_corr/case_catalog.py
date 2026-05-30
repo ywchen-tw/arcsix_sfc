@@ -57,6 +57,57 @@ def split_case_tmhr_ranges(tmhr_ranges_select, simulation_interval):
     return split_ranges
 
 
+def extract_call_argument(call_text, argument_name):
+    """Extract one keyword argument expression from a stored function call."""
+    marker = f'{argument_name}='
+    start = call_text.find(marker)
+    if start < 0:
+        return None
+    start += len(marker)
+
+    depth = 0
+    quote = None
+    for offset, char in enumerate(call_text[start:]):
+        if quote:
+            if char == quote and call_text[start + offset - 1] != '\\':
+                quote = None
+            continue
+        if char in ('"', "'"):
+            quote = char
+            continue
+        if char in '([{':
+            depth += 1
+            continue
+        if char in ')]}':
+            depth -= 1
+            continue
+        if char == ',' and depth == 0:
+            return call_text[start:start + offset].strip()
+    return call_text[start:].strip()
+
+
+def catalog_case_levels(case):
+    """Return custom atmospheric levels for a catalog case, or None for default levels."""
+    if not case.get('has_custom_levels'):
+        return None
+
+    import numpy as np
+
+    levels_expr = extract_call_argument(case['original_call'], 'levels')
+    if levels_expr is None:
+        raise ValueError(f"{case['id']} is marked has_custom_levels but has no levels expression.")
+
+    try:
+        levels = eval(levels_expr, {'__builtins__': {}}, {'np': np})
+    except Exception as err:
+        raise ValueError(f"Could not evaluate custom levels for {case['id']}: {levels_expr}") from err
+
+    levels = np.asarray(levels, dtype=float)
+    if levels.ndim != 1 or levels.size == 0:
+        raise ValueError(f"{case['id']} custom levels must be a non-empty 1-D array.")
+    return levels
+
+
 def missing_cloud_observation_files(case, date_s):
     """Return missing preprocessed cloud-observation files needed by a catalog case."""
     tmhr_ranges_select = split_case_tmhr_ranges(
@@ -2472,8 +2523,8 @@ ALL_CASE_CATALOG = [{'id': 'case_001',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [[13.212, 13.347]],
   'simulation_interval': 0.5,
-  'clear_sky': True,
-  'manual_cloud': False,
+  'clear_sky': False,
+  'manual_cloud': True,
   'has_custom_levels': True,
   'manual_cloud_cer': 15.3,
   'manual_cloud_cwp': 0.14393999999999998,
@@ -2493,9 +2544,9 @@ ALL_CASE_CATALOG = [{'id': 'case_001',
                    '                                               np.arange(5.0, 10.1, 2.5),\n'
                    '                                               np.array([15, 20, 30., 40., 45.]))),\n'
                    '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
+                   '                        clear_sky=False,\n'
                    '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
+                   '                        manual_cloud=True,\n'
                    '                        manual_cloud_cer=15.3,\n'
                    '                        manual_cloud_cwp=143.94/1000,\n'
                    '                        manual_cloud_cth=1.98,\n'
@@ -2508,8 +2559,8 @@ ALL_CASE_CATALOG = [{'id': 'case_001',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [[15.314, 15.504]],
   'simulation_interval': 0.5,
-  'clear_sky': True,
-  'manual_cloud': False,
+  'clear_sky': False,
+  'manual_cloud': True,
   'has_custom_levels': True,
   'manual_cloud_cer': 7.8,
   'manual_cloud_cwp': 0.06418,
@@ -2528,9 +2579,9 @@ ALL_CASE_CATALOG = [{'id': 'case_001',
                    '                                               np.arange(5.0, 10.1, 2.5),\n'
                    '                                               np.array([15, 20, 30., 40., 45.]))),\n'
                    '                        simulation_interval=0.5,\n'
-                   '                        clear_sky=True,\n'
+                   '                        clear_sky=False,\n'
                    '                        overwrite_lrt=atm_corr_overwrite_lrt,\n'
-                   '                        manual_cloud=False,\n'
+                   '                        manual_cloud=True,\n'
                    '                        manual_cloud_cer=7.8,\n'
                    '                        manual_cloud_cwp=64.18/1000,\n'
                    '                        manual_cloud_cth=2.21,\n'
@@ -2902,10 +2953,9 @@ def run_catalog_case(
     run_final_sim=True,
     skip_missing_cloud_observations=True,
 ):
-    """Run a catalog case that does not require custom levels."""
+    """Run one atmospheric-correction catalog case."""
     case = get_case(case_id)
-    if case['has_custom_levels']:
-        raise ValueError(f"{case_id} used custom levels in the original script; see case['original_call'].")
+    levels = catalog_case_levels(case)
     year, month, day = [int(part) for part in case['date'].split('-')]
     date_s = f'{year:04d}{month:02d}{day:02d}'
     missing_cloud_files = missing_cloud_observation_files(case, date_s)
@@ -2929,6 +2979,7 @@ def run_catalog_case(
             tmhr_ranges_select=case['tmhr_ranges_select'],
             case_tag=case['case_tag'],
             config=config,
+            levels=levels,
             simulation_interval=case['simulation_interval'],
             clear_sky=case['clear_sky'],
             overwrite_lrt=overwrite_lrt,
@@ -2949,6 +3000,7 @@ def run_catalog_case(
             tmhr_ranges_select=case['tmhr_ranges_select'],
             case_tag=case['case_tag'],
             config=config,
+            levels=levels,
             simulation_interval=case['simulation_interval'],
             clear_sky=case['clear_sky'],
             overwrite_lrt=overwrite_lrt,
