@@ -2913,7 +2913,8 @@ def run_catalog_case(
         missing_text = '\n  '.join(missing_cloud_files)
         message = (
             f'{case_id}: missing {len(missing_cloud_files)} preprocessed cloud-observation file(s); '
-            f'this case cannot run until they are generated.\n  {missing_text}'
+            f'this case cannot run until they are generated. '
+            f'Run python3 -m lrt_sim.ssfr_atm_corr.preprocess_runner {case_id} first.\n  {missing_text}'
         )
         if skip_missing_cloud_observations:
             print(f'{message}\n{case_id}: skipping case.')
