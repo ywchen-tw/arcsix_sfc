@@ -191,7 +191,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     
 
     
-    data_dropsonde = load_nearest_dropsonde(_fdir_general_, date, tmhr_ranges_select, log)
+    data_dropsonde_legs = load_nearest_dropsonde(_fdir_general_, date, tmhr_ranges_select, log)
 
     zpt_filedir = f'{_fdir_general_}/zpt/{date_s}'
     os.makedirs(zpt_filedir, exist_ok=True)
@@ -275,6 +275,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             print("Start leg %d atmospheric correction ..." % (ileg+1))
             print(f"Date: {date_s}, Time: {time_start:.3f}-{time_end:.3f}h, Alt: {alt_avg:.2f}km")
             if iter==0:
+                data_dropsonde = data_dropsonde_legs[ileg] if data_dropsonde_legs else None
                 prepare_atmospheric_profile(_fdir_general_, date_s, case_tag, ileg, date, time_start, time_end,
                                             alt_avg, data_dropsonde,
                                             cld_leg, levels=levels,

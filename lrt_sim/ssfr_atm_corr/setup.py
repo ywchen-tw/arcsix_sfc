@@ -50,7 +50,7 @@ def default_atm_levels():
 
 
 def load_nearest_dropsonde(fdir_general, date, tmhr_ranges_select, log):
-    """Load the dropsonde nearest to the selected flight time windows."""
+    """Load the nearest dropsonde profile for each selected flight time window."""
     dropsonde_file_list, dropsonde_date_list, dropsonde_tmhr_list, _, _ = dropsonde_time_loc_list(
         dir_dropsonde=f'{fdir_general}/dropsonde'
     )
@@ -59,19 +59,32 @@ def load_nearest_dropsonde(fdir_general, date, tmhr_ranges_select, log):
     if np.sum(date_select) == 0:
         print(f"No dropsonde data found for date {date.strftime('%Y-%m-%d')}")
         log.info(f"No dropsonde data found for date {date.strftime('%Y-%m-%d')}")
-        return None
+        return [None for _ in tmhr_ranges_select]
 
     dropsonde_tmhr_array = np.array(dropsonde_tmhr_list)[date_select]
+    dropsonde_files = np.array(dropsonde_file_list)[date_select]
     mid_tmhr = np.array([np.mean(rng) for rng in tmhr_ranges_select])
     dropsonde_idx = closest_indices(dropsonde_tmhr_array, mid_tmhr)
-    dropsonde_file = np.array(dropsonde_file_list)[date_select][dropsonde_idx[0]]
-    log.info(f"Using dropsonde file: {dropsonde_file}")
-    _, data_dropsonde = read_ict_dropsonde(
-        dropsonde_file,
-        encoding='utf-8',
-        na_values=[-9999999, -777, -888],
-    )
-    return data_dropsonde
+
+    data_dropsonde_legs = []
+    data_dropsonde_by_file = {}
+    for time_range, idx in zip(tmhr_ranges_select, dropsonde_idx):
+        dropsonde_file = dropsonde_files[idx]
+        if dropsonde_file not in data_dropsonde_by_file:
+            _, data_dropsonde_by_file[dropsonde_file] = read_ict_dropsonde(
+                dropsonde_file,
+                encoding='utf-8',
+                na_values=[-9999999, -777, -888],
+            )
+        data_dropsonde_legs.append(data_dropsonde_by_file[dropsonde_file])
+        log.info(
+            "Using dropsonde file for %.3f-%.3fh: %s",
+            time_range[0],
+            time_range[1],
+            dropsonde_file,
+        )
+
+    return data_dropsonde_legs
 
 
 def lrt_wavelength_grid(clear_sky):
