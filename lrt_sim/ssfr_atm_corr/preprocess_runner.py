@@ -13,17 +13,17 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
         sys.path.insert(0, _path)
 
 if __package__:
-    from .runner import CASE_ID_LIST, DEFAULT_CASE_ID
+    from .runner import CASE_ID_LIST, DEFAULT_CASE_ID, SPIRAL_CASE_ID_LIST
 else:
-    from runner import CASE_ID_LIST, DEFAULT_CASE_ID
+    from runner import CASE_ID_LIST, DEFAULT_CASE_ID, SPIRAL_CASE_ID_LIST
 
 
 def run_preprocess_cases(case_id=DEFAULT_CASE_ID, case_ids=None, overwrite=False, plot_qc=True):
     """Preprocess one or more catalog cases for atmospheric correction."""
     if __package__:
-        from .preprocess import make_default_config, preprocess_catalog_case
+        from .preprocess import make_default_config, preprocess_catalog_case, preprocess_spiral_catalog_case
     else:
-        from preprocess import make_default_config, preprocess_catalog_case
+        from preprocess import make_default_config, preprocess_catalog_case, preprocess_spiral_catalog_case
 
     os.makedirs('./fig', exist_ok=True)
     config = make_default_config()
@@ -31,12 +31,23 @@ def run_preprocess_cases(case_id=DEFAULT_CASE_ID, case_ids=None, overwrite=False
         case_ids = [case_id]
 
     for selected_case_id in case_ids:
-        preprocess_catalog_case(
-            config,
-            selected_case_id,
-            overwrite=overwrite,
-            plot_qc=plot_qc,
-        )
+        if selected_case_id in CASE_ID_LIST:
+            preprocess_catalog_case(
+                config,
+                selected_case_id,
+                overwrite=overwrite,
+                plot_qc=plot_qc,
+            )
+        elif selected_case_id in SPIRAL_CASE_ID_LIST:
+            preprocess_spiral_catalog_case(
+                config,
+                selected_case_id,
+                overwrite=overwrite,
+                plot_qc=plot_qc,
+            )
+        else:
+            valid_text = ', '.join(CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
+            raise ValueError(f'Unknown case ID: {selected_case_id}. Valid IDs: {valid_text}')
 
 
 def parse_args():
@@ -49,7 +60,17 @@ def parse_args():
     parser.add_argument(
         '--all',
         action='store_true',
-        help='Preprocess all case IDs listed in ssfr_atm_corr.runner.CASE_ID_LIST.',
+        help='Preprocess all track and spiral case IDs.',
+    )
+    parser.add_argument(
+        '--track-all',
+        action='store_true',
+        help='Preprocess all track case IDs.',
+    )
+    parser.add_argument(
+        '--spiral-all',
+        action='store_true',
+        help='Preprocess all spiral case IDs.',
     )
     parser.add_argument(
         '--overwrite',
@@ -67,7 +88,13 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     if args.all:
-        selected_case_ids = CASE_ID_LIST
+        selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
+    elif args.track_all or args.spiral_all:
+        selected_case_ids = []
+        if args.track_all:
+            selected_case_ids.extend(CASE_ID_LIST)
+        if args.spiral_all:
+            selected_case_ids.extend(SPIRAL_CASE_ID_LIST)
     elif args.case_ids:
         selected_case_ids = args.case_ids
     else:

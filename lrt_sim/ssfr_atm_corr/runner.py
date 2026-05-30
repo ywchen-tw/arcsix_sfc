@@ -7,7 +7,6 @@ workflow implementation.
 import os
 import sys
 import datetime
-import argparse
 from pathlib import Path
 
 _THIS_FILE = Path(__file__).resolve()
@@ -118,87 +117,16 @@ def run_spiral_cases(atm_corr_spiral_plot, spiral_case_ids=None):
         )
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Run SSFR atmospheric-correction catalog cases.')
-    parser.add_argument(
-        'case_ids',
-        nargs='*',
-        help=(
-            'Case IDs to run. Use case_### for track cases and spiral_### for spiral cases. '
-            f'Defaults to {DEFAULT_CASE_ID}.'
-        ),
-    )
-    parser.add_argument(
-        '--all',
-        action='store_true',
-        help='Run all track and spiral cases.',
-    )
-    parser.add_argument(
-        '--track-all',
-        action='store_true',
-        help='Run all track cases.',
-    )
-    parser.add_argument(
-        '--spiral-all',
-        action='store_true',
-        help='Run all spiral cases.',
-    )
-    parser.add_argument(
-        '--iterations',
-        type=int,
-        default=8,
-        help='Number of track-workflow iterations to allow. Default: 8.',
-    )
-    parser.add_argument(
-        '--no-overwrite-lrt',
-        action='store_true',
-        help='Do not overwrite existing libRadtran products.',
-    )
-    return parser.parse_args()
+if __name__ == '__main__':
+    RUN_TRACK_CASES = True
+    RUN_SPIRAL_CASES = False
 
+    TRACK_CASE_IDS = [DEFAULT_CASE_ID]
+    SPIRAL_CASE_IDS = SPIRAL_CASE_ID_LIST
+    ITERATIONS = range(8)
+    OVERWRITE_LRT = True
 
-def split_selected_case_ids(selected_case_ids):
-    """Split selected IDs into track and spiral case IDs."""
-    track_case_ids = []
-    spiral_case_ids = []
-    unknown_case_ids = []
-
-    for case_id in selected_case_ids:
-        if case_id in CASE_ID_LIST:
-            track_case_ids.append(case_id)
-        elif case_id in SPIRAL_CASE_ID_LIST:
-            spiral_case_ids.append(case_id)
-        else:
-            unknown_case_ids.append(case_id)
-
-    if unknown_case_ids:
-        valid_text = ', '.join(CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
-        unknown_text = ', '.join(unknown_case_ids)
-        raise ValueError(f'Unknown case ID(s): {unknown_text}. Valid IDs: {valid_text}')
-
-    return track_case_ids, spiral_case_ids
-
-
-def main():
-    args = parse_args()
-
-    if args.all:
-        selected_case_ids = CASE_ID_LIST + SPIRAL_CASE_ID_LIST
-    elif args.track_all or args.spiral_all:
-        selected_case_ids = []
-        if args.track_all:
-            selected_case_ids.extend(CASE_ID_LIST)
-        if args.spiral_all:
-            selected_case_ids.extend(SPIRAL_CASE_ID_LIST)
-    elif args.case_ids:
-        selected_case_ids = args.case_ids
-    else:
-        selected_case_ids = [DEFAULT_CASE_ID]
-
-    track_case_ids, spiral_case_ids = split_selected_case_ids(selected_case_ids)
-    overwrite_lrt = not args.no_overwrite_lrt
-
-    if track_case_ids:
+    if RUN_TRACK_CASES:
         if __package__:
             from .workflow import flt_trk_atm_corr
         else:
@@ -206,12 +134,12 @@ def main():
 
         run_cases(
             flt_trk_atm_corr,
-            case_ids=track_case_ids,
-            overwrite_lrt=overwrite_lrt,
-            iterations=range(args.iterations),
+            case_ids=TRACK_CASE_IDS,
+            overwrite_lrt=OVERWRITE_LRT,
+            iterations=ITERATIONS,
         )
 
-    if spiral_case_ids:
+    if RUN_SPIRAL_CASES:
         if __package__:
             from .spiral import atm_corr_spiral_plot
         else:
@@ -219,9 +147,5 @@ def main():
 
         run_spiral_cases(
             atm_corr_spiral_plot,
-            spiral_case_ids=spiral_case_ids,
+            spiral_case_ids=SPIRAL_CASE_IDS,
         )
-
-
-if __name__ == '__main__':
-    main()

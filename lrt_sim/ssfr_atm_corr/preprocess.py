@@ -10,6 +10,7 @@ import logging
 import os
 import pickle
 import platform
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -28,13 +29,23 @@ from scipy.interpolate import interp1d
 from util import FlightConfig, load_h5, nearest_indices, read_ict_kt19, solar_interpolation_func
 
 try:
-    from .case_catalog import cloud_observation_file, get_case
+    from .case_catalog import (
+        cloud_observation_file,
+        get_case,
+        get_spiral_case,
+        spiral_cloud_observation_file,
+    )
     from .helpers import ssfr_flags
     from .qc_plotting import ssfr_time_series_plot
     from .settings import _fdir_data_, _fdir_general_, _mission_, _platform_
     from .setup import split_tmhr_ranges, write_ssfr_support_files
 except ImportError:
-    from case_catalog import cloud_observation_file, get_case
+    from case_catalog import (
+        cloud_observation_file,
+        get_case,
+        get_spiral_case,
+        spiral_cloud_observation_file,
+    )
     from helpers import ssfr_flags
     from qc_plotting import ssfr_time_series_plot
     from settings import _fdir_data_, _fdir_general_, _mission_, _platform_
@@ -288,3 +299,48 @@ def preprocess_catalog_case(config, case_id, overwrite=False, plot_qc=True):
         manual_cloud_cbh=case['manual_cloud_cbh'] or 0.0,
         manual_cloud_cot=case['manual_cloud_cot'] or 0.0,
     )
+
+
+def preprocess_spiral_catalog_case(config, case_id, overwrite=False, plot_qc=True):
+    """Preprocess one spiral catalog case and create legacy index-named pickle files."""
+    case = get_spiral_case(case_id)
+    year, month, day = [int(part) for part in case['date'].split('-')]
+    date = datetime.datetime(year, month, day)
+    date_s = date.strftime('%Y%m%d')
+
+    time_named_files = collect_cloud_observation_legs(
+        date=date,
+        tmhr_ranges_select=case['tmhr_ranges_select'],
+        case_tag=case['case_tag'],
+        config=config,
+        simulation_interval=None,
+        clear_sky=True,
+        overwrite=overwrite,
+        plot_qc=plot_qc,
+        manual_cloud=False,
+    )
+
+    index_named_files = []
+    for leg_index, time_named_file in enumerate(time_named_files):
+        index_named_file = spiral_cloud_observation_file(
+            _fdir_general_,
+            _mission_,
+            _platform_,
+            date_s,
+            case['case_tag'],
+            leg_index,
+        )
+        index_named_files.append(index_named_file)
+        if not os.path.exists(time_named_file):
+            print(
+                f"Cannot create spiral cloud-observation alias because "
+                f"{time_named_file} does not exist."
+            )
+            continue
+        if os.path.exists(index_named_file) and not overwrite:
+            print(f"Spiral cloud-observation alias exists, skipping: {index_named_file}")
+            continue
+        shutil.copy2(time_named_file, index_named_file)
+        print(f"Saved spiral cloud-observation alias to {index_named_file}")
+
+    return index_named_files

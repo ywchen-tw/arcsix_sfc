@@ -42,6 +42,21 @@ def cloud_observation_file(fdir_general, mission, platform_name, date_s, case_ta
     )
 
 
+def spiral_cloud_observation_file(fdir_general, mission, platform_name, date_s, case_tag, leg_index):
+    """Return the legacy index-named cloud-observation file expected by spiral plotting."""
+    return (
+        '%s/flt_cld_obs_info/%s_cld_obs_info_%s_%s_%s_%d_atm_corr.pkl'
+        % (
+            fdir_general,
+            mission.lower(),
+            platform_name.lower(),
+            date_s,
+            case_tag,
+            leg_index,
+        )
+    )
+
+
 def split_case_tmhr_ranges(tmhr_ranges_select, simulation_interval):
     """Split selected time ranges using the same rule as the workflow setup."""
     if simulation_interval is None:
@@ -125,6 +140,22 @@ def missing_cloud_observation_files(case, date_s):
             time_end,
         )
         for time_start, time_end in tmhr_ranges_select
+    ]
+    return [fname for fname in expected_files if not os.path.exists(fname)]
+
+
+def missing_spiral_cloud_observation_files(case, date_s):
+    """Return missing legacy index-named cloud-observation files needed by a spiral case."""
+    expected_files = [
+        spiral_cloud_observation_file(
+            _fdir_general_,
+            _mission_,
+            _platform_,
+            date_s,
+            case['case_tag'],
+            leg_index,
+        )
+        for leg_index, _ in enumerate(case['tmhr_ranges_select'])
     ]
     return [fname for fname in expected_files if not os.path.exists(fname)]
 
@@ -2903,6 +2934,14 @@ def spiral_cases_for_date(date_s):
 def get_case(case_id):
     """Return one flight-track catalog entry by id."""
     for case in CASE_CATALOG:
+        if case['id'] == case_id:
+            return case
+    raise KeyError(case_id)
+
+
+def get_spiral_case(case_id):
+    """Return one spiral catalog entry by id."""
+    for case in SPIRAL_CASE_CATALOG:
         if case['id'] == case_id:
             return case
     raise KeyError(case_id)
