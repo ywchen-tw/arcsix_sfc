@@ -675,12 +675,23 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             alb_corr[alb_corr<0.0] = 0.0
             alb_corr[alb_corr>1.0] = 1.0
             
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_avg)
-            
-            alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
-            
-            # alb_ice_fit = ice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg)
-            alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
+            if iter < 3:
+                alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_avg)
+                alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
+                # alb_ice_fit = ice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg)
+                alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
+            else:
+                alb_corr_mask = np.full_like(alb_corr, np.nan, dtype=float)
+                if np.any(np.isnan(alb_corr)):
+                    if np.any(np.isfinite(alb_corr)):
+                        alb_corr_series = pd.Series(alb_corr)
+                        alb_corr_filled = alb_corr_series.ffill(limit=2).bfill(limit=2)
+                        while np.any(np.isnan(alb_corr_filled)):
+                            alb_corr_filled = alb_corr_filled.ffill(limit=2).bfill(limit=2)
+                        alb_corr[np.isnan(alb_corr)] = np.array(alb_corr_filled)[np.isnan(alb_corr)]
+                    else:
+                        alb_corr = alb_obs.copy()
+                alb_ice_fit = alb_corr.copy()
             
  
             heading_saa_diff = heading_avg - saa_avg
