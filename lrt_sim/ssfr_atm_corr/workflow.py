@@ -188,7 +188,8 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     # Build leg masks
     t_hsk = np.array(data_hsk["tmhr"])
     leg_masks = [(t_hsk>=lo)&(t_hsk<=hi) for lo,hi in tmhr_ranges_select]
-    
+    del data_hsk, data_ssfr, data_hsr1, t_hsk
+    gc.collect()
 
     
     data_dropsonde_legs = load_nearest_dropsonde(_fdir_general_, date, tmhr_ranges_select, log)
@@ -247,6 +248,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         ssfr_nad_flux = cld_leg['ssfr_nad']
         if np.all(np.isnan(ssfr_zen_flux)) or np.all(np.isnan(ssfr_nad_flux)):
             print(f"All SSFR zenith or nadir fluxes are NaN for leg {ileg+1}, skipping atmospheric correction")
+            cld_legs[ileg] = None
+            del cld_leg, ssfr_zen_flux, ssfr_nad_flux
+            gc.collect()
             continue
         
         # atm profile searching setting
@@ -269,6 +273,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             native_final_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_final.csv'
             native_iteration_albedo_name = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
             native_final_albedo_name = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_final.dat'
+            final_extension_albedo_name = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_final_extension.dat'
         else:
             output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km_iteration_{iter}.csv'
 
@@ -294,6 +299,23 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     f"Warning: cannot create SSFR-grid final albedo because "
                     f"{native_iteration_albedo_name} does not exist."
                 )
+            if (
+                os.path.exists(output_csv_name)
+                and not overwrite_lrt
+                and os.path.exists(native_iteration_albedo_name)
+                and not os.path.exists(final_extension_albedo_name)
+            ):
+                alb_data = np.loadtxt(native_iteration_albedo_name, comments='#')
+                final_alb_wvl, final_alb = alb_extention(alb_data[:, 0], alb_data[:, 1], clear_sky=clear_sky)
+                final_alb = np.clip(final_alb, 0.0, 1.0)
+                write_2col_file(
+                    final_extension_albedo_name,
+                    final_alb_wvl,
+                    final_alb,
+                    header=(f'# SSFR final extended sfc albedo {date_s} iteration {iter}\n'
+                            '# wavelength (nm)      albedo (unitless)\n'),
+                )
+                print(f"Saving final extended albedo to {final_extension_albedo_name}")
 
         
         if not os.path.exists(output_csv_name) or overwrite_lrt:
@@ -373,7 +395,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             atm_z_grid_str = ' '.join(['%.3f' % z for z in atm_z_grid])
 
           
-            flux_output = np.zeros(len(data_hsk['lon'][leg_masks[ileg]]))
+            flux_output = np.zeros(np.count_nonzero(leg_masks[ileg]))
             
             for ix in range(1):
                 flux_key_all = []
@@ -401,7 +423,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 if platform.system() == 'Darwin':
                     lrt_cfg['number_of_streams'] = 4
                 elif platform.system() == 'Linux':
-                    lrt_cfg['number_of_streams'] = 8
+                    lrt_cfg['number_of_streams'] = 4 if (final_sim and not clear_sky) else 8
                 lrt_cfg['mol_abs_param'] = 'reptran coarse'
                 # lrt_cfg['mol_abs_param'] = f'reptran medium'
                 albedo_file = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
@@ -414,8 +436,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     final_alb_wvl, final_alb = alb_extention(alb_wvl_for_ext, alb_val_for_ext, clear_sky=clear_sky)
                     final_alb = np.clip(final_alb, 0.0, 1.0)
                     albedo_file = (
-                        f'{_fdir_general_}/sfc_alb/'
-                        f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_final_extension.dat'
+                        final_extension_albedo_name
                     )
                     write_2col_file(
                         albedo_file,
@@ -653,6 +674,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
                 del output_dict, output_df
                 del flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results
+                cld_legs[ileg] = None
                 del fup_mean, fdn_mean, fup_std, fdn_std, cld_leg
                 gc.collect()
                 continue
@@ -973,6 +995,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 #\----------------------------------------------------------------------------/#
 
             del output_dict, output_df
+            cld_legs[ileg] = None
             del cld_leg, Fup_sfc, Fdn_sfc, Fdn_sfc_direct, Fdn_sfc_diff
             del Fup_p3, Fdn_p3
             del Fup_sfc_mean_interp, Fdn_sfc_mean_interp
@@ -986,7 +1009,11 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             del fup_mean, fdn_mean, fup_std, fdn_std
             del toa_mean
             del alb_avg, alb_ice_fit
-            
+
+            gc.collect()
+        else:
+            cld_legs[ileg] = None
+            del cld_leg
             gc.collect()
 
     print("Finished libratran calculations.")  

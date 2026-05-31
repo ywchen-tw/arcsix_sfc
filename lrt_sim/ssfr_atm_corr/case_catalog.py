@@ -7,9 +7,11 @@ This catalog keeps the cases from ``legacy/ssfr_atm_corr_ori.py`` after line
 
 import datetime
 import csv
+import filecmp
 import glob
 import math
 import os
+import re
 import numpy as np
 
 if __package__:
@@ -922,6 +924,84 @@ def iteration_output_files(case, date_s, iter):
     return sorted(set(output_files))
 
 
+def case_lrt_output_dir(case, date_s):
+    """Return the libRadtran output directory for a catalog case."""
+    sky_tag = 'clear' if case['clear_sky'] else 'sat_cloud'
+    return os.path.join(_fdir_general_, 'lrt', f"{date_s}_{case['case_tag']}_{sky_tag}")
+
+
+def final_native_output_files(case, date_s):
+    """Return native-grid final CSV files expected for a completed case."""
+    output_dir = case_lrt_output_dir(case, date_s)
+    native_files = []
+    missing_patterns = []
+    tmhr_ranges_select = split_case_tmhr_ranges(
+        case['tmhr_ranges_select'],
+        case['simulation_interval'],
+    )
+    for time_start, time_end in tmhr_ranges_select:
+        pattern = os.path.join(
+            output_dir,
+            f'ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-*km_final.csv',
+        )
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            native_files.extend(matches)
+        else:
+            missing_patterns.append(pattern)
+    return sorted(set(native_files)), missing_patterns
+
+
+def missing_final_extension_outputs(native_final_files):
+    """Return missing final-extension CSV/albedo files for native final files."""
+    missing = []
+    for native_final_file in native_final_files:
+        final_extension_file = native_final_file.replace('_final.csv', '_final_extension.csv')
+        if not os.path.exists(final_extension_file):
+            missing.append(final_extension_file)
+        albedo_extension_file = final_albedo_extension_file(native_final_file)
+        if albedo_extension_file is not None and not os.path.exists(albedo_extension_file):
+            missing.append(albedo_extension_file)
+    return missing
+
+
+def final_albedo_extension_file(native_final_file):
+    """Return the final-extension albedo file matching a native-grid final CSV."""
+    match = re.search(
+        r'ssfr_simu_flux_(\d{8})_(\d+\.\d{3})-(\d+\.\d{3})_alt-(-?\d+\.\d+)km_final\.csv$',
+        os.path.basename(native_final_file),
+    )
+    if match is None:
+        return None
+    date_s, time_start, time_end, alt = match.groups()
+    return os.path.join(
+        _fdir_general_,
+        'sfc_alb',
+        f'sfc_alb_{date_s}_{time_start}_{time_end}_{float(alt):.2f}km_final_extension.dat',
+    )
+
+
+def infer_final_iteration_from_native_final(native_final_file):
+    """Infer the iteration number that was copied to one native-grid final CSV."""
+    iteration_pattern = native_final_file.replace('_final.csv', '_iteration_*.csv')
+    iteration_files = sorted(glob.glob(iteration_pattern))
+    inferred_iters = []
+    for iteration_file in iteration_files:
+        match = re.search(r'_iteration_(\d+)\.csv$', iteration_file)
+        if match is None:
+            continue
+        iter_value = int(match.group(1))
+        try:
+            if filecmp.cmp(native_final_file, iteration_file, shallow=False):
+                return iter_value
+        except OSError:
+            pass
+        inferred_iters.append(iter_value)
+    if inferred_iters:
+        return max(inferred_iters)
+    return None
+
+
 def run_catalog_case(
     flt_trk_atm_corr,
     config,
@@ -966,9 +1046,10 @@ def run_catalog_case(
             return False
         raise FileNotFoundError(message)
 
-    def run_final_iteration(iter, final_status):
+    def run_final_iteration(iter, final_status, final_overwrite_lrt=None):
         if not run_final_sim:
             return
+        final_overwrite_lrt = overwrite_lrt if final_overwrite_lrt is None else final_overwrite_lrt
         flt_trk_atm_corr(
             date=datetime.datetime(year, month, day),
             tmhr_ranges_select=case['tmhr_ranges_select'],
@@ -977,7 +1058,7 @@ def run_catalog_case(
             levels=levels,
             simulation_interval=case['simulation_interval'],
             clear_sky=case['clear_sky'],
-            overwrite_lrt=overwrite_lrt,
+            overwrite_lrt=final_overwrite_lrt,
             manual_cloud=manual_cloud,
             manual_cloud_cer=manual_cloud_cer,
             manual_cloud_cwp=manual_cloud_cwp,
@@ -987,6 +1068,27 @@ def run_catalog_case(
             iter=iter,
             final_sim=True,
             final_status=final_status,
+        )
+
+    native_final_files, missing_native_final_patterns = final_native_output_files(case, date_s)
+    missing_final_extension_files = missing_final_extension_outputs(native_final_files)
+    if run_final_sim and native_final_files and missing_final_extension_files and not missing_native_final_patterns:
+        final_iter = infer_final_iteration_from_native_final(native_final_files[0])
+        if final_iter is not None:
+            print(
+                f'{case_id}: found native final output(s) but missing '
+                f'{len(missing_final_extension_files)} final-extension file(s); '
+                f'running extension-only final simulation from iteration {final_iter}.'
+            )
+            run_final_iteration(
+                final_iter,
+                final_status='extension_only_from_existing_final',
+                final_overwrite_lrt=False,
+            )
+            return True
+        print(
+            f'{case_id}: native final output(s) exist and final-extension file(s) are missing, '
+            'but final iteration could not be inferred; continuing with normal iteration flow.'
         )
 
     for iter in iterations:
