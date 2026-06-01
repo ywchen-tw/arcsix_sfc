@@ -510,8 +510,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                             clear += 1
                         else:
                             fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt'
-                            if os.path.exists(fname_cld):
+                            try:
                                 os.remove(fname_cld)
+                            except FileNotFoundError:
+                                pass
                             cld_cfg = er3t.rtm.lrt.get_cld_cfg()
                             cloudy += 1
                             cld_cfg['cloud_file'] = fname_cld
