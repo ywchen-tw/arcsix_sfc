@@ -954,24 +954,56 @@ def final_native_output_files(case, date_s):
 
 def iteration_albedo_files(case, date_s, iter):
     """Return native-grid albedo files generated for one catalog iteration."""
-    albedo_files = []
-    missing_patterns = []
     tmhr_ranges_select = split_case_tmhr_ranges(
         case['tmhr_ranges_select'],
         case['simulation_interval'],
     )
+    pattern = os.path.join(
+        _fdir_general_,
+        'sfc_alb',
+        f'sfc_alb_{date_s}_*km_iter_{iter}.dat',
+    )
+    candidates = sorted(glob.glob(pattern))
+
+    albedo_files = []
+    missing_ranges = []
     for time_start, time_end in tmhr_ranges_select:
-        pattern = os.path.join(
-            _fdir_general_,
-            'sfc_alb',
-            f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_*km_iter_{iter}.dat',
-        )
-        matches = sorted(glob.glob(pattern))
+        matches = [
+            candidate
+            for candidate in candidates
+            if albedo_file_matches_time_range(candidate, time_start, time_end)
+        ]
         if matches:
             albedo_files.extend(matches)
         else:
-            missing_patterns.append(pattern)
-    return sorted(set(albedo_files)), missing_patterns
+            missing_ranges.append(f'{time_start:.3f}-{time_end:.3f}')
+    return sorted(set(albedo_files)), missing_ranges
+
+
+def albedo_file_matches_time_range(albedo_file, time_start, time_end, tolerance=0.002):
+    """Return True when an albedo filename time range belongs to a split leg."""
+    match = re.search(
+        r'sfc_alb_\d{8}_(\d+\.\d{3})_(\d+\.\d{3})_-?\d+\.\d+km_iter_\d+\.dat$',
+        os.path.basename(albedo_file),
+    )
+    if match is None:
+        return False
+
+    file_start, file_end = [float(value) for value in match.groups()]
+    file_midpoint = 0.5 * (file_start + file_end)
+    return (
+        file_start >= time_start - tolerance
+        and file_end <= time_end + tolerance
+        and time_start - tolerance <= file_midpoint <= time_end + tolerance
+    )
+
+
+def summarize_missing_ranges(missing_ranges, max_items=5):
+    """Return a compact missing-range summary for logging."""
+    if len(missing_ranges) <= max_items:
+        return ', '.join(missing_ranges)
+    shown_ranges = ', '.join(missing_ranges[:max_items])
+    return f'{shown_ranges}, ...'
 
 
 def missing_final_extension_outputs(native_final_files):
@@ -1146,6 +1178,14 @@ def run_catalog_case(
                 final_status='max_iteration_from_existing_albedo',
             )
             return True
+        if last_iter_albedo_files:
+            print(
+                f'{case_id}: found {len(last_iter_albedo_files)} albedo file(s) for '
+                f'max-limit iteration {last_iter}, but missing '
+                f'{len(missing_last_iter_albedo_patterns)} split range(s): '
+                f'{summarize_missing_ranges(missing_last_iter_albedo_patterns)}. '
+                'Continuing with normal iteration flow.'
+            )
 
     for iter in iterations:
         flt_trk_atm_corr(
