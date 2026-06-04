@@ -88,10 +88,39 @@ def write_2col_file(filename, wvl, val, header):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')
 
 
-def gas_abs_masking(wvl, alb, alt, altitude_dependent=False):
+def find_h2o_6_end(wvl, alb, default_end=h2o_6_end):
+    """Extend the H2O-6 mask until albedo recovers to its pre-band value."""
+    wvl = np.asarray(wvl, dtype=float)
+    alb = np.asarray(alb, dtype=float)
+    finite = np.isfinite(wvl) & np.isfinite(alb)
+
+    before_indices = np.flatnonzero(finite & (wvl < h2o_6_start))
+    after_indices = np.flatnonzero(finite & (wvl > default_end))
+    if before_indices.size == 0 or after_indices.size == 0:
+        return default_end
+
+    reference_albedo = alb[before_indices[-1]]
+    first_after_index = after_indices[0]
+    if alb[first_after_index] <= reference_albedo:
+        return default_end
+
+    recovered_indices = after_indices[alb[after_indices] <= reference_albedo]
+    if recovered_indices.size == 0:
+        return default_end
+    return float(wvl[recovered_indices[0]])
+
+
+def gas_abs_masking(
+    wvl,
+    alb,
+    alt,
+    altitude_dependent=False,
+    h2o_6_end_override=None,
+):
     """Mask all gas bands by default, with optional reduced low-altitude masking."""
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
+    selected_h2o_6_end = h2o_6_end if h2o_6_end_override is None else h2o_6_end_override
     full_mask = (
         ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
         | ((wvl >= h2o_1_start) & (wvl <= h2o_1_end))
@@ -99,7 +128,7 @@ def gas_abs_masking(wvl, alb, alt, altitude_dependent=False):
         | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
         | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
         | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
-        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_6_start) & (wvl <= selected_h2o_6_end))
         | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
         | ((wvl >= h2o_8_start) & (wvl <= h2o_8_end))
         | ((wvl >= final_start) & (wvl <= final_end))
@@ -111,7 +140,7 @@ def gas_abs_masking(wvl, alb, alt, altitude_dependent=False):
         | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
         | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
         | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
-        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_6_start) & (wvl <= selected_h2o_6_end))
         | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
         | ((wvl >= final_start) & (wvl <= final_end))
     )

@@ -95,7 +95,7 @@ from util import *
 
 try:
     from .settings import *
-    from .helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
+    from .helpers import find_h2o_6_end, fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
     from .qc_plotting import ssfr_time_series_plot
     from .setup import (
         default_atm_levels,
@@ -108,7 +108,7 @@ try:
     )
 except ImportError:
     from settings import *
-    from helpers import fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
+    from helpers import find_h2o_6_end, fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
     from qc_plotting import ssfr_time_series_plot
     from setup import (
         default_atm_levels,
@@ -817,7 +817,18 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             alb_corr[alb_corr < 0.0] = 0.0
             alb_corr[alb_corr > 1.0] = 1.0
             
-            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_avg)
+            adaptive_h2o_6_end = find_h2o_6_end(alb_wvl, alb_corr)
+            if adaptive_h2o_6_end != h2o_6_end:
+                print(
+                    f'Extending H2O-6 mask end from {h2o_6_end:.1f} '
+                    f'to {adaptive_h2o_6_end:.1f} nm.'
+                )
+            alb_corr_mask = gas_abs_masking(
+                alb_wvl,
+                alb_corr,
+                alt=alt_avg,
+                h2o_6_end_override=adaptive_h2o_6_end,
+            )
             alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
             if np.any(np.isnan(alb_corr)):
                 if np.any(np.isfinite(alb_corr)):
@@ -832,7 +843,13 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             try:
                 # Keep fitting/smoothing gas absorption bands for every iteration,
                 # including iter >= 3 and whichever iteration is later copied to final.
-                alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
+                alb_ice_fit = snowice_alb_fitting(
+                    alb_wvl,
+                    alb_corr,
+                    alt=alt_avg,
+                    clear_sky=clear_sky,
+                    h2o_6_end=adaptive_h2o_6_end,
+                )
                 if np.all(~np.isfinite(alb_ice_fit)):
                     raise ValueError('snow/ice fitted albedo is all non-finite')
             except Exception as err:
