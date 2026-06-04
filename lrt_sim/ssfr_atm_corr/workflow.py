@@ -802,12 +802,15 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             corr_dn_masked = gas_abs_masking(alb_wvl, corr_dn, alt=999.0)
             corr_dn_filled = np.where(np.isnan(corr_dn_masked), 1.0, corr_dn_masked)
 
-            # corr_up: altitude-dependent — upwelling path is short at low altitude
-            if alt_avg < 0.5:
-                corr_up_filled = corr_up.copy()
-            else:
-                corr_up_masked = gas_abs_masking(alb_wvl, corr_up, alt=alt_avg)
-                corr_up_filled = np.where(np.isnan(corr_up_masked), 1.0, corr_up_masked)
+            # Full masking is the current default. The settings switch retains the
+            # reduced low-altitude corr_up mask as an optional future experiment.
+            corr_up_masked = gas_abs_masking(
+                alb_wvl,
+                corr_up,
+                alt=alt_avg,
+                altitude_dependent=ALTITUDE_DEPENDENT_GAS_MASKING,
+            )
+            corr_up_filled = np.where(np.isnan(corr_up_masked), 1.0, corr_up_masked)
 
             alb_corr = alb_obs * (corr_dn_filled / corr_up_filled)
             alb_corr[:4] = alb_corr[4]

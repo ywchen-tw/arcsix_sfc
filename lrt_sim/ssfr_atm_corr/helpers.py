@@ -88,32 +88,34 @@ def write_2col_file(filename, wvl, val, header):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')
 
 
-def gas_abs_masking(wvl, alb, alt):
-    """Mask strong gas absorption bands in an albedo spectrum."""
+def gas_abs_masking(wvl, alb, alt, altitude_dependent=False):
+    """Mask all gas bands by default, with optional reduced low-altitude masking."""
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
-    if alt > 0.5:
-        mask = (
-            ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
-            | ((wvl >= h2o_1_start) & (wvl <= h2o_1_end))
-            | ((wvl >= h2o_2_start) & (wvl <= h2o_2_end))
-            | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
-            | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
-            | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
-            | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
-            | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
-            | ((wvl >= h2o_8_start) & (wvl <= h2o_8_end))
-            | ((wvl >= final_start) & (wvl <= final_end))
-        )
-    else:
-        mask = (
-            ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
-            | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
-            | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
-            | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
-            | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
-            | ((wvl >= final_start) & (wvl <= final_end))
-        )
+    full_mask = (
+        ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
+        | ((wvl >= h2o_1_start) & (wvl <= h2o_1_end))
+        | ((wvl >= h2o_2_start) & (wvl <= h2o_2_end))
+        | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
+        | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
+        | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
+        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
+        | ((wvl >= h2o_8_start) & (wvl <= h2o_8_end))
+        | ((wvl >= final_start) & (wvl <= final_end))
+    )
+
+    # Future option: retain O2 masking but omit short-path H2O bands below 0.5 km.
+    reduced_low_altitude_mask = (
+        ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
+        | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
+        | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
+        | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
+        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
+        | ((wvl >= final_start) & (wvl <= final_end))
+    )
+    mask = reduced_low_altitude_mask if altitude_dependent and alt <= 0.5 else full_mask
 
     alb_mask[mask] = np.nan
     effective_mask_[mask] = np.nan

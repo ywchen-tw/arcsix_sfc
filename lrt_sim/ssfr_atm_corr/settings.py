@@ -73,8 +73,8 @@ _dates2_ = [
 _dates_ = _dates1_
 
 o2a_1_start, o2a_1_end = 748, 780
-h2o_1_start, h2o_1_end = 672, 706
-h2o_2_start, h2o_2_end = 705, 746
+h2o_1_start, h2o_1_end = 650, 706
+h2o_2_start, h2o_2_end = 705, 760
 h2o_3_start, h2o_3_end = 884, 996
 h2o_4_start, h2o_4_end = 1084, 1175
 h2o_5_start, h2o_5_end = 1230, 1286
@@ -95,6 +95,9 @@ gas_bands = [
     (h2o_8_start, h2o_8_end),
     (final_start, final_end),
 ]
+
+# Future experiment switch. Keep False to mask every configured gas band at all altitudes.
+ALTITUDE_DEPENDENT_GAS_MASKING = False
 
 __all__ = [
     name

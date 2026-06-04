@@ -47,12 +47,12 @@ visible discontinuities at every gas-band boundary in the fitted iter 2 albedo.
 ## Proposed Changes
 
 ### Change 1 — `workflow.py:748–778`
-**Separate masking of `corr_dn` and `corr_up` before the Odell multiplication**
+**Mask `corr_dn` and `corr_up` before the Odell multiplication**
 
-`corr_dn` always sees the full atmospheric column and must always be masked at gas bands.
-`corr_up` at low altitude is well-conditioned (thin upwelling path, ratio ≈ 1 at gas bands)
-and should not be masked. Fill masked correction factors with 1.0 (identity) rather than
-letting them blow up.
+For the current conservative implementation, mask every configured gas band in both
+`corr_dn` and `corr_up` at every altitude. Fill masked correction factors with 1.0
+(identity) rather than letting them blow up. A reduced low-altitude `corr_up` mask remains
+available behind `ALTITUDE_DEPENDENT_GAS_MASKING=True` for future evaluation.
 
 ```python
 corr_up = Fup_p3_mean_interp / fup_mean
@@ -62,12 +62,14 @@ corr_dn = Fdn_p3_mean_interp / fdn_mean
 corr_dn_masked = gas_abs_masking(alb_wvl, corr_dn, alt=999.0)
 corr_dn_filled = np.where(np.isnan(corr_dn_masked), 1.0, corr_dn_masked)
 
-# corr_up: altitude-dependent — upwelling path is short at low altitude
-if alt_avg < 0.5:
-    corr_up_filled = corr_up.copy()   # well-conditioned at gas bands, no masking needed
-else:
-    corr_up_masked = gas_abs_masking(alb_wvl, corr_up, alt=alt_avg)
-    corr_up_filled = np.where(np.isnan(corr_up_masked), 1.0, corr_up_masked)
+# corr_up: full masking now; optional reduced low-altitude mask behind settings switch
+corr_up_masked = gas_abs_masking(
+    alb_wvl,
+    corr_up,
+    alt=alt_avg,
+    altitude_dependent=ALTITUDE_DEPENDENT_GAS_MASKING,
+)
+corr_up_filled = np.where(np.isnan(corr_up_masked), 1.0, corr_up_masked)
 
 alb_corr = alb_obs * (corr_dn_filled / corr_up_filled)
 alb_corr[:4] = alb_corr[4]
@@ -160,6 +162,30 @@ alb_corr_fit[bands_fit] = alb_corr_fit_replace
 
 ## Optional — Physics justification for altitude-dependent `corr_up` masking
 
+### Current implementation status
+
+For now, all configured gas absorption bands are masked at every altitude. Both active
+`gas_abs_masking` implementations default to:
+
+```python
+altitude_dependent=False
+```
+
+The reduced mask below 0.5 km is retained as an optional future experiment and can be
+enabled for the workflow by setting:
+
+```python
+ALTITUDE_DEPENDENT_GAS_MASKING = True
+```
+
+or enabled for an individual helper call with:
+
+```python
+gas_abs_masking(wvl, alb, alt=alt, altitude_dependent=True)
+```
+
+O2-A remains masked in both full and reduced-mask modes.
+
 ### Geometry of the two flux measurements at altitude z
 
 **Downwelling (zenith, F_dn) at any altitude z:**
@@ -198,8 +224,7 @@ The 0.5 km threshold is grounded in the water vapor scale height (~2.5 km):
 starts introducing non-trivial absorption in the NIR H2O bands. For O2-A (scale height
 ~8 km) the threshold could be higher, but 0.5 km is conservative.
 
-The altitude-dependent branches in the `elif/else` blocks of `gas_abs_masking`
-(`alb_fitting.py:55–105`) were originally physically motivated for the upwelling correction
-only, but were being applied to the full correction ratio. The `if 1:` override was the
-wrong fix; the right fix (Change 1 above) is to call the function with different intent
-depending on which flux component is being masked.
+The altitude-dependent reduced mask remains useful as a future experiment, but the current
+conservative default masks all configured gases for both correction factors and all
+altitudes. Enable the reduced low-altitude behavior only with
+`ALTITUDE_DEPENDENT_GAS_MASKING=True`.

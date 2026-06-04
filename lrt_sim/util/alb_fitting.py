@@ -14,11 +14,17 @@ _PKL_DIR = Path(__file__).resolve().parent.parent
 # mpl.use('Agg')
 
 
-def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
+def gas_abs_masking(
+    wvl,
+    alb,
+    alt,
+    h2o_6_end=1509,
+    interp_nan=True,
+    altitude_dependent=False,
+):
+    """Mask all gas bands by default, with optional reduced low-altitude masking."""
     o2a_1_start, o2a_1_end = 748, 780
-    # h2o_1_start, h2o_1_end = 672, 706
-    # h2o_2_start, h2o_2_end = 705, 746
-    h2o_1_start, h2o_1_end = 650 , 706
+    h2o_1_start, h2o_1_end = 650, 706
     h2o_2_start, h2o_2_end = 705, 760
     h2o_3_start, h2o_3_end = 884, 996
     h2o_4_start, h2o_4_end = 1084, 1175
@@ -28,84 +34,35 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
     h2o_8_start, h2o_8_end = 801, 843
     final_start, final_end = 2110, 2200
     
+    full_mask = (
+        ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
+        | ((wvl >= h2o_1_start) & (wvl <= h2o_1_end))
+        | ((wvl >= h2o_2_start) & (wvl <= h2o_2_end))
+        | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
+        | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
+        | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
+        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
+        | ((wvl >= h2o_8_start) & (wvl <= h2o_8_end))
+        | ((wvl >= final_start) & (wvl <= final_end))
+    )
+
+    # Future option: retain O2 masking but omit short-path H2O bands below 0.5 km.
+    reduced_low_altitude_mask = (
+        ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
+        | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
+        | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
+        | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
+        | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
+        | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
+        | ((wvl >= final_start) & (wvl <= final_end))
+    )
+    mask = reduced_low_altitude_mask if altitude_dependent and alt <= 0.5 else full_mask
+
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
-    if alt > 0.5:
-        alb_mask[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-        effective_mask_[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-    elif alt <= 0.5 and alt > 0.2:
-        alb_mask[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-        effective_mask_[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-    else: 
-        # Not mask O2 band and water abs band at VIS and NIR if altitude is low
-        alb_mask[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
-        effective_mask_[
-                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
-                # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
-                # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
-                ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
-                ((wvl>=h2o_4_start) & (wvl<=h2o_4_end)) | 
-                ((wvl>=h2o_5_start) & (wvl<=h2o_5_end)) | 
-                ((wvl>=h2o_6_start) & (wvl<=h2o_6_end)) | 
-                ((wvl>=h2o_7_start) & (wvl<=h2o_7_end)) |
-                # ((wvl>=h2o_8_start) & (wvl<=h2o_8_end)) |
-                ((wvl>=final_start) & (wvl<=final_end))
-                ] = np.nan
+    alb_mask[mask] = np.nan
+    effective_mask_[mask] = np.nan
     
     before_interp = alb_mask.copy()
     # interpolation if nan in effective_mask_ range
