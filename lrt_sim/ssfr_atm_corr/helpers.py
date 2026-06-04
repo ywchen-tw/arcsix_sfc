@@ -107,7 +107,8 @@ def gas_abs_masking(wvl, alb, alt):
         )
     else:
         mask = (
-            ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
+            ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
+            | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
             | ((wvl >= h2o_5_start) & (wvl <= h2o_5_end))
             | ((wvl >= h2o_6_start) & (wvl <= h2o_6_end))
             | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))

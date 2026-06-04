@@ -120,8 +120,8 @@ def load_nearest_dropsonde(fdir_general, date, tmhr_ranges_select, log):
 def lrt_wavelength_grid(clear_sky):
     if platform.system() == 'Darwin':
         if clear_sky:
-            return np.arange(350, 2000.1, 2.5)
-        return np.arange(350, 2000.1, 10.0)
+            return np.arange(350, 2000.1, 5.0)
+        return np.arange(350, 2000.1, 20.0)
     if platform.system() == 'Linux':
         return np.arange(350, 2000.1, 1.0)
     return np.arange(350, 2000.1, 2.5)

@@ -237,6 +237,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     for ileg, _ in enumerate(leg_masks):
         
         cld_leg = cld_legs[ileg]
+        if cld_leg.get('skip'):
+            print(
+                f"Leg {ileg+1}: flagged as skip during preprocessing "
+                f"({cld_leg.get('skip_reason', '')}); skipping."
+            )
+            continue
         time_start, time_end = cld_leg['time'][0], cld_leg['time'][-1]
         lon_avg = np.round(np.mean(cld_leg['lon']), 2)
         lat_avg = np.round(np.mean(cld_leg['lat']), 2)
@@ -252,7 +258,25 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             del cld_leg, ssfr_zen_flux, ssfr_nad_flux
             gc.collect()
             continue
-        
+
+        # Skip legs where too many wavelength channels are all-NaN in the time-mean.
+        # A channel is NaN in nanmean only when every time step at that wavelength is
+        # invalid. The ffill/bfill fill-loop below would propagate a constant value
+        # across those channels, producing a flat spectrum that corrupts snowice fitting.
+        _MAX_NAN_WVL_FRAC = 0.3
+        zen_nan_frac = np.mean(~np.isfinite(np.nanmean(ssfr_zen_flux, axis=0)))
+        nad_nan_frac = np.mean(~np.isfinite(np.nanmean(ssfr_nad_flux, axis=0)))
+        if zen_nan_frac > _MAX_NAN_WVL_FRAC or nad_nan_frac > _MAX_NAN_WVL_FRAC:
+            print(
+                f"Skipping leg {ileg+1} ({time_start:.3f}-{time_end:.3f}h): "
+                f"too many NaN wavelengths in SSFR "
+                f"(zen {zen_nan_frac:.0%}, nad {nad_nan_frac:.0%})"
+            )
+            cld_legs[ileg] = None
+            del cld_leg, ssfr_zen_flux, ssfr_nad_flux
+            gc.collect()
+            continue
+
         # atm profile searching setting
         boundary_from_center = 0.25 # degree
         mod_lon = np.array([lon_avg-boundary_from_center, lon_avg+boundary_from_center])
@@ -279,6 +303,14 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
         os.makedirs(fdir_tmp, exist_ok=True)
         os.makedirs(fdir, exist_ok=True)
+        atm_profile_file = os.path.join(
+            zpt_filedir,
+            f'atm_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat',
+        )
+        ch4_profile_file = os.path.join(
+            zpt_filedir,
+            f'ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat',
+        )
 
         if final_sim:
             if os.path.exists(native_iteration_csv_name):
@@ -322,16 +354,22 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             print("Start leg %d atmospheric correction ..." % (ileg+1))
             print(f"Date: {date_s}, Time: {time_start:.3f}-{time_end:.3f}h, Alt: {alt_avg:.2f}km")
             if iter==0:
-                data_dropsonde = data_dropsonde_legs[ileg] if data_dropsonde_legs else None
-                prepare_atmospheric_profile(_fdir_general_, date_s, case_tag, ileg, date, time_start, time_end,
-                                            alt_avg, data_dropsonde,
-                                            cld_leg, levels=levels,
-                                            mod_extent=[np.round(np.nanmin(cld_leg['lon']), 2), 
-                                                        np.round(np.nanmax(cld_leg['lon']), 2),
-                                                        np.round(np.nanmin(cld_leg['lat']), 2),
-                                                        np.round(np.nanmax(cld_leg['lat']), 2)],
-                                            zpt_filedir=f'{_fdir_general_}/zpt/{date_s}'
-                                            )
+                if os.path.exists(atm_profile_file) and os.path.exists(ch4_profile_file):
+                    print(
+                        f"Using existing atmospheric profile files for "
+                        f"{date_s} {time_start:.3f}-{time_end:.3f}h Alt {alt_avg:.2f}km"
+                    )
+                else:
+                    data_dropsonde = data_dropsonde_legs[ileg] if data_dropsonde_legs else None
+                    prepare_atmospheric_profile(_fdir_general_, date_s, case_tag, ileg, date, time_start, time_end,
+                                                alt_avg, data_dropsonde,
+                                                cld_leg, levels=levels,
+                                                mod_extent=[np.round(np.nanmin(cld_leg['lon']), 2), 
+                                                            np.round(np.nanmax(cld_leg['lon']), 2),
+                                                            np.round(np.nanmin(cld_leg['lat']), 2),
+                                                            np.round(np.nanmax(cld_leg['lat']), 2)],
+                                                zpt_filedir=f'{_fdir_general_}/zpt/{date_s}'
+                                                )
             # =================================================================================
             
             
@@ -414,7 +452,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 #/----------------------------------------------------------------------------\#
                 lrt_cfg = copy.deepcopy(er3t.rtm.lrt.get_lrt_cfg())
                 
-                lrt_cfg['atmosphere_file'] = os.path.join(zpt_filedir, f'atm_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat')
+                lrt_cfg['atmosphere_file'] = atm_profile_file
                 # lrt_cfg['atmosphere_file'] = lrt_cfg['atmosphere_file'].replace('afglus.dat', 'afglss.dat')
                 lrt_cfg['solar_file'] = solar_file
                 # lrt_cfg['solar_file'] = lrt_cfg['solar_file'].replace('kurudz_0.1nm.dat', 'kurudz_1.0nm.dat')
@@ -448,7 +486,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 input_dict_extra_general = {
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': albedo_file,
-                                    'mol_file': 'CH4 %s' % os.path.join(zpt_filedir, f'ch4_profiles_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.dat'),
+                                    'mol_file': 'CH4 %s' % ch4_profile_file,
                                     'wavelength_grid_file': wavelength_grid_file,
                                     'atm_z_grid': atm_z_grid_str,
                                     # 'no_scattering':'mol',
@@ -760,27 +798,46 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 alb_data = np.loadtxt(alb_file, comments='#', skiprows=2)
                 alb_obs = alb_data[:, 1][1:-1]
             
-            alb_corr = alb_obs * (corr_dn/corr_up)
-            alb_corr[:4] = alb_corr[4]
-            alb_corr[alb_corr<0.0] = 0.0
-            alb_corr[alb_corr>1.0] = 1.0
-            
-            if iter < 3:
-                alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_avg)
-                alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
-                # alb_ice_fit = ice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg)
-                alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
+            # corr_dn: always mask — downwelling always traverses the full atmospheric column
+            corr_dn_masked = gas_abs_masking(alb_wvl, corr_dn, alt=999.0)
+            corr_dn_filled = np.where(np.isnan(corr_dn_masked), 1.0, corr_dn_masked)
+
+            # corr_up: altitude-dependent — upwelling path is short at low altitude
+            if alt_avg < 0.5:
+                corr_up_filled = corr_up.copy()
             else:
-                alb_corr_mask = np.full_like(alb_corr, np.nan, dtype=float)
-                if np.any(np.isnan(alb_corr)):
-                    if np.any(np.isfinite(alb_corr)):
-                        alb_corr_series = pd.Series(alb_corr)
-                        alb_corr_filled = alb_corr_series.ffill(limit=2).bfill(limit=2)
-                        while np.any(np.isnan(alb_corr_filled)):
-                            alb_corr_filled = alb_corr_filled.ffill(limit=2).bfill(limit=2)
-                        alb_corr[np.isnan(alb_corr)] = np.array(alb_corr_filled)[np.isnan(alb_corr)]
-                    else:
-                        alb_corr = alb_obs.copy()
+                corr_up_masked = gas_abs_masking(alb_wvl, corr_up, alt=alt_avg)
+                corr_up_filled = np.where(np.isnan(corr_up_masked), 1.0, corr_up_masked)
+
+            alb_corr = alb_obs * (corr_dn_filled / corr_up_filled)
+            alb_corr[:4] = alb_corr[4]
+            alb_corr[alb_corr < 0.0] = 0.0
+            alb_corr[alb_corr > 1.0] = 1.0
+            
+            alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr, alt=alt_avg)
+            alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
+            if np.any(np.isnan(alb_corr)):
+                if np.any(np.isfinite(alb_corr)):
+                    alb_corr_series = pd.Series(alb_corr)
+                    alb_corr_filled = alb_corr_series.ffill(limit=2).bfill(limit=2)
+                    while np.any(np.isnan(alb_corr_filled)):
+                        alb_corr_filled = alb_corr_filled.ffill(limit=2).bfill(limit=2)
+                    alb_corr[np.isnan(alb_corr)] = np.array(alb_corr_filled)[np.isnan(alb_corr)]
+                else:
+                    alb_corr = alb_obs.copy()
+
+            try:
+                # Keep fitting/smoothing gas absorption bands for every iteration,
+                # including iter >= 3 and whichever iteration is later copied to final.
+                alb_ice_fit = snowice_alb_fitting(alb_wvl, alb_corr, alt=alt_avg, clear_sky=clear_sky)
+                if np.all(~np.isfinite(alb_ice_fit)):
+                    raise ValueError('snow/ice fitted albedo is all non-finite')
+            except Exception as err:
+                print(
+                    f'Warning: snow/ice albedo fitting failed for {date_s} '
+                    f'{time_start:.3f}-{time_end:.3f} iter {iter}: {err}. '
+                    'Using corrected albedo without fitted gas-band smoothing.'
+                )
                 alb_ice_fit = alb_corr.copy()
             
  

@@ -250,6 +250,36 @@ def collect_cloud_observation_legs(
         ssfr_zen_flux[alp_ang_pit_rol_issue_leg, :] = np.nan
         ssfr_nad_flux_interp[alp_ang_pit_rol_issue_leg, :] = np.nan
 
+        # Skip legs where too many wavelength channels are all-NaN after masking.
+        # A channel is NaN in nanmean only when every time step at that wavelength is
+        # invalid. The workflow would ffill/bfill those channels into a flat spectrum,
+        # corrupting the snowice fitting. Save a minimal sentinel so downstream code
+        # still finds the expected pickle file without raising FileNotFoundError.
+        _MAX_NAN_WVL_FRAC = 0.3
+        zen_nan_frac = np.mean(~np.isfinite(np.nanmean(ssfr_zen_flux, axis=0)))
+        nad_nan_frac = np.mean(~np.isfinite(np.nanmean(ssfr_nad_flux_interp, axis=0)))
+        if zen_nan_frac > _MAX_NAN_WVL_FRAC or nad_nan_frac > _MAX_NAN_WVL_FRAC:
+            skip_reason = (
+                f"too many NaN wavelengths after masking "
+                f"(zen {zen_nan_frac:.0%}, nad {nad_nan_frac:.0%})"
+            )
+            print(
+                f"Leg {ileg + 1} ({time_start:.3f}-{time_end:.3f}h): {skip_reason}. "
+                f"Saving skip-flagged sentinel."
+            )
+            sentinel = {
+                'skip': True,
+                'skip_reason': skip_reason,
+                'time': times_leg,
+                'alt': data_hsk["alt"][mask] / 1000.0,
+            }
+            with open(fname_pkl, 'wb') as f:
+                pickle.dump(sentinel, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"Saved skip-flagged sentinel to {fname_pkl}")
+            del ssfr_zen_flux, ssfr_nad_flux, ssfr_nad_flux_interp
+            gc.collect()
+            continue
+
         leg['ssfr_zen'] = ssfr_zen_flux
         leg['ssfr_nad'] = ssfr_nad_flux_interp
         leg['ssfr_zen_wvl'] = ssfr_zen_wvl

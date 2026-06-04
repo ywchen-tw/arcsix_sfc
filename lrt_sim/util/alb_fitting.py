@@ -3,10 +3,13 @@ import sys
 import glob
 import copy
 import pickle
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.ndimage import uniform_filter1d
 import matplotlib.pyplot as plt
+
+_PKL_DIR = Path(__file__).resolve().parent.parent
 
 # mpl.use('Agg')
 
@@ -27,7 +30,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
     
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
-    if 1:#alt > 0.5:
+    if alt > 0.5:
         alb_mask[
                 ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
@@ -54,7 +57,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
                 ] = np.nan
     elif alt <= 0.5 and alt > 0.2:
         alb_mask[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
                 ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
@@ -66,7 +69,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
                 ((wvl>=final_start) & (wvl<=final_end))
                 ] = np.nan
         effective_mask_[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
                 ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
@@ -80,7 +83,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
     else: 
         # Not mask O2 band and water abs band at VIS and NIR if altitude is low
         alb_mask[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
                 ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
@@ -92,7 +95,7 @@ def gas_abs_masking(wvl, alb, alt, h2o_6_end=1509, interp_nan=True):
                 ((wvl>=final_start) & (wvl<=final_end))
                 ] = np.nan
         effective_mask_[
-                # ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
+                ((wvl>=o2a_1_start) & (wvl<=o2a_1_end)) | 
                 # ((wvl>=h2o_1_start) & (wvl<=h2o_1_end)) | 
                 # ((wvl>=h2o_2_start) & (wvl<=h2o_2_end)) | 
                 ((wvl>=h2o_3_start) & (wvl<=h2o_3_end)) | 
@@ -201,9 +204,9 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
 def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
     # snicar_albedo_list = []
     if clear_sky:
-        snicar_filename = 'snicar_model_results_direct.pkl'
+        snicar_filename = str(_PKL_DIR / 'snicar_model_results_direct.pkl')
     else:
-        snicar_filename = 'snicar_model_results_diffuse.pkl'
+        snicar_filename = str(_PKL_DIR / 'snicar_model_results_diffuse.pkl')
     with open(snicar_filename, 'rb') as f:
         snicar_data = pickle.load(f)
     #     wvl = list(snicar_data.values())[0]['wvl']
@@ -244,16 +247,17 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
     alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
     alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
-    alb_wvl_sep_5th_s, alb_wvl_sep_5th_e = 1185, 1700
     alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1520, 2100
     if h2o_6_end > 1520:
         alb_wvl_sep_6th_s = h2o_6_end+5
-    
+
     band_1_fit = (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e)
     band_2_fit = (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e)
     band_3_fit = (alb_wvl >= alb_wvl_sep_3rd_s) & (alb_wvl < alb_wvl_sep_3rd_e)
     band_4_fit = (alb_wvl >= alb_wvl_sep_4th_s) & (alb_wvl < alb_wvl_sep_4th_e)
-    band_5_fit = (alb_wvl >= alb_wvl_sep_5th_s) & (alb_wvl < alb_wvl_sep_5th_e)
+    band_5a_fit = (alb_wvl >= 1185) & (alb_wvl < 1290)   # bridges h2o_5 (1230–1286) only
+    band_5b_fit = (alb_wvl >= 1285) & (alb_wvl < 1520)   # bridges h2o_6 (1290–1509) only
+    band_5c_fit = (alb_wvl >= 1515) & (alb_wvl < 1700)   # clean window, no internal gap
     band_6_fit = (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e)
     
     alb_corr_fit = copy.deepcopy(alb_corr_mask)
@@ -309,92 +313,70 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     
     
     for bands_fit in [
-                    #   band_1_fit, 
-                      band_2_fit, band_3_fit, band_4_fit, band_5_fit, band_6_fit]:
+                    #   band_1_fit,
+                      band_2_fit, band_3_fit, band_4_fit,
+                      band_5a_fit, band_5b_fit, band_5c_fit, band_6_fit]:
         
-        # if np.isnan(alb_corr_mask[bands_fit]).any():
-            # best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
-            #     model_library=snicar_data,
-            #     obs_wvl=alb_wvl[bands_fit],
-            #     obs_albedo=alb_corr_mask[bands_fit]
-            #     )
         bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
         if bandfit_nan.sum() == 0:
             continue
         bandfit_nan_ind = np.where(bandfit_nan)[0]
-        if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
-            bandfit_nan_ind = bandfit_nan_ind[:-1]
-        left_mean_ind_num = 5
-        if bandfit_nan_ind[0] < left_mean_ind_num:
-            left_mean_ind_num = bandfit_nan_ind[0]
-        xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
-        right_mean_ind_num = 5
-        if (len(bandfit_nan) - bandfit_nan_ind[-1] -1) < right_mean_ind_num:
-            right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] -1
-            
-        # print("bandfit_nan_ind[-1]:", bandfit_nan_ind[-1])
-        # print("len(bandfit_nan):", len(bandfit_nan))
-        # print("xr_origin start end:", bandfit_nan_ind[-1]+1, bandfit_nan_ind[-1]+right_mean_ind_num)
-        xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
-        xl_fit, xr_fit = best_fit_spectrum[bands_fit][bandfit_nan_ind[0]-1], best_fit_spectrum[bands_fit][bandfit_nan_ind[-1]+1]
-        xfit_base = np.min([xl_fit, xr_fit])
-        # print("xl_origin, xr_origin:", xl_origin, xr_origin)
-        if np.isfinite(xl_origin) and np.isfinite(xr_origin):
-            base = np.min([xl_origin, xr_origin])
-            scale = (xr_origin - xl_origin) / (xr_fit - xl_fit)
-            scale = np.abs(scale)
-            replace_array = base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale
-            # print("rescale (1) replace_array shape:", replace_array.shape)
-        elif np.isfinite(xl_origin) and not np.isfinite(xr_origin):
-            # only have value on xl_origin
-            # use valid point to scale
-            xl_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][0:5].mean()
-            xr_origin_new = alb_corr_fit[bands_fit][~bandfit_nan][-6:-1].mean()
-            xl_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][0:6].mean()
-            xr_fit_new = best_fit_spectrum[bands_fit][~bandfit_nan][-6:-1].mean()
-            xfit_base_new = xl_fit_new
-            base = np.min([xl_origin_new, xr_origin_new])
-            scale = (xr_origin_new - xl_origin_new) / (xr_fit_new - xl_fit_new)
-            scale = np.abs(scale)
-            replace_array_all = base + (best_fit_spectrum[bands_fit] - xfit_base_new) * scale
-            replace_array = replace_array_all[bandfit_nan]
-            # print("rescale (2) replace_array_all shape:", replace_array_all.shape)
-            # print("rescale replace_array shape:", replace_array.shape)
-            # plt.close('all')
-            # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
-            # plt.plot(alb_wvl[bands_fit], replace_array_all, '--', color='b', label='Replace All')
-            # plt.legend()
-            # plt.show()
-            # sys.exit()
-        elif not np.isfinite(xl_origin) and np.isfinite(xr_origin):
-            # only have value on xr_origin
-            # not supported yet
-            raise NotImplementedError("Only have value on right side is not supported yet.")
-        else:
-            # print("base, scale:", base, scale)
-            # print("base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale:", replace_array)
-            # print("alb_corr_fit[bands_fit][bandfit_nan] after adjustment:", alb_corr_fit[bands_fit][bandfit_nan])
-            # plt.close('all')
-            # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
-            # plt.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
-            # plt.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
-            # plt.xlabel('Wavelength (nm)')
-            # plt.ylabel('Albedo')
-            # plt.legend()
-            # plt.show()
-            print("Both sides have no valid value, skip rescaling.")
-        
+
+        band_len = int(np.sum(bands_fit))
+        has_left  = bandfit_nan_ind[0] > 0
+        has_right = bandfit_nan_ind[-1] + 1 < band_len
+
+        if not has_left and not has_right:
+            # entire band is NaN — nothing to anchor against, leave for ffill/bfill cleanup
+            continue
+
+        # Exact single boundary points — guarantees zero discontinuity at gap edges
+        if has_left and has_right:
+            xl_obs    = alb_corr_fit[bands_fit][bandfit_nan_ind[0] - 1]
+            xl_snicar = best_fit_spectrum[bands_fit][bandfit_nan_ind[0] - 1]
+            xr_obs    = alb_corr_fit[bands_fit][bandfit_nan_ind[-1] + 1]
+            xr_snicar = best_fit_spectrum[bands_fit][bandfit_nan_ind[-1] + 1]
+            denom = xr_snicar - xl_snicar
+            if abs(denom) > 1e-6:
+                a = (xr_obs - xl_obs) / denom
+                b = xl_obs - a * xl_snicar
+                replace_array = a * best_fit_spectrum[bands_fit][bandfit_nan] + b
+            else:
+                # SNICAR is flat in this gap — fall back to linear interpolation between observed edges
+                wvl_gap = alb_wvl[bands_fit][bandfit_nan]
+                wvl_l = alb_wvl[bands_fit][bandfit_nan_ind[0] - 1]
+                wvl_r = alb_wvl[bands_fit][bandfit_nan_ind[-1] + 1]
+                replace_array = np.interp(wvl_gap, [wvl_l, wvl_r], [xl_obs, xr_obs])
+        elif has_left:
+            anchor_ind = bandfit_nan_ind[0] - 1
+            anchor_obs = alb_corr_fit[bands_fit][anchor_ind]
+            anchor_snicar = best_fit_spectrum[bands_fit][anchor_ind]
+            valid = np.isfinite(alb_corr_fit[bands_fit]) & np.isfinite(best_fit_spectrum[bands_fit])
+            snicar_valid = best_fit_spectrum[bands_fit][valid]
+            obs_valid = alb_corr_fit[bands_fit][valid]
+            denom = np.sum((snicar_valid - np.mean(snicar_valid))**2)
+            if snicar_valid.size >= 2 and denom > 1e-12:
+                slope = np.sum((snicar_valid - np.mean(snicar_valid)) * (obs_valid - np.mean(obs_valid))) / denom
+                replace_array = anchor_obs + slope * (best_fit_spectrum[bands_fit][bandfit_nan] - anchor_snicar)
+            else:
+                replace_array = np.full(np.sum(bandfit_nan), anchor_obs)
+        else:  # has_right only
+            anchor_ind = bandfit_nan_ind[-1] + 1
+            anchor_obs = alb_corr_fit[bands_fit][anchor_ind]
+            anchor_snicar = best_fit_spectrum[bands_fit][anchor_ind]
+            valid = np.isfinite(alb_corr_fit[bands_fit]) & np.isfinite(best_fit_spectrum[bands_fit])
+            snicar_valid = best_fit_spectrum[bands_fit][valid]
+            obs_valid = alb_corr_fit[bands_fit][valid]
+            denom = np.sum((snicar_valid - np.mean(snicar_valid))**2)
+            if snicar_valid.size >= 2 and denom > 1e-12:
+                slope = np.sum((snicar_valid - np.mean(snicar_valid)) * (obs_valid - np.mean(obs_valid))) / denom
+                replace_array = anchor_obs + slope * (best_fit_spectrum[bands_fit][bandfit_nan] - anchor_snicar)
+            else:
+                replace_array = np.full(np.sum(bandfit_nan), anchor_obs)
+
         alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
-        # print('replace_array shape:', replace_array.shape)
-        # print('alb_corr_fit_replace shape:', alb_corr_fit_replace.shape)
-        # print('bandfit_nan sum:', print(np.sum(bandfit_nan)))
-        
-        alb_corr_fit_replace[bandfit_nan] = copy.deepcopy(replace_array)
-        alb_corr_fit[bands_fit] = copy.deepcopy(alb_corr_fit_replace)
-            
-        # print("base, scale:", base, scale)
-        # print("base + (best_fit_spectrum[bands_fit][bandfit_nan] - xfit_base) * scale:", replace_array)
-        # print("alb_corr_fit[bands_fit][bandfit_nan] after adjustment:", alb_corr_fit[bands_fit][bandfit_nan])
+        alb_corr_fit_replace[bandfit_nan] = replace_array
+        alb_corr_fit[bands_fit] = alb_corr_fit_replace
         # plt.close('all')
         # plt.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
         # plt.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
@@ -406,6 +388,19 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
             
     
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
+    finite_fit = np.isfinite(alb_corr_fit)
+    if not np.all(finite_fit):
+        if np.any(finite_fit):
+            alb_corr_fit[~finite_fit] = np.interp(
+                alb_wvl[~finite_fit],
+                alb_wvl[finite_fit],
+                alb_corr_fit[finite_fit],
+                left=alb_corr_fit[finite_fit][0],
+                right=alb_corr_fit[finite_fit][-1],
+            )
+        else:
+            alb_corr_fit = np.copy(alb_corr)
+            alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
@@ -440,9 +435,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_corr_fit_smooth = alb_corr_fit.copy()
     alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5, mode='reflect')
     alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
-    
-    alb_corr_fit_smooth[np.isfinite(alb_corr_fit_smooth)] = alb_corr_fit_smooth
-    
+
     # print("alb_wvl shape:", alb_wvl.shape)
     # print("alb_corr shape:", alb_corr.shape)
     # print("alb_corr_mask shape:", alb_corr_mask.shape)
@@ -457,15 +450,15 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     ext_wvl_end = 4050
     ext_wvl = np.arange(ext_wvl_start, ext_wvl_end+1, 1)
     ext_alb = np.ones_like(ext_wvl) * alb_corr_fitted[-1]
-    
+
     alb_wvl_ext = np.concatenate((ext_wvl[ext_wvl < alb_wvl[0]], alb_wvl, ext_wvl[ext_wvl > alb_wvl[-1]]))
     alb_corr_fitted_ext = np.concatenate((ext_alb[ext_wvl < alb_wvl[0]], alb_corr_fitted, ext_alb[ext_wvl > alb_wvl[-1]]))
-    
+
     # snicar_albedo_list = []
     if clear_sky:
-        snicar_filename = 'snicar_model_results_direct.pkl'
+        snicar_filename = str(_PKL_DIR / 'snicar_model_results_direct.pkl')
     else:
-        snicar_filename = 'snicar_model_results_diffuse.pkl'
+        snicar_filename = str(_PKL_DIR / 'snicar_model_results_diffuse.pkl')
     with open(snicar_filename, 'rb') as f:
         snicar_data = pickle.load(f)
         

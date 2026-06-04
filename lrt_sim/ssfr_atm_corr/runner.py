@@ -64,6 +64,7 @@ def run_cases(
     case_id=DEFAULT_CASE_ID,
     case_ids=None,
     overwrite_lrt=True,
+    rerun_simulation=False,
     iterations=range(3),
     closure_check=True,
     closure_thresholds=None,
@@ -87,6 +88,7 @@ def run_cases(
             config,
             selected_case_id,
             overwrite_lrt=overwrite_lrt,
+            rerun_simulation=rerun_simulation,
             iterations=iterations,
             closure_check=closure_check,
             closure_thresholds=closure_thresholds,
@@ -143,6 +145,15 @@ def parse_args():
         action='store_true',
         help='Do not overwrite existing libRadtran products.',
     )
+    parser.add_argument(
+        '--rerun-simulation',
+        '--overwrite-simulation',
+        action='store_true',
+        help=(
+            'Force rerun/overwrite of existing simulation products before final outputs. '
+            'This bypasses resume shortcuts that would otherwise reuse existing CSVs.'
+        ),
+    )
     return parser.parse_args()
 
 
@@ -190,6 +201,8 @@ def main():
 
     track_case_ids = split_selected_case_ids(selected_case_ids)
     overwrite_lrt = not args.no_overwrite_lrt
+    if args.rerun_simulation:
+        overwrite_lrt = True
     if track_case_ids:
         print(f"Selected track case(s): {', '.join(track_case_ids)}")
 
@@ -203,6 +216,7 @@ def main():
             flt_trk_atm_corr,
             case_ids=track_case_ids,
             overwrite_lrt=overwrite_lrt,
+            rerun_simulation=args.rerun_simulation,
             iterations=range(args.iterations),
         )
 

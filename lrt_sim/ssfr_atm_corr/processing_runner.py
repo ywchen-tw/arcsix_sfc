@@ -30,7 +30,14 @@ else:
     )
 
 
-def run_processing_cases(case_id=DEFAULT_CASE_ID, case_ids=None, output_dir=None):
+def run_processing_cases(
+    case_id=DEFAULT_CASE_ID,
+    case_ids=None,
+    output_dir=None,
+    make_plots=True,
+    fig_dir='fig',
+    plot_every=1,
+):
     """Process one or more atmospheric-correction catalog cases."""
     if __package__:
         from .processing import make_default_config, process_catalog_case
@@ -46,7 +53,14 @@ def run_processing_cases(case_id=DEFAULT_CASE_ID, case_ids=None, output_dir=None
         if selected_case_id not in CASE_ID_LIST:
             valid_text = ', '.join(CASE_ID_LIST)
             raise ValueError(f'Unknown track case ID: {selected_case_id}. Valid IDs: {valid_text}')
-        process_catalog_case(config, selected_case_id, output_dir=output_dir)
+        process_catalog_case(
+            config,
+            selected_case_id,
+            output_dir=output_dir,
+            make_plots=make_plots,
+            fig_dir=fig_dir,
+            plot_every=plot_every,
+        )
 
 
 def parse_args():
@@ -81,6 +95,22 @@ def parse_args():
         default=None,
         help='Optional output directory for processed pickle files.',
     )
+    parser.add_argument(
+        '--no-plots',
+        action='store_true',
+        help='Write processed pickle files without generating diagnostic plots.',
+    )
+    parser.add_argument(
+        '--fig-dir',
+        default='fig',
+        help='Base directory for diagnostic plots. Default: fig.',
+    )
+    parser.add_argument(
+        '--plot-every',
+        type=int,
+        default=1,
+        help='Plot every Nth leg for per-leg diagnostics. Default: 1.',
+    )
     return parser.parse_args()
 
 
@@ -105,4 +135,7 @@ if __name__ == '__main__':
     run_processing_cases(
         case_ids=selected_case_ids,
         output_dir=args.output_dir,
+        make_plots=not args.no_plots,
+        fig_dir=args.fig_dir,
+        plot_every=args.plot_every,
     )

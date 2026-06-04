@@ -952,6 +952,28 @@ def final_native_output_files(case, date_s):
     return sorted(set(native_files)), missing_patterns
 
 
+def iteration_native_output_files(case, date_s, iter):
+    """Return native-grid iteration CSV files expected for one catalog iteration."""
+    output_dir = case_lrt_output_dir(case, date_s)
+    native_files = []
+    missing_patterns = []
+    tmhr_ranges_select = split_case_tmhr_ranges(
+        case['tmhr_ranges_select'],
+        case['simulation_interval'],
+    )
+    for time_start, time_end in tmhr_ranges_select:
+        pattern = os.path.join(
+            output_dir,
+            f'ssfr_simu_flux_{date_s}_{time_start:.3f}-{time_end:.3f}_alt-*km_iteration_{iter}.csv',
+        )
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            native_files.extend(matches)
+        else:
+            missing_patterns.append(pattern)
+    return sorted(set(native_files)), missing_patterns
+
+
 def iteration_albedo_files(case, date_s, iter):
     """Return native-grid albedo files generated for one catalog iteration."""
     tmhr_ranges_select = split_case_tmhr_ranges(
@@ -1076,6 +1098,7 @@ def run_catalog_case(
     config,
     case_id,
     overwrite_lrt=True,
+    rerun_simulation=False,
     iterations=range(3),
     closure_check=True,
     closure_thresholds=None,
@@ -1140,9 +1163,34 @@ def run_catalog_case(
             final_status=final_status,
         )
 
+    def run_track_iteration(iter):
+        flt_trk_atm_corr(
+            date=datetime.datetime(year, month, day),
+            tmhr_ranges_select=case['tmhr_ranges_select'],
+            case_tag=case['case_tag'],
+            config=config,
+            levels=levels,
+            simulation_interval=case['simulation_interval'],
+            clear_sky=case['clear_sky'],
+            overwrite_lrt=overwrite_lrt,
+            manual_cloud=manual_cloud,
+            manual_cloud_cer=manual_cloud_cer,
+            manual_cloud_cwp=manual_cloud_cwp,
+            manual_cloud_cth=manual_cloud_cth,
+            manual_cloud_cbh=manual_cloud_cbh,
+            manual_cloud_cot=manual_cloud_cot,
+            iter=iter,
+        )
+
     native_final_files, missing_native_final_patterns = final_native_output_files(case, date_s)
     missing_final_extension_files = missing_final_extension_outputs(native_final_files)
-    if run_final_sim and native_final_files and missing_final_extension_files and not missing_native_final_patterns:
+    if (
+        run_final_sim
+        and not rerun_simulation
+        and native_final_files
+        and missing_final_extension_files
+        and not missing_native_final_patterns
+    ):
         final_iter = infer_final_iteration_from_native_final(native_final_files[0])
         if final_iter is not None:
             print(
@@ -1162,17 +1210,32 @@ def run_catalog_case(
         )
 
     last_iter = max_limit_iteration(iterations, min_closure_iteration, max_additional_iterations)
-    if run_final_sim and last_iter is not None:
+    if run_final_sim and last_iter is not None and not rerun_simulation:
         last_iter_albedo_files, missing_last_iter_albedo_patterns = iteration_albedo_files(
             case,
             date_s,
             last_iter,
         )
         if last_iter_albedo_files and not missing_last_iter_albedo_patterns:
-            print(
-                f'{case_id}: found albedo file(s) for max-limit iteration {last_iter}; '
-                'running final copy and final-extension simulation from that iteration.'
+            _, missing_last_iter_output_patterns = iteration_native_output_files(
+                case,
+                date_s,
+                last_iter,
             )
+            if missing_last_iter_output_patterns:
+                print(
+                    f'{case_id}: found albedo file(s) for max-limit iteration {last_iter}, '
+                    f'but missing {len(missing_last_iter_output_patterns)} native iteration output(s): '
+                    f'{summarize_missing_ranges(missing_last_iter_output_patterns)}. '
+                    'Running the native iteration before final outputs.'
+                )
+                run_track_iteration(last_iter)
+            else:
+                print(
+                    f'{case_id}: found albedo and native output file(s) for max-limit '
+                    f'iteration {last_iter}; running final copy and final-extension '
+                    'simulation from that iteration.'
+                )
             run_final_iteration(
                 last_iter,
                 final_status='max_iteration_from_existing_albedo',
@@ -1188,23 +1251,7 @@ def run_catalog_case(
             )
 
     for iter in iterations:
-        flt_trk_atm_corr(
-            date=datetime.datetime(year, month, day),
-            tmhr_ranges_select=case['tmhr_ranges_select'],
-            case_tag=case['case_tag'],
-            config=config,
-            levels=levels,
-            simulation_interval=case['simulation_interval'],
-            clear_sky=case['clear_sky'],
-            overwrite_lrt=overwrite_lrt,
-            manual_cloud=manual_cloud,
-            manual_cloud_cer=manual_cloud_cer,
-            manual_cloud_cwp=manual_cloud_cwp,
-            manual_cloud_cth=manual_cloud_cth,
-            manual_cloud_cbh=manual_cloud_cbh,
-            manual_cloud_cot=manual_cloud_cot,
-            iter=iter,
-        )
+        run_track_iteration(iter)
         if closure_check and iter >= min_closure_iteration:
             output_files = iteration_output_files(case, date_s, iter)
             thresholds = closure_thresholds or DEFAULT_CLOSURE_THRESHOLDS
