@@ -93,6 +93,9 @@ import er3t
 # from util.arcsix_atm import prepare_atmospheric_profile
 from util import *
 
+
+MIN_FINAL_ITERATION = 2
+
 try:
     from .settings import *
     from .helpers import find_h2o_6_end, fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
@@ -169,6 +172,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
     assert config, "FlightConfig required"
     date_s = date.strftime("%Y%m%d")
+    if final_sim and iter < MIN_FINAL_ITERATION:
+        raise ValueError(
+            f'Refusing final simulation for {date_s}_{case_tag} from iteration {iter}. '
+            f'Final products require iter >= {MIN_FINAL_ITERATION} because iter_1 has '
+            'not gone through smooth/fitting.'
+        )
     
     os.makedirs(f'fig/{date_s}', exist_ok=True)
     
@@ -888,7 +897,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo = SSFR upward/downward ratio', fontsize=10)
             elif iter == 1:
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (Odell)', fontsize=10)
-            elif iter == 2:
+            elif iter >= 2:
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (fit)', fontsize=10)
             fig.tight_layout()
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_flux_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
@@ -933,7 +942,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo = SSFR upward/downward ratio', fontsize=10)
             elif iter == 1:
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (Odell)', fontsize=10)
-            elif iter == 2:
+            elif iter >= 2:
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (fit)', fontsize=10)
             fig.tight_layout()
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_toa_dnflux_toa_ratio_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
@@ -1038,7 +1047,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                 )
                 #\----------------------------------------------------------------------------/#
                 del alb_avg_update3, alb_avg_update4
-            if iter >= 2:
+            if iter >= 1:
                 alb_wvl_extend = np.concatenate(([348.0], alb_wvl, [2050.0]))
                 alb_ice_fit_extend = np.concatenate(([alb_ice_fit[0]], alb_ice_fit, [alb_ice_fit[-1]]))
 

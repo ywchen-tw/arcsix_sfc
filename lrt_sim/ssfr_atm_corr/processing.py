@@ -38,14 +38,6 @@ except ImportError:
     from settings import _fdir_data_, _fdir_general_, gas_bands
     from setup import load_cloud_observation_legs, split_tmhr_ranges
 
-
-# TEMPORARY: CURC maintenance prevents rerunning final simulations/albedo copies.
-# Prefer iter_2 as the final albedo stand-in even when stale ``sfc_alb_*_final.dat``
-# files exist. Remove this override and use real final albedo products after the
-# workflow can be rerun.
-TEMPORARY_FINAL_ALBEDO_ITER = 2
-
-
 def make_default_config():
     """Return the default ARCSIX P3B data-location config."""
     return FlightConfig(
@@ -154,6 +146,29 @@ def native_albedo_values(wvl, alb, native_wvl):
     return np.interp(native_wvl, wvl, alb, left=np.nan, right=np.nan)
 
 
+def collect_iteration_albedos(fdir_alb, stem_alb, native_wvl):
+    """Read all numbered native-grid iteration albedo files for one leg."""
+    iterations = {}
+    iteration_files = {}
+    pattern = f'sfc_alb_{stem_alb}_iter_*.dat'
+    for path in Path(fdir_alb).glob(pattern):
+        parts = path.stem.rsplit('_iter_', 1)
+        if len(parts) != 2:
+            continue
+        try:
+            iter_num = int(parts[1])
+        except ValueError:
+            continue
+        alb_wvl, alb = maybe_read_two_column_file(str(path), 'alb')
+        iterations[iter_num] = native_albedo_values(alb_wvl, alb, native_wvl)
+        iteration_files[iter_num] = str(path)
+
+    return (
+        dict(sorted(iterations.items())),
+        dict(sorted(iteration_files.items())),
+    )
+
+
 def all_nonfinite(values):
     """Return True when an array has no finite values."""
     values = np.asarray(values, dtype=float)
@@ -212,6 +227,49 @@ def plot_native_albedo_diagnostic(record, series_keys, labels, colors, filename,
     fig.tight_layout()
     fig.savefig(filename, bbox_inches='tight', dpi=150)
     plt.close(fig)
+
+
+def plot_all_iteration_albedo_diagnostic(record, filename, title):
+    """Plot all numbered iteration albedo spectra for one leg."""
+    import matplotlib.pyplot as plt
+
+    iterations = record.get('alb_iterations', {})
+    if not iterations:
+        return None
+
+    wvl = np.asarray(record['native_wvl'], dtype=float)
+    finite_items = []
+    for iter_num, values in iterations.items():
+        values = np.asarray(values, dtype=float)
+        if values.size == wvl.size and np.any(np.isfinite(values)):
+            finite_items.append((iter_num, values))
+    if not finite_items:
+        return None
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    cmap = plt.get_cmap('viridis')
+    denom = max(len(finite_items) - 1, 1)
+    for i, (iter_num, values) in enumerate(finite_items):
+        ax.plot(
+            wvl,
+            values,
+            '-',
+            color=cmap(i / denom),
+            label=f'iter {iter_num}',
+        )
+
+    plot_gas_absorption_bands(ax, wvl=wvl, alt=record.get('alt_avg'))
+    ax.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax.set_ylabel('Surface Albedo', fontsize=14)
+    ax.tick_params(labelsize=12)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlim(350, 2000)
+    ax.set_title(title, fontsize=13)
+    ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    fig.tight_layout()
+    fig.savefig(filename, bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    return filename
 
 
 def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
@@ -370,20 +428,25 @@ def plot_processing_outputs(date_s, case_tag, records, output, fig_dir='fig', pl
         )
         plot_files.append(iter012_file)
 
-        final_label = 'final'
-        if record.get('temporary_final_albedo'):
-            final_label = f'final (TEMP iter {TEMPORARY_FINAL_ALBEDO_ITER})'
-
         iter01final_file = f'{leg_fig_dir}/{stem}_iter0_iter1_final.png'
         plot_native_albedo_diagnostic(
             record,
             ('alb_initial', 'alb_corrected', 'alb_final'),
-            ('iter 0', 'iter 1', final_label),
+            ('iter 0', 'iter 1', 'final'),
             ('black', 'blue', 'red'),
             iter01final_file,
             f'{title_base}\niter 0, iter 1, final',
         )
         plot_files.append(iter01final_file)
+
+        all_iter_file = f'{leg_fig_dir}/{stem}_all_iterations.png'
+        all_iter_file = plot_all_iteration_albedo_diagnostic(
+            record,
+            all_iter_file,
+            f'{title_base}\nall numbered iterations',
+        )
+        if all_iter_file is not None:
+            plot_files.append(all_iter_file)
 
     mean_file = plot_mean_final_albedo(date_s, case_tag, output, summary_fig_dir)
     if mean_file is not None:
@@ -469,6 +532,7 @@ def process_atm_corr_case(
             alb_wvl, alb = maybe_read_two_column_file(alb_paths[key], 'alb')
             albedo_native[key] = native_albedo_values(alb_wvl, alb, native_wvl)
             broadband_native[key] = weighted_broadband_albedo(albedo_native[key], native_weight, native_wvl)
+        alb_iterations, alb_iteration_files = collect_iteration_albedos(fdir_alb, stem_alb, native_wvl)
 
         extension_wvl = np.array([])
         albedo_extension = np.array([])
@@ -498,30 +562,10 @@ def process_atm_corr_case(
 
         final_iter = final_iteration_from_extension(df_extension)
         final_albedo_source = alb_paths['final']
-        temporary_final_albedo = False
         final_albedo_warning = None
         fallback_albedo = None
-        temporary_iter_path = f'{fdir_alb}/sfc_alb_{stem_alb}_iter_{TEMPORARY_FINAL_ALBEDO_ITER}.dat'
-        fallback_wvl, fallback_alb = maybe_read_two_column_file(temporary_iter_path, 'alb')
-        if fallback_wvl is not None:
-            fallback_albedo = native_albedo_values(fallback_wvl, fallback_alb, native_wvl)
-            final_albedo_source = temporary_iter_path
-            temporary_final_albedo = True
-            if os.path.exists(alb_paths['final']):
-                final_albedo_warning = (
-                    f'TEMPORARY FINAL ALBEDO OVERRIDE: ignoring existing {alb_paths["final"]}; '
-                    f'using iter_{TEMPORARY_FINAL_ALBEDO_ITER} instead. '
-                    'Replace with real final albedo after rerunning workflow.'
-                )
-            else:
-                final_albedo_warning = (
-                    f'TEMPORARY FINAL ALBEDO: missing {alb_paths["final"]}; '
-                    f'using iter_{TEMPORARY_FINAL_ALBEDO_ITER} instead. '
-                    'Replace with real final albedo after rerunning workflow.'
-                )
-            print(f'WARNING: {final_albedo_warning}')
-        elif all_nonfinite(albedo_native['final']):
-            if final_iter is not None and final_iter != TEMPORARY_FINAL_ALBEDO_ITER:
+        if all_nonfinite(albedo_native['final']):
+            if final_iter is not None:
                 final_iter_path = f'{fdir_alb}/sfc_alb_{stem_alb}_iter_{final_iter}.dat'
                 fallback_wvl, fallback_alb = maybe_read_two_column_file(final_iter_path, 'alb')
                 if fallback_wvl is not None:
@@ -548,7 +592,6 @@ def process_atm_corr_case(
             'leg_index': ileg,
             'final_iter': final_iter,
             'final_albedo_source': final_albedo_source,
-            'temporary_final_albedo': temporary_final_albedo,
             'final_albedo_warning': final_albedo_warning,
             'time': np.asarray(cld_leg['time']),
             'time_start': time_start,
@@ -574,6 +617,7 @@ def process_atm_corr_case(
             'alb_corrected': albedo_native['corrected'],
             'alb_fitted_baseline': albedo_native['fitted_baseline'],
             'alb_final': albedo_native['final'],
+            'alb_iterations': alb_iterations,
             'broadband_alb_initial': broadband_native['initial'],
             'broadband_alb_corrected': broadband_native['corrected'],
             'broadband_alb_fitted_baseline': broadband_native['fitted_baseline'],
@@ -584,6 +628,7 @@ def process_atm_corr_case(
             'final_csv': final_csv,
             'final_extension_csv': final_extension_csv if os.path.exists(final_extension_csv) else None,
             'albedo_files': alb_paths,
+            'albedo_iteration_files': alb_iteration_files,
         })
         gc.collect()
 
@@ -606,6 +651,7 @@ def process_atm_corr_case(
         'alb_corrected': stack_or_object([record['alb_corrected'] for record in records]),
         'alb_fitted_baseline': stack_or_object([record['alb_fitted_baseline'] for record in records]),
         'alb_final': stack_or_object([record['alb_final'] for record in records]),
+        'alb_iterations': np.array([record['alb_iterations'] for record in records], dtype=object),
         'broadband_alb_initial': np.array([record['broadband_alb_initial'] for record in records]),
         'broadband_alb_corrected': np.array([record['broadband_alb_corrected'] for record in records]),
         'broadband_alb_fitted_baseline': np.array([record['broadband_alb_fitted_baseline'] for record in records]),
@@ -618,12 +664,12 @@ def process_atm_corr_case(
             for record in records
         ]),
         'final_albedo_source': np.array([record['final_albedo_source'] for record in records], dtype=object),
-        'temporary_final_albedo': np.array([record['temporary_final_albedo'] for record in records], dtype=bool),
         'final_albedo_warnings': [
             record['final_albedo_warning']
             for record in records
             if record['final_albedo_warning'] is not None
         ],
+        'albedo_iteration_files': np.array([record['albedo_iteration_files'] for record in records], dtype=object),
         'records': records,
         'skipped': skipped,
     }

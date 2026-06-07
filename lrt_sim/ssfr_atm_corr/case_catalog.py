@@ -27,6 +27,10 @@ DEFAULT_CLOSURE_THRESHOLDS = {
     'fup_flux_weighted_relative_rmse': 0.08,
 }
 
+# iter_1 is only the Odell-corrected product. The first smooth/fitted albedo is
+# iter_2, so final products must never be copied or extended from iter_1.
+MIN_FINAL_ITERATION = 2
+
 
 def cloud_observation_file(fdir_general, mission, platform_name, date_s, case_tag, time_start, time_end):
     """Return the expected preprocessed cloud-observation file for one time window."""
@@ -1093,6 +1097,11 @@ def max_limit_iteration(iterations, min_closure_iteration, max_additional_iterat
     return last_requested_iteration
 
 
+def final_iteration_is_allowed(iter):
+    """Return True when an iteration is eligible to become a final product."""
+    return iter is not None and iter >= MIN_FINAL_ITERATION
+
+
 def run_catalog_case(
     flt_trk_atm_corr,
     config,
@@ -1142,6 +1151,12 @@ def run_catalog_case(
     def run_final_iteration(iter, final_status, final_overwrite_lrt=None):
         if not run_final_sim:
             return
+        if not final_iteration_is_allowed(iter):
+            raise ValueError(
+                f'{case_id}: refusing to create final output from iteration {iter}. '
+                f'Final products require iter >= {MIN_FINAL_ITERATION} because iter_1 '
+                'has not gone through smooth/fitting.'
+            )
         final_overwrite_lrt = overwrite_lrt if final_overwrite_lrt is None else final_overwrite_lrt
         flt_trk_atm_corr(
             date=datetime.datetime(year, month, day),
@@ -1193,62 +1208,78 @@ def run_catalog_case(
     ):
         final_iter = infer_final_iteration_from_native_final(native_final_files[0])
         if final_iter is not None:
+            if not final_iteration_is_allowed(final_iter):
+                print(
+                    f'{case_id}: native final output appears to come from iteration {final_iter}, '
+                    f'but final products require iter >= {MIN_FINAL_ITERATION}; '
+                    'not running extension-only final simulation from this file. '
+                    'Continuing with normal iteration flow.'
+                )
+            else:
+                print(
+                    f'{case_id}: found native final output(s) but missing '
+                    f'{len(missing_final_extension_files)} final-extension file(s); '
+                    f'running extension-only final simulation from iteration {final_iter}.'
+                )
+                run_final_iteration(
+                    final_iter,
+                    final_status='extension_only_from_existing_final',
+                    final_overwrite_lrt=False,
+                )
+                return True
+        if final_iter is None:
             print(
-                f'{case_id}: found native final output(s) but missing '
-                f'{len(missing_final_extension_files)} final-extension file(s); '
-                f'running extension-only final simulation from iteration {final_iter}.'
+                f'{case_id}: native final output(s) exist and final-extension file(s) are missing, '
+                'but final iteration could not be inferred; continuing with normal iteration flow.'
             )
-            run_final_iteration(
-                final_iter,
-                final_status='extension_only_from_existing_final',
-                final_overwrite_lrt=False,
-            )
-            return True
-        print(
-            f'{case_id}: native final output(s) exist and final-extension file(s) are missing, '
-            'but final iteration could not be inferred; continuing with normal iteration flow.'
-        )
 
     last_iter = max_limit_iteration(iterations, min_closure_iteration, max_additional_iterations)
     if run_final_sim and last_iter is not None and not rerun_simulation:
-        last_iter_albedo_files, missing_last_iter_albedo_patterns = iteration_albedo_files(
-            case,
-            date_s,
-            last_iter,
-        )
-        if last_iter_albedo_files and not missing_last_iter_albedo_patterns:
-            _, missing_last_iter_output_patterns = iteration_native_output_files(
+        if not final_iteration_is_allowed(last_iter):
+            print(
+                f'{case_id}: max-limit iteration {last_iter} is not eligible for final output; '
+                f'final products require iter >= {MIN_FINAL_ITERATION}. '
+                'Skipping final shortcut and continuing with normal iteration flow.'
+            )
+        else:
+            last_iter_albedo_files, missing_last_iter_albedo_patterns = iteration_albedo_files(
                 case,
                 date_s,
                 last_iter,
             )
-            if missing_last_iter_output_patterns:
-                print(
-                    f'{case_id}: found albedo file(s) for max-limit iteration {last_iter}, '
-                    f'but missing {len(missing_last_iter_output_patterns)} native iteration output(s): '
-                    f'{summarize_missing_ranges(missing_last_iter_output_patterns)}. '
-                    'Running the native iteration before final outputs.'
+            if last_iter_albedo_files and not missing_last_iter_albedo_patterns:
+                _, missing_last_iter_output_patterns = iteration_native_output_files(
+                    case,
+                    date_s,
+                    last_iter,
                 )
-                run_track_iteration(last_iter)
-            else:
-                print(
-                    f'{case_id}: found albedo and native output file(s) for max-limit '
-                    f'iteration {last_iter}; running final copy and final-extension '
-                    'simulation from that iteration.'
+                if missing_last_iter_output_patterns:
+                    print(
+                        f'{case_id}: found albedo file(s) for max-limit iteration {last_iter}, '
+                        f'but missing {len(missing_last_iter_output_patterns)} native iteration output(s): '
+                        f'{summarize_missing_ranges(missing_last_iter_output_patterns)}. '
+                        'Running the native iteration before final outputs.'
+                    )
+                    run_track_iteration(last_iter)
+                else:
+                    print(
+                        f'{case_id}: found albedo and native output file(s) for max-limit '
+                        f'iteration {last_iter}; running final copy and final-extension '
+                        'simulation from that iteration.'
+                    )
+                run_final_iteration(
+                    last_iter,
+                    final_status='max_iteration_from_existing_albedo',
                 )
-            run_final_iteration(
-                last_iter,
-                final_status='max_iteration_from_existing_albedo',
-            )
-            return True
-        if last_iter_albedo_files:
-            print(
-                f'{case_id}: found {len(last_iter_albedo_files)} albedo file(s) for '
-                f'max-limit iteration {last_iter}, but missing '
-                f'{len(missing_last_iter_albedo_patterns)} split range(s): '
-                f'{summarize_missing_ranges(missing_last_iter_albedo_patterns)}. '
-                'Continuing with normal iteration flow.'
-            )
+                return True
+            if last_iter_albedo_files:
+                print(
+                    f'{case_id}: found {len(last_iter_albedo_files)} albedo file(s) for '
+                    f'max-limit iteration {last_iter}, but missing '
+                    f'{len(missing_last_iter_albedo_patterns)} split range(s): '
+                    f'{summarize_missing_ranges(missing_last_iter_albedo_patterns)}. '
+                    'Continuing with normal iteration flow.'
+                )
 
     for iter in iterations:
         run_track_iteration(iter)
