@@ -158,6 +158,37 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
         
     return best_fit_params, best_fit_spectrum, min_rmse, model_wvl, ori_model_spectrum
 
+
+def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
+    """Remove narrow spikes and smooth the clean continuum before H2O-7."""
+    window_start = h2o_6_end + 5
+    window = (alb_wvl >= window_start) & (alb_wvl < h2o_7_start)
+    if np.count_nonzero(window) < 5:
+        return alb
+
+    smoothed = alb.copy()
+    y = smoothed[window].copy()
+    finite = np.isfinite(y)
+    if np.count_nonzero(finite) < 5:
+        return smoothed
+    if not np.all(finite):
+        x = alb_wvl[window]
+        y[~finite] = np.interp(x[~finite], x[finite], y[finite])
+
+    continuum = uniform_filter1d(y, size=11, mode='reflect')
+    resid = y - continuum
+    mad = np.nanmedian(np.abs(resid - np.nanmedian(resid)))
+    sigma = 1.4826 * mad if mad > 0 else np.nanstd(resid)
+
+    if np.isfinite(sigma) and sigma > 0:
+        spike = np.abs(resid) > 3 * sigma
+        y[spike] = continuum[spike]
+
+    y = uniform_filter1d(y, size=9, mode='reflect')
+    smoothed[window] = y
+    return np.clip(smoothed, 0, 1)
+
+
 def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
     # snicar_albedo_list = []
     if clear_sky:
@@ -386,6 +417,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     alb_corr_fit[alb_wvl < replace_wvl_end] = replace_array.copy()
     
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
+    alb_corr_fit = _smooth_h2o6_h2o7_continuum(alb_wvl, alb_corr_fit, h2o_6_end)
     
     
     # smooth with window size of 5
