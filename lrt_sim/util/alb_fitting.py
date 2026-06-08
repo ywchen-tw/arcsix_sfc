@@ -349,6 +349,58 @@ def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
     return np.clip(smoothed, 0, 1)
 
 
+def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit_spectrum, h2o_6_end):
+    """Fill H2O-6 with the best-fit SNICAR shape before generic gap bridging."""
+    h2o_6_start = 1290
+    h2o6_gap = (
+        (alb_wvl >= h2o_6_start)
+        & (alb_wvl <= h2o_6_end)
+        & np.isnan(alb_corr_mask)
+        & np.isfinite(best_fit_spectrum)
+    )
+    if not np.any(h2o6_gap):
+        return alb_corr_fit, alb_corr_mask
+
+    left_anchor = (
+        (alb_wvl >= 1185)
+        & (alb_wvl < h2o_6_start)
+        & np.isfinite(alb_corr_fit)
+        & np.isfinite(best_fit_spectrum)
+    )
+    right_anchor = (
+        (alb_wvl > h2o_6_end)
+        & (alb_wvl <= 1700)
+        & np.isfinite(alb_corr_fit)
+        & np.isfinite(best_fit_spectrum)
+    )
+    anchors = left_anchor | right_anchor
+
+    if np.count_nonzero(anchors) >= 2:
+        model = best_fit_spectrum[anchors]
+        obs = alb_corr_fit[anchors]
+        model_var = np.sum((model - np.mean(model)) ** 2)
+        if model_var > 1e-12:
+            scale = np.sum((model - np.mean(model)) * (obs - np.mean(obs))) / model_var
+            offset = np.mean(obs) - scale * np.mean(model)
+        else:
+            scale = 1.0
+            offset = np.mean(obs - model)
+    elif np.count_nonzero(anchors) == 1:
+        anchor = np.flatnonzero(anchors)[0]
+        scale = 1.0
+        offset = alb_corr_fit[anchor] - best_fit_spectrum[anchor]
+    else:
+        scale = 1.0
+        offset = 0.0
+
+    replacement = scale * best_fit_spectrum[h2o6_gap] + offset
+    alb_corr_fit = alb_corr_fit.copy()
+    alb_corr_mask = alb_corr_mask.copy()
+    alb_corr_fit[h2o6_gap] = np.clip(replacement, 0, 1)
+    alb_corr_mask[h2o6_gap] = alb_corr_fit[h2o6_gap]
+    return alb_corr_fit, alb_corr_mask
+
+
 def _snowice_alb_fitting_from_best(
     alb_wvl,
     alb_corr,
@@ -389,6 +441,13 @@ def _snowice_alb_fitting_from_best(
     ) = _snowice_band_masks(_array_cache_key(alb_wvl), float(h2o_6_end))
     
     alb_corr_fit = alb_corr_mask.copy()
+    alb_corr_fit, alb_corr_mask = _fill_h2o6_with_scaled_snicar(
+        alb_wvl,
+        alb_corr_fit,
+        alb_corr_mask,
+        best_fit_spectrum,
+        h2o_6_end,
+    )
     
     for bands_fit in [
                       band_1_fit, 
