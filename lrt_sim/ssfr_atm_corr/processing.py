@@ -13,30 +13,55 @@ import gc
 import os
 import pickle
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 _LRT_SIM_ROOT = str(Path(__file__).resolve().parents[1])
 _REPO_ROOT = str(Path(__file__).resolve().parents[2])
-for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
+_UTIL_ROOT = str(Path(__file__).resolve().parents[1] / 'util')
+_SSFR_ROOT = str(Path(__file__).resolve().parent)
+for _path in (_SSFR_ROOT, _UTIL_ROOT, _REPO_ROOT, _LRT_SIM_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
 import numpy as np
 import pandas as pd
 
-from util import FlightConfig
+from alb_fitting import alb_extention, snowice_alb_fitting
 
 try:
-    from .case_catalog import get_case
     from .helpers import gas_abs_masking
     from .settings import _fdir_data_, _fdir_general_, gas_bands
-    from .setup import load_cloud_observation_legs, split_tmhr_ranges
 except ImportError:
-    from case_catalog import get_case
     from helpers import gas_abs_masking
     from settings import _fdir_data_, _fdir_general_, gas_bands
-    from setup import load_cloud_observation_legs, split_tmhr_ranges
+
+
+@dataclass(frozen=True)
+class FlightConfig:
+    mission: str
+    platform: str
+    data_root: Path
+    root_mac: Path
+    root_linux: Path
+
+    def hsk(self, date_s): return f"{self.data_root}/{self.mission}-HSK_{self.platform}_{date_s}_v0.h5"
+    def ssfr(self, date_s): return f"{self.data_root}/{self.mission}-SSFR_{self.platform}_{date_s}_R1.h5"
+    def ssrr(self, date_s): return f"{self.data_root}/{self.mission}-SSRR_{self.platform}_{date_s}_R0.h5"
+    def hsr1(self, date_s): return f"{self.data_root}/{self.mission}-HSR1_{self.platform}_{date_s}_R0.h5"
+    def logic(self, date_s): return f"{self.data_root}/{self.mission}-LOGIC_{self.platform}_{date_s}_RA.h5"
+    def sat_coll(self, date_s): return f"{self.data_root}/{self.mission}-SAT-CLD_{self.platform}_{date_s}_v0.h5"
+    def marli(self, date_s):
+        root = self.root_mac if sys.platform == "darwin" else self.root_linux
+        return f"{root}/marli/ARCSIX-MARLi_P3B_{date_s}_R0.cdf"
+    def kt19(self, date_s):
+        root = self.root_mac if sys.platform == "darwin" else self.root_linux
+        return f"{root}/kt19/ARCSIX-MetNav-KT19-10Hz_P3B_{date_s}_R0.ict"
+    def sat_nc(self, date_s, raw):
+        root = self.root_mac if sys.platform == "darwin" else self.root_linux
+        return f"{root}/sat-data/{date_s}/{raw}"
+
 
 def make_default_config():
     """Return the default ARCSIX P3B data-location config."""
@@ -71,6 +96,29 @@ def weighted_broadband_albedo(albedo, weight, wvl):
     if denominator == 0:
         return np.nan
     return np.trapz(albedo[valid] * weight[valid], x=wvl[valid]) / denominator
+
+
+def weighted_broadband_albedo_rows(albedo, weight, wvl):
+    """Return per-row wavelength-integrated albedo weighted by spectral irradiance."""
+    albedo = np.asarray(albedo, dtype=float)
+    weight = np.asarray(weight, dtype=float)
+    wvl = np.asarray(wvl, dtype=float)
+    if albedo.ndim == 1:
+        return weighted_broadband_albedo(albedo, weight, wvl)
+    if weight.ndim == 1:
+        weight = np.broadcast_to(weight, albedo.shape)
+
+    broadband = np.full(albedo.shape[0], np.nan, dtype=float)
+    finite_wvl = np.isfinite(wvl)
+    for irow in range(albedo.shape[0]):
+        valid = finite_wvl & np.isfinite(albedo[irow]) & np.isfinite(weight[irow])
+        if np.count_nonzero(valid) < 2:
+            continue
+        denominator = np.trapz(weight[irow, valid], x=wvl[valid])
+        if denominator == 0 or not np.isfinite(denominator):
+            continue
+        broadband[irow] = np.trapz(albedo[irow, valid] * weight[irow, valid], x=wvl[valid]) / denominator
+    return broadband
 
 
 def dataframe_weight(df, preferred_columns, expected_length):
@@ -144,6 +192,238 @@ def native_albedo_values(wvl, alb, native_wvl):
     if len(wvl) == len(native_wvl) and np.allclose(wvl, native_wvl):
         return alb
     return np.interp(native_wvl, wvl, alb, left=np.nan, right=np.nan)
+
+
+def fill_nan_ffill_bfill(arr, limit=2):
+    """Fill NaNs in a one-dimensional array using repeated forward/backward fill."""
+    values = np.asarray(arr, dtype=float)
+    if not np.any(np.isnan(values)):
+        return values
+    if np.all(np.isnan(values)):
+        return values
+    series = pd.Series(values)
+    series = series.ffill(limit=limit).bfill(limit=limit)
+    while series.isna().any():
+        series = series.ffill(limit=limit).bfill(limit=limit)
+    return series.to_numpy()
+
+
+def read_iteration_corr_factor(csv_path, native_wvl):
+    """Read an iteration CSV correction factor on the native wavelength grid."""
+    if not os.path.exists(csv_path):
+        return None
+    df = pd.read_csv(csv_path)
+    if 'corr_factor' not in df:
+        return None
+    corr = pd.to_numeric(df['corr_factor'], errors='coerce').to_numpy(dtype=float)
+    if corr.size == native_wvl.size:
+        corr_native = corr
+    elif 'wvl' in df:
+        csv_wvl = pd.to_numeric(df['wvl'], errors='coerce').to_numpy(dtype=float)
+        valid = np.isfinite(csv_wvl) & np.isfinite(corr)
+        if np.count_nonzero(valid) < 2:
+            return None
+        corr_native = np.interp(native_wvl, csv_wvl[valid], corr[valid], left=np.nan, right=np.nan)
+    else:
+        return None
+
+    if np.any(~np.isfinite(corr_native)):
+        corr_native = fill_nan_ffill_bfill(corr_native)
+    return np.where(np.isfinite(corr_native), corr_native, 1.0)
+
+
+def apply_corr_factor_1s(albedo_1s, corr_factor):
+    """Apply one spectral correction factor to every one-second albedo spectrum."""
+    corrected = np.asarray(albedo_1s, dtype=float).copy()
+    for irow in range(corrected.shape[0]):
+        if np.any(np.isnan(corrected[irow])) and np.any(np.isfinite(corrected[irow])):
+            corrected[irow] = fill_nan_ffill_bfill(corrected[irow])
+    corrected = np.clip(corrected, 0.0, 1.0)
+    corrected = corrected * corr_factor[np.newaxis, :]
+    return np.clip(corrected, 0.0, 1.0)
+
+
+def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky):
+    """Apply snow/ice fitting to each one-second corrected albedo spectrum."""
+    fitted = np.full_like(corrected_1s, np.nan, dtype=float)
+    for irow in range(corrected_1s.shape[0]):
+        row = corrected_1s[irow]
+        if np.all(~np.isfinite(row)):
+            continue
+        alt = float(alt_1s[irow]) if np.isfinite(alt_1s[irow]) else np.nan
+        try:
+            fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky)
+            if np.all(~np.isfinite(fitted_row)):
+                raise ValueError('all non-finite fitted albedo')
+            fitted[irow] = fitted_row
+        except Exception:
+            fitted[irow] = row
+    return np.clip(fitted, 0.0, 1.0)
+
+
+def infer_final_iter(albedo_native, alb_iterations):
+    """Infer the final iteration by matching final.dat to numbered iteration files."""
+    final_albedo = np.asarray(albedo_native.get('final', []), dtype=float)
+    if final_albedo.size == 0 or np.all(~np.isfinite(final_albedo)):
+        return None
+    best_iter = None
+    best_diff = np.inf
+    for iter_num, iter_albedo in alb_iterations.items():
+        iter_albedo = np.asarray(iter_albedo, dtype=float)
+        valid = np.isfinite(final_albedo) & np.isfinite(iter_albedo)
+        if np.count_nonzero(valid) == 0:
+            continue
+        diff = np.nanmean(np.abs(final_albedo[valid] - iter_albedo[valid]))
+        if diff < best_diff:
+            best_diff = diff
+            best_iter = iter_num
+    return best_iter
+
+
+def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl, leg_extension, clear_sky):
+    """Extend true 1s native albedo using final_extension.dat as the preferred template."""
+    native_wvl = np.asarray(native_wvl, dtype=float)
+    final_1s = np.asarray(final_1s, dtype=float)
+    leg_native_final = np.asarray(leg_native_final, dtype=float)
+    extension_wvl = np.asarray(extension_wvl, dtype=float)
+    leg_extension = np.asarray(leg_extension, dtype=float)
+
+    use_template = (
+        extension_wvl.size > 0
+        and leg_extension.size == extension_wvl.size
+        and np.any(np.isfinite(leg_extension))
+        and leg_native_final.size == native_wvl.size
+        and np.any(np.isfinite(leg_native_final))
+    )
+
+    if not use_template:
+        ext_wvl = None
+        extended_rows = []
+        for row in final_1s:
+            if np.all(~np.isfinite(row)):
+                if ext_wvl is None:
+                    ext_wvl, _ = alb_extention(native_wvl, np.zeros_like(native_wvl), clear_sky=clear_sky)
+                extended_rows.append(np.full(ext_wvl.shape, np.nan, dtype=float))
+                continue
+            row_ext_wvl, row_ext = alb_extention(native_wvl, row, clear_sky=clear_sky)
+            if ext_wvl is None:
+                ext_wvl = row_ext_wvl
+            extended_rows.append(np.interp(ext_wvl, row_ext_wvl, row_ext, left=np.nan, right=np.nan))
+        return ext_wvl if ext_wvl is not None else np.array([]), np.vstack(extended_rows) if extended_rows else np.empty((0, 0))
+
+    extended = np.full((final_1s.shape[0], extension_wvl.size), np.nan, dtype=float)
+    native_range = (extension_wvl >= np.nanmin(native_wvl)) & (extension_wvl <= np.nanmax(native_wvl))
+    for irow, row in enumerate(final_1s):
+        valid_ratio = (
+            np.isfinite(row)
+            & np.isfinite(leg_native_final)
+            & (np.abs(leg_native_final) > 1e-6)
+        )
+        if np.count_nonzero(valid_ratio) < 2:
+            row_ext = leg_extension.copy()
+            finite_row = np.isfinite(row)
+            if np.any(native_range) and np.count_nonzero(finite_row) >= 2:
+                row_ext[native_range] = np.interp(
+                    extension_wvl[native_range],
+                    native_wvl[finite_row],
+                    row[finite_row],
+                    left=np.nan,
+                    right=np.nan,
+                )
+            extended[irow] = np.clip(row_ext, 0.0, 1.0)
+            continue
+
+        ratio_native = row[valid_ratio] / leg_native_final[valid_ratio]
+        ratio_ext = np.interp(
+            extension_wvl,
+            native_wvl[valid_ratio],
+            ratio_native,
+            left=ratio_native[0],
+            right=ratio_native[-1],
+        )
+        row_ext = leg_extension * ratio_ext
+        finite_row = np.isfinite(row)
+        if np.any(native_range) and np.count_nonzero(finite_row) >= 2:
+            row_ext[native_range] = np.interp(
+                extension_wvl[native_range],
+                native_wvl[finite_row],
+                row[finite_row],
+                left=np.nan,
+                right=np.nan,
+            )
+        extended[irow] = np.clip(row_ext, 0.0, 1.0)
+    return extension_wvl, extended
+
+
+def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky):
+    """Build true 1s iter1, iter2, final, and final-extension albedo for one record."""
+    fup = np.asarray(record['ssfr_fup'], dtype=float)
+    fdn = np.asarray(record['ssfr_fdn'], dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        raw_1s = np.divide(fup, fdn, out=np.full_like(fup, np.nan, dtype=float), where=fdn != 0)
+    raw_1s = np.clip(raw_1s, 0.0, 1.0)
+
+    final_iter = record['final_iter']
+    if final_iter is None or not np.isfinite(final_iter):
+        final_iter = infer_final_iter(
+            {
+                'final': record['alb_final'],
+            },
+            record['alb_iterations'],
+        )
+    final_iter = int(final_iter) if final_iter is not None and np.isfinite(final_iter) else 2
+    max_target_iter = max(2, final_iter)
+
+    current = raw_1s
+    iter1_1s = np.repeat(np.asarray(record['alb_corrected'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
+    iter2_1s = np.repeat(np.asarray(record['alb_fitted_baseline'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
+    final_1s = np.repeat(np.asarray(record['alb_final'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
+    corr0_1s = np.full_like(raw_1s, np.nan, dtype=float)
+
+    for target_iter in range(1, max_target_iter + 1):
+        corr_iter = target_iter - 1
+        corr_csv = f'{fdir_lrt}/ssfr_simu_flux_{stem_time}_iteration_{corr_iter}.csv'
+        corr_factor = read_iteration_corr_factor(corr_csv, native_wvl)
+        if corr_factor is None:
+            if target_iter == 2:
+                current = fit_albedo_1s(native_wvl, current, record['alt'], clear_sky)
+                iter2_1s = current
+            break
+
+        corrected = apply_corr_factor_1s(current, corr_factor)
+        if target_iter == 1:
+            iter1_1s = corrected
+            corr0_1s = np.broadcast_to(corr_factor, corrected.shape).copy()
+            current = corrected
+        else:
+            current = fit_albedo_1s(native_wvl, corrected, record['alt'], clear_sky)
+            if target_iter == 2:
+                iter2_1s = current
+        if target_iter == final_iter:
+            final_1s = current
+
+    if final_iter == 1:
+        final_1s = iter1_1s
+    elif final_iter == 2:
+        final_1s = iter2_1s
+
+    ext_wvl_1s, final_ext_1s = extend_final_albedo_1s(
+        native_wvl,
+        final_1s,
+        record['alb_final'],
+        record['extension_wvl'],
+        record['alb_final_extension'],
+        clear_sky,
+    )
+    return {
+        'raw_alb_all_1s': raw_1s,
+        'correction_factor_iter0_all_1s': corr0_1s,
+        'alb_iter1_all_1s': iter1_1s,
+        'alb_iter2_all_1s': iter2_1s,
+        'alb_final_all_1s': final_1s,
+        'extension_wvl_1s': ext_wvl_1s,
+        'alb_final_ext_all_1s': final_ext_1s,
+    }
 
 
 def collect_iteration_albedos(fdir_alb, stem_alb, native_wvl):
@@ -472,6 +752,11 @@ def process_atm_corr_case(
     plot_every=1,
 ):
     """Collect final atmospheric-correction products for one case."""
+    try:
+        from .setup import load_cloud_observation_legs, split_tmhr_ranges
+    except ImportError:
+        from setup import load_cloud_observation_legs, split_tmhr_ranges
+
     if tmhr_ranges_select is None:
         tmhr_ranges_select = [[14.10, 14.27]]
     if config is None:
@@ -536,6 +821,7 @@ def process_atm_corr_case(
 
         extension_wvl = np.array([])
         albedo_extension = np.array([])
+        extension_weight = np.array([])
         broadband_extension = np.nan
         df_extension = None
         if os.path.exists(final_extension_csv):
@@ -588,7 +874,7 @@ def process_atm_corr_case(
             albedo_native['final'] = fallback_albedo
             broadband_native['final'] = weighted_broadband_albedo(albedo_native['final'], native_weight, native_wvl)
 
-        records.append({
+        record = {
             'leg_index': ileg,
             'final_iter': final_iter,
             'final_albedo_source': final_albedo_source,
@@ -624,12 +910,56 @@ def process_atm_corr_case(
             'broadband_alb_final': broadband_native['final'],
             'extension_wvl': extension_wvl,
             'alb_final_extension': albedo_extension,
+            'extension_weight': extension_weight,
             'broadband_alb_final_extension': broadband_extension,
             'final_csv': final_csv,
             'final_extension_csv': final_extension_csv if os.path.exists(final_extension_csv) else None,
             'albedo_files': alb_paths,
             'albedo_iteration_files': alb_iteration_files,
-        })
+        }
+
+        record.update(build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky))
+        gas_mask = np.isfinite(gas_abs_masking(native_wvl, np.ones_like(native_wvl, dtype=float), alt=1))
+        record['broadband_alb_iter1_all_1s'] = weighted_broadband_albedo_rows(
+            record['alb_iter1_all_1s'],
+            record['ssfr_toa'],
+            native_wvl,
+        )
+        record['broadband_alb_iter2_all_1s'] = weighted_broadband_albedo_rows(
+            record['alb_iter2_all_1s'],
+            record['ssfr_toa'],
+            native_wvl,
+        )
+        record['broadband_alb_final_all_1s'] = weighted_broadband_albedo_rows(
+            record['alb_final_all_1s'],
+            record['ssfr_toa'],
+            native_wvl,
+        )
+        record['broadband_alb_iter1_all_filter_1s'] = weighted_broadband_albedo_rows(
+            record['alb_iter1_all_1s'][:, gas_mask],
+            record['ssfr_toa'][:, gas_mask],
+            native_wvl[gas_mask],
+        )
+        record['broadband_alb_iter2_all_filter_1s'] = weighted_broadband_albedo_rows(
+            record['alb_iter2_all_1s'][:, gas_mask],
+            record['ssfr_toa'][:, gas_mask],
+            native_wvl[gas_mask],
+        )
+        record['broadband_alb_final_all_filter_1s'] = weighted_broadband_albedo_rows(
+            record['alb_final_all_1s'][:, gas_mask],
+            record['ssfr_toa'][:, gas_mask],
+            native_wvl[gas_mask],
+        )
+        ext_weight = record['extension_weight']
+        if ext_weight.size != record['alb_final_ext_all_1s'].shape[1]:
+            ext_weight = np.ones(record['alb_final_ext_all_1s'].shape[1], dtype=float)
+        record['broadband_alb_final_ext_all_1s'] = weighted_broadband_albedo_rows(
+            record['alb_final_ext_all_1s'],
+            ext_weight,
+            record['extension_wvl_1s'],
+        )
+
+        records.append(record)
         gc.collect()
 
     if not records:
@@ -659,6 +989,7 @@ def process_atm_corr_case(
         'extension_wvl': first_nonempty_array(records, 'extension_wvl'),
         'alb_final_extension': stack_or_object([record['alb_final_extension'] for record in records]),
         'broadband_alb_final_extension': np.array([record['broadband_alb_final_extension'] for record in records]),
+        'extension_wvl_1s': first_nonempty_array(records, 'extension_wvl_1s'),
         'final_iter': np.array([
             np.nan if record['final_iter'] is None else record['final_iter']
             for record in records
@@ -686,8 +1017,6 @@ def process_atm_corr_case(
         'broadband_alb_iter1_filter': output['broadband_alb_corrected'],
         'broadband_alb_iter2_filter': output['broadband_alb_final'],
         'ext_wvl': output['extension_wvl'],
-        'alb_iter2_ext_all': repeat_spectral_by_time(records, 'alb_final_extension', output['extension_wvl']),
-        'broadband_alb_iter2_ext_all': repeat_scalar_by_time(records, 'broadband_alb_final_extension'),
         'time_all': concatenate_record_arrays(records, 'time'),
         'lon_all': concatenate_record_arrays(records, 'lon'),
         'lat_all': concatenate_record_arrays(records, 'lat'),
@@ -698,14 +1027,33 @@ def process_atm_corr_case(
         'fdn_all': concatenate_record_arrays(records, 'ssfr_fdn'),
         'fup_all': concatenate_record_arrays(records, 'ssfr_fup'),
         'toa_expand_all': concatenate_record_arrays(records, 'ssfr_toa'),
+        'raw_alb_all_1s': concatenate_record_arrays(records, 'raw_alb_all_1s'),
+        'correction_factor_iter0_all_1s': concatenate_record_arrays(records, 'correction_factor_iter0_all_1s'),
         'icing_all': concatenate_record_arrays(records, 'ssfr_icing'),
         'icing_pre_all': concatenate_record_arrays(records, 'ssfr_icing_pre'),
-        'alb_iter1_all': repeat_spectral_by_time(records, 'alb_corrected', output['native_wvl']),
-        'alb_iter2_all': repeat_spectral_by_time(records, 'alb_final', output['native_wvl']),
-        'broadband_alb_iter1_all': repeat_scalar_by_time(records, 'broadband_alb_corrected'),
-        'broadband_alb_iter2_all': repeat_scalar_by_time(records, 'broadband_alb_final'),
-        'broadband_alb_iter1_all_filter': repeat_scalar_by_time(records, 'broadband_alb_corrected'),
-        'broadband_alb_iter2_all_filter': repeat_scalar_by_time(records, 'broadband_alb_final'),
+        'alb_iter1_all_1s': concatenate_record_arrays(records, 'alb_iter1_all_1s'),
+        'alb_iter2_all_1s': concatenate_record_arrays(records, 'alb_iter2_all_1s'),
+        'alb_final_all_1s': concatenate_record_arrays(records, 'alb_final_all_1s'),
+        'broadband_alb_iter1_all_1s': concatenate_record_arrays(records, 'broadband_alb_iter1_all_1s'),
+        'broadband_alb_iter2_all_1s': concatenate_record_arrays(records, 'broadband_alb_iter2_all_1s'),
+        'broadband_alb_final_all_1s': concatenate_record_arrays(records, 'broadband_alb_final_all_1s'),
+        'broadband_alb_iter1_all_filter_1s': concatenate_record_arrays(records, 'broadband_alb_iter1_all_filter_1s'),
+        'broadband_alb_iter2_all_filter_1s': concatenate_record_arrays(records, 'broadband_alb_iter2_all_filter_1s'),
+        'broadband_alb_final_all_filter_1s': concatenate_record_arrays(records, 'broadband_alb_final_all_filter_1s'),
+        'alb_final_ext_all_1s': concatenate_record_arrays(records, 'alb_final_ext_all_1s'),
+        'broadband_alb_final_ext_all_1s': concatenate_record_arrays(records, 'broadband_alb_final_ext_all_1s'),
+    })
+    output.update({
+        'alb_final_all': output['alb_final_all_1s'],
+        'alb_iter1_all': output['alb_iter1_all_1s'],
+        'alb_iter2_all': output['alb_final_all_1s'],
+        'broadband_alb_final_all': output['broadband_alb_final_all_1s'],
+        'broadband_alb_iter1_all': output['broadband_alb_iter1_all_1s'],
+        'broadband_alb_iter2_all': output['broadband_alb_final_all_1s'],
+        'broadband_alb_iter1_all_filter': output['broadband_alb_iter1_all_filter_1s'],
+        'broadband_alb_iter2_all_filter': output['broadband_alb_final_all_filter_1s'],
+        'alb_iter2_ext_all': output['alb_final_ext_all_1s'],
+        'broadband_alb_iter2_ext_all': output['broadband_alb_final_ext_all_1s'],
     })
 
     if make_plots:
@@ -733,6 +1081,11 @@ def process_atm_corr_case(
 
 def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_dir='fig', plot_every=1):
     """Process one active atmospheric-correction catalog case by id."""
+    try:
+        from .case_catalog import get_case
+    except ImportError:
+        from case_catalog import get_case
+
     case = get_case(case_id)
     year, month, day = [int(part) for part in case['date'].split('-')]
     return process_atm_corr_case(

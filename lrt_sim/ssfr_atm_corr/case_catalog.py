@@ -749,16 +749,16 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_062',
-  'date': '2024-08-08',
-  'case_tag': 'clear_atm_corr_2',
-  'tmhr_ranges_select': [
-                        [14.250, 14.373], # 180m, clear
-                        ],
-  'simulation_interval': 0.5,
-  'clear_sky': True,
-  'levels': None,
-  },
+#  {'id': 'case_062',
+#   'date': '2024-08-08',
+#   'case_tag': 'clear_atm_corr_2',
+#   'tmhr_ranges_select': [
+#                         [14.250, 14.373], # 180m, clear
+#                         ],
+#   'simulation_interval': 0.5,
+#   'clear_sky': True,
+#   'levels': None,
+#   },
  
  {'id': 'case_063',
   'date': '2024-08-08',

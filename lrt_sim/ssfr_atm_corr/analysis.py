@@ -132,6 +132,7 @@ def selected_case_arrays(combined_data, date_select, case_tags):
     for case_tag in case_tags:
         case_tag_mask |= np.array([case_tag in ct for ct in tags])
     final_mask = date_mask & case_tag_mask
+    alb, broadband_alb = one_second_albedo_arrays(combined_data, date_select, final_mask)
     return {
         'suffix': suffix,
         'mask': final_mask,
@@ -140,13 +141,8 @@ def selected_case_arrays(combined_data, date_select, case_tags):
         'lat': combined_data[f'lat_all_{suffix}'][final_mask],
         'alt': combined_data[f'alt_all_{suffix}'][final_mask],
         'time': combined_data[f'time_{suffix}_all'][final_mask],
-        'alb': season_data(combined_data, 'alb_final_all', date_select, fallback_base_name='alb_iter2_all')[final_mask, :],
-        'broadband_alb': season_data(
-            combined_data,
-            'broadband_alb_final',
-            date_select,
-            fallback_base_name='broadband_alb_iter2_all_filter',
-        )[final_mask],
+        'alb': alb,
+        'broadband_alb': broadband_alb,
     }
 
 
@@ -210,6 +206,20 @@ def finite_color_limits(values, default=(0.1, 1.0)):
     return float(vmin), float(vmax)
 
 
+def one_second_albedo_arrays(combined_data, date_select, final_mask):
+    """Return final-iteration albedo on the combined product's 1-second timeline."""
+    alb = season_data(combined_data, 'alb_final_all_1s', date_select, fallback_base_name='alb_final_all')[
+        final_mask, :
+    ]
+    broadband_alb = season_data(
+        combined_data,
+        'broadband_alb_final_all_1s',
+        date_select,
+        fallback_base_name='broadband_alb_iter2_all_filter',
+    )[final_mask]
+    return alb, broadband_alb
+
+
 
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
@@ -235,8 +245,7 @@ def combined_atm_corr():
     lon_selected_all = combined_data['lon_all_summer'][final_mask] if date_select > '20240630' else combined_data['lon_all_spring'][final_mask]
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     lon_selected_all = lon_selected_all[lat_mask]
@@ -384,8 +393,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # lon_selected_all = lon_selected_all[lat_mask]
@@ -534,8 +542,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # lon_selected_all = lon_selected_all[lat_mask]
@@ -685,8 +692,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # time_selected_all = time_selected_all[lat_mask]
@@ -848,8 +854,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     lon_select = []
     lat_select = []
@@ -1014,8 +1019,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     lon_select = []
     lat_select = []
@@ -1180,8 +1184,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     lon_select = []
     lat_select = []
@@ -1346,8 +1349,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     lon_select = []
     lat_select = []
@@ -1516,8 +1518,7 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
-    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
+    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
     
     
     time_mask = (time_selected_all >= 14.726) & (time_selected_all <= 14.936)

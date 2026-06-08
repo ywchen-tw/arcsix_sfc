@@ -901,6 +901,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (fit)', fontsize=10)
             fig.tight_layout()
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_flux_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
+            plt.close(fig)
             # plt.show()
             
 
@@ -946,6 +947,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km heading-saa {heading_saa_diff:.1f} deg\nAlbedo updated (fit)', fontsize=10)
             fig.tight_layout()
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_toa_dnflux_toa_ratio_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
+            plt.close(fig)
 
             
             fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))
@@ -962,6 +964,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             ax.set_title(f'{date_s} {time_start:.3f}-{time_end:.3f} Alt {alt_avg:.2f}km')
             fig.tight_layout()
             fig.savefig('fig/%s/%s_%s_time_%.2f-%.2f_alt-%.2fkm_albedo_iteration_%d.png' % (date_s, date_s, case_tag, time_start, time_end, alt_avg, iter), bbox_inches='tight', dpi=150)
+            plt.close(fig)
 
         
             (
