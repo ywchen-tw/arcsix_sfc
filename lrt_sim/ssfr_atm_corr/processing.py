@@ -183,6 +183,48 @@ def same_spectrum(wvl_a, alb_a, wvl_b, alb_b, atol=5e-4):
     )
 
 
+def apply_workflow_shortwave_shape_1s(
+    wvl,
+    albedo_1s,
+    workflow_albedo,
+    shortwave_end=550.0,
+    anchor_start=550.0,
+    anchor_end=650.0,
+    scale_bounds=(0.85, 1.15),
+):
+    """Use the workflow final shortwave shape, scaled to each 1s row near 550-650 nm."""
+    wvl = np.asarray(wvl, dtype=float)
+    adjusted = np.asarray(albedo_1s, dtype=float).copy()
+    template = np.asarray(workflow_albedo, dtype=float)
+    if adjusted.ndim != 2 or template.shape != wvl.shape or adjusted.shape[1] != wvl.size:
+        return adjusted, 0
+
+    shortwave = (wvl < shortwave_end) & np.isfinite(template)
+    anchor = (
+        (wvl >= anchor_start)
+        & (wvl <= anchor_end)
+        & np.isfinite(template)
+        & (np.abs(template) > 1e-8)
+    )
+    if np.count_nonzero(shortwave) == 0 or np.count_nonzero(anchor) < 2:
+        return adjusted, 0
+
+    n_adjusted = 0
+    for irow in range(adjusted.shape[0]):
+        row = adjusted[irow]
+        valid_anchor = anchor & np.isfinite(row)
+        if np.count_nonzero(valid_anchor) < 2:
+            continue
+        scale = np.nanmedian(row[valid_anchor] / template[valid_anchor])
+        if not np.isfinite(scale):
+            continue
+        scale = np.clip(scale, scale_bounds[0], scale_bounds[1])
+        adjusted[irow, shortwave] = np.clip(template[shortwave] * scale, 0.0, 1.0)
+        n_adjusted += 1
+
+    return adjusted, n_adjusted
+
+
 def dataframe_weight(df, preferred_columns, expected_length):
     """Return the first available finite spectral weight column from a DataFrame."""
     for column in preferred_columns:
@@ -731,6 +773,17 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         final_1s = iter1_1s
     elif final_iter == 2:
         final_1s = iter2_1s
+    final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
+        native_wvl,
+        final_1s,
+        record['alb_final'],
+    )
+    if n_shortwave_adjusted:
+        progress(
+            f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
+            f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
+            verbose,
+        )
 
     final_finite_rows = int(np.count_nonzero(np.any(np.isfinite(final_1s), axis=1)))
     progress(
