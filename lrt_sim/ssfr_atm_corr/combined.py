@@ -12,6 +12,7 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
 import glob
 import copy
 import time
+import argparse
 from collections import OrderedDict
 import datetime
 import multiprocessing as mp
@@ -22,7 +23,8 @@ from typing import Optional
 import h5py
 from netCDF4 import Dataset
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator, griddata, NearestNDInterpolator
+from scipy.interpolate import RegularGridInterpolator, NearestNDInterpolator
+from scipy.spatial import cKDTree
 from scipy import ndimage
 from scipy.optimize import curve_fit
 from scipy.signal import convolve
@@ -372,6 +374,120 @@ def require_processed_1s_keys(mapping, filepath):
         )
 
 
+def cache_is_fresh(outputs, inputs):
+    """Return True when every output exists and is newer than every input."""
+    outputs = [str(path) for path in outputs]
+    inputs = [str(path) for path in inputs]
+    if not outputs or not inputs:
+        return False
+    if any(not os.path.exists(path) for path in outputs):
+        return False
+    newest_input = max(os.path.getmtime(path) for path in inputs)
+    oldest_output = min(os.path.getmtime(path) for path in outputs)
+    return oldest_output >= newest_input
+
+
+def _combined_key(mapping, suffix, base_name, fallback_base_name=None, default=None):
+    """Read one season-specific key from the combined-product cache."""
+    keys = [f'{base_name}_{suffix}']
+    if fallback_base_name is not None:
+        keys.append(f'{fallback_base_name}_{suffix}')
+    for key in keys:
+        if key in mapping:
+            return mapping[key]
+    return default
+
+
+def season_from_combined_cache(mapping, name):
+    """Rebuild the season object needed by summary plotting from the combined cache."""
+    suffix = name
+    n_pts = len(mapping[f'time_{suffix}_all'])
+    season = types.SimpleNamespace(
+        name=name,
+        wvl=_combined_key(mapping, suffix, 'native_wvl', fallback_base_name='wvl'),
+        lon=mapping[f'lon_all_{suffix}'],
+        lat=mapping[f'lat_all_{suffix}'],
+        alt=mapping[f'alt_all_{suffix}'],
+        time=mapping[f'time_{suffix}_all'],
+        dates=mapping[f'dates_{suffix}_all'],
+        conditions=_combined_key(
+            mapping,
+            suffix,
+            'leg_conditions_all',
+            fallback_base_name='leg_contidions_all',
+        ),
+        case_tags=mapping[f'case_tags_{suffix}_all'],
+        case_tags_leg=mapping.get(f'case_tags_{suffix}', np.array([], dtype=object)),
+        lon_avg=mapping[f'lon_avg_{suffix}'],
+        lat_avg=mapping.get(f'lat_avg_{suffix}', np.array([], dtype=float)),
+        alt_avg=mapping.get(f'alt_avg_{suffix}', np.array([], dtype=float)),
+        fdn=mapping.get(f'fdn_all_{suffix}', np.empty((n_pts, 0))),
+        fup=mapping.get(f'fup_all_{suffix}', np.empty((n_pts, 0))),
+        toa_expand=mapping.get(f'toa_expand_all_{suffix}', np.empty((n_pts, 0))),
+        icing=mapping.get(f'icing_all_{suffix}', np.zeros(n_pts, dtype=bool)),
+        icing_pre=mapping.get(f'icing_pre_all_{suffix}', np.zeros(n_pts, dtype=bool)),
+        alb_iter1=_combined_key(mapping, suffix, 'alb_iter1_all_1s', fallback_base_name='alb_iter1_all'),
+        alb_iter2=_combined_key(mapping, suffix, 'alb_final_all_1s', fallback_base_name='alb_iter2_all'),
+        broadband_alb_iter2=_combined_key(
+            mapping,
+            suffix,
+            'broadband_alb_final_all_1s',
+            fallback_base_name='broadband_alb_iter2_all',
+        ),
+        bb_alb_iter2_690_1190=mapping[f'broadband_alb_690_1190_{suffix}_all'],
+        kt19_sfc_T=mapping.get(f'kt19_sfc_T_{suffix}_all', np.full(n_pts, np.nan)),
+        sza=mapping.get(f'sza_{suffix}_all', np.full(n_pts, np.nan)),
+        ice_frac=mapping[f'ice_frac_all_{suffix}'],
+        nad_hdrf=mapping.get(f'nad_hdrf_{suffix}_all', np.full(n_pts, np.nan)),
+        nad_rad=mapping.get(f'nad_rad_{suffix}_all', np.full(n_pts, np.nan)),
+        myi_ratio=mapping[f'myi_ratio_{suffix}_all'],
+        fyi_ratio=mapping.get(f'fyi_ratio_{suffix}_all', np.full(n_pts, np.nan)),
+        yi_ratio=mapping.get(f'yi_ratio_{suffix}_all', np.full(n_pts, np.nan)),
+        ice_ratio=mapping[f'ice_ratio_{suffix}_all'],
+        ow_ratio=mapping.get(f'ow_ratio_{suffix}_all', np.full(n_pts, np.nan)),
+        ice_age=mapping[f'ice_age_{suffix}_all'],
+        era5_alb=mapping[f'era5_alb_{suffix}_all'],
+        grain_size=mapping.get(f'grain_size_{suffix}_all', np.full(n_pts, np.nan)),
+        grain_size_1240=mapping.get(f'grain_size_1240_{suffix}_all', np.full(n_pts, np.nan)),
+        grain_size_ratio=mapping.get(f'grain_size_ratio_{suffix}_all', np.full(n_pts, np.nan)),
+        grain_size_ratio_1650_1020=mapping.get(
+            f'grain_size_ratio_1650_1020_{suffix}_all',
+            np.full(n_pts, np.nan),
+        ),
+        grain_size_ratio_1020_865=mapping.get(
+            f'grain_size_ratio_1020_865_{suffix}_all',
+            np.full(n_pts, np.nan),
+        ),
+        brt19h=mapping.get(f'brt19h_{suffix}_all', np.full(n_pts, np.nan)),
+        brt37h=mapping.get(f'brt37h_{suffix}_all', np.full(n_pts, np.nan)),
+        brt37v=mapping.get(f'brt37v_{suffix}_all', np.full(n_pts, np.nan)),
+        amsr2_ice_conc=mapping.get(f'amsr2_ice_conc_{suffix}_all', np.full(n_pts, np.nan)),
+    )
+    season._bb_alb_iter1 = _combined_key(
+        mapping,
+        suffix,
+        'broadband_alb_iter1_all_1s',
+        fallback_base_name='broadband_alb_iter1_all',
+        default=np.full(n_pts, np.nan),
+    )
+    season._bb_alb_iter2_file = season.broadband_alb_iter2
+    season._bb_alb_iter1_filter = _combined_key(
+        mapping,
+        suffix,
+        'broadband_alb_iter1_all_filter_1s',
+        fallback_base_name='broadband_alb_iter1_all_filter',
+        default=season._bb_alb_iter1,
+    )
+    season._bb_alb_iter2_filter = _combined_key(
+        mapping,
+        suffix,
+        'broadband_alb_final_all_filter_1s',
+        fallback_base_name='broadband_alb_iter2_all_filter',
+        default=season.broadband_alb_iter2,
+    )
+    return season
+
+
 # ---------------------------------------------------------------------------
 # Helper: load one season worth of files and return a SeasonData
 # ---------------------------------------------------------------------------
@@ -716,6 +832,85 @@ def make_polar_map(lon_all, lat_all, figsize=(8, 4)):
     return fig, ax
 
 
+def _as_float_array(values):
+    """Return a float ndarray, preserving masks as NaN."""
+    return np.asarray(np.ma.asarray(values).astype(float).filled(np.nan), dtype=float)
+
+
+def _lonlat_to_unit_xyz(lon, lat):
+    """Convert lon/lat in degrees to unit-sphere coordinates for nearest search."""
+    lon_rad = np.deg2rad(np.asarray(lon, dtype=float))
+    lat_rad = np.deg2rad(np.asarray(lat, dtype=float))
+    cos_lat = np.cos(lat_rad)
+    return np.column_stack((
+        cos_lat * np.cos(lon_rad),
+        cos_lat * np.sin(lon_rad),
+        np.sin(lat_rad),
+    ))
+
+
+def nearest_lonlat_indices(lon_src, lat_src, lon_pts, lat_pts):
+    """Return flattened source-grid indices nearest to each target lon/lat point."""
+    lon_f = np.asarray(lon_src, dtype=float).ravel()
+    lat_f = np.asarray(lat_src, dtype=float).ravel()
+    lon_pts = np.asarray(lon_pts, dtype=float)
+    lat_pts = np.asarray(lat_pts, dtype=float)
+
+    out = np.full(lon_pts.shape, -1, dtype=int)
+    coord_valid = np.isfinite(lon_f) & np.isfinite(lat_f)
+    point_valid = np.isfinite(lon_pts) & np.isfinite(lat_pts)
+    if not np.any(coord_valid) or not np.any(point_valid):
+        return out
+
+    source_indices = np.flatnonzero(coord_valid)
+    tree = cKDTree(_lonlat_to_unit_xyz(lon_f[coord_valid], lat_f[coord_valid]))
+    _, nearest = tree.query(_lonlat_to_unit_xyz(lon_pts[point_valid], lat_pts[point_valid]), k=1)
+    out[point_valid] = source_indices[nearest]
+    return out
+
+
+def values_at_flat_indices(values, indices):
+    """Gather flattened values at indices, keeping -1 targets as NaN."""
+    flat_values = _as_float_array(values).ravel()
+    out = np.full(indices.shape, np.nan, dtype=float)
+    valid = indices >= 0
+    out[valid] = flat_values[indices[valid]]
+    return out
+
+
+def nearest_time_indices(time_src, time_pts, max_delta):
+    """Return nearest source indices for each target time using sorted search."""
+    time_src = np.asarray(time_src, dtype=float)
+    time_pts = np.asarray(time_pts, dtype=float)
+    out = np.full(time_pts.shape, -1, dtype=int)
+    valid_src = np.isfinite(time_src)
+    valid_pts = np.isfinite(time_pts)
+    if not np.any(valid_src) or not np.any(valid_pts):
+        return out
+
+    src_indices = np.flatnonzero(valid_src)
+    order = np.argsort(time_src[valid_src])
+    sorted_time = time_src[valid_src][order]
+    sorted_indices = src_indices[order]
+
+    pts = time_pts[valid_pts]
+    right = np.searchsorted(sorted_time, pts, side='left')
+    left = np.clip(right - 1, 0, sorted_time.size - 1)
+    right = np.clip(right, 0, sorted_time.size - 1)
+
+    left_diff = np.abs(sorted_time[left] - pts)
+    right_diff = np.abs(sorted_time[right] - pts)
+    use_right = right_diff < left_diff
+    best_pos = np.where(use_right, right, left)
+    best_diff = np.where(use_right, right_diff, left_diff)
+    best_indices = sorted_indices[best_pos]
+
+    target_positions = np.flatnonzero(valid_pts)
+    within = best_diff <= max_delta
+    out[target_positions[within]] = best_indices[within]
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Helper: diagnostic ECICE maps for one date
 # ---------------------------------------------------------------------------
@@ -966,18 +1161,22 @@ def collocate_ice_frac(season, ice_frac_data, time_offsets):
         ice_frac_time_date = ice_frac_time[date_idx].copy()
         ice_frac_time_date += t_offset
 
+        closest_indices = nearest_time_indices(
+            ice_frac_time_date,
+            time_pts,
+            max_delta=1. / 60 / 60,
+        )
+        matched = closest_indices >= 0
         tmp          = np.full(len(time_pts), np.nan)
         tmp_nad_hdrf = np.full(len(time_pts), np.nan)
         tmp_nad_rad  = np.full(len(time_pts), np.nan)
-        for i, t in enumerate(time_pts):
-            time_diff = np.abs(ice_frac_time_date - t)
-            if i % 1000 == 0:
-                print(f"  time index {i}, t: {t}, time_diff min: {np.min(time_diff)}")
-            if np.min(time_diff) <= 1. / 60 / 60:   # within 1 s
-                closest_index = np.argmin(time_diff)
-                tmp[i]          = ice_frac_all_date[closest_index].copy()
-                tmp_nad_hdrf[i] = nad_hdrf_all_date[closest_index].copy()
-                tmp_nad_rad[i]  = nad_rad_all_date[closest_index].copy()
+        tmp[matched]          = ice_frac_all_date[closest_indices[matched]]
+        tmp_nad_hdrf[matched] = nad_hdrf_all_date[closest_indices[matched]]
+        tmp_nad_rad[matched]  = nad_rad_all_date[closest_indices[matched]]
+        print(
+            f"  matched {np.count_nonzero(matched)}/{len(time_pts)} camera ice-fraction "
+            f"samples within 1 s for {date_s}"
+        )
         result[date_mask]       = tmp.copy()
         nad_hdrf_out[date_mask] = tmp_nad_hdrf.copy()
         nad_rad_out[date_mask]  = tmp_nad_rad.copy()
@@ -994,9 +1193,9 @@ def collocate_ice_frac(season, ice_frac_data, time_offsets):
 
 def collocate_ecice(season, data_dir,
                     era5_lon_mesh, era5_lat_mesh, era5_alb, era5_time_dates_str,
-                    lon_all, lat_all):
+                    lon_all, lat_all, make_diagnostic_plots=True):
     """
-    For each date in the season, load the ECICE NetCDF, griddata-interpolate
+    For each date in the season, load the ECICE NetCDF, nearest-neighbor collocate
     to flight track, and assign to season fields.
     Also calls plot_ecice_diagnostics for each date.
 
@@ -1038,57 +1237,55 @@ def collocate_ecice(season, data_dir,
             brt37v_nc     = nc.variables['BRT37V'][:]
 
         lonlat_shape = lon_nc.shape
-        lon_f    = lon_nc.flatten()
-        lat_f    = lat_nc.flatten()
-        myi_f    = myi_nc.flatten()
-        fyi_f    = fyi_nc.flatten()
-        yi_f     = yi_nc.flatten()
-        ice_f    = ice_nc.flatten()
-        ow_f     = ow_nc.flatten()
-        brt19h_f = brt19h_nc.flatten()
-        brt37h_f = brt37h_nc.flatten()
-        brt37v_f = brt37v_nc.flatten()
+        lon_f    = _as_float_array(lon_nc).flatten()
+        lat_f    = _as_float_array(lat_nc).flatten()
+        myi_f    = _as_float_array(myi_nc).flatten()
+        fyi_f    = _as_float_array(fyi_nc).flatten()
+        yi_f     = _as_float_array(yi_nc).flatten()
+        ice_f    = _as_float_array(ice_nc).flatten()
+        ow_f     = _as_float_array(ow_nc).flatten()
+        brt19h_f = _as_float_array(brt19h_nc).flatten()
+        brt37h_f = _as_float_array(brt37h_nc).flatten()
+        brt37v_f = _as_float_array(brt37v_nc).flatten()
 
         date_mask = season.dates == date_s
         if date_mask.sum() > 0:
             lon_pts = season.lon[date_mask]
             lat_pts = season.lat[date_mask]
 
-            myi_out[date_mask]  = griddata((lon_f, lat_f), myi_f,  (lon_pts, lat_pts), method='nearest')
-            fyi_out[date_mask]  = griddata((lon_f, lat_f), fyi_f,  (lon_pts, lat_pts), method='nearest')
-            yi_out[date_mask]   = griddata((lon_f, lat_f), yi_f,   (lon_pts, lat_pts), method='nearest')
-            ice_out[date_mask]  = griddata((lon_f, lat_f), ice_f,  (lon_pts, lat_pts), method='nearest')
-            ow_out[date_mask]     = griddata((lon_f, lat_f), ow_f,     (lon_pts, lat_pts), method='nearest')
-            brt19h_out[date_mask] = griddata((lon_f, lat_f), brt19h_f, (lon_pts, lat_pts), method='nearest')
-            brt37h_out[date_mask] = griddata((lon_f, lat_f), brt37h_f, (lon_pts, lat_pts), method='nearest')
-            brt37v_out[date_mask] = griddata((lon_f, lat_f), brt37v_f, (lon_pts, lat_pts), method='nearest')
+            ecice_indices = nearest_lonlat_indices(lon_f, lat_f, lon_pts, lat_pts)
+            myi_out[date_mask]    = values_at_flat_indices(myi_f, ecice_indices)
+            fyi_out[date_mask]    = values_at_flat_indices(fyi_f, ecice_indices)
+            yi_out[date_mask]     = values_at_flat_indices(yi_f, ecice_indices)
+            ice_out[date_mask]    = values_at_flat_indices(ice_f, ecice_indices)
+            ow_out[date_mask]     = values_at_flat_indices(ow_f, ecice_indices)
+            brt19h_out[date_mask] = values_at_flat_indices(brt19h_f, ecice_indices)
+            brt37h_out[date_mask] = values_at_flat_indices(brt37h_f, ecice_indices)
+            brt37v_out[date_mask] = values_at_flat_indices(brt37v_f, ecice_indices)
 
             era5_alb_date = era5_alb[era5_time_dates_str == date_s_str]
-            era5_out[date_mask] = griddata(
-                (era5_lon_mesh.flatten(), era5_lat_mesh.flatten()),
-                era5_alb_date[0].flatten(),
-                (lon_pts, lat_pts),
-                method='nearest'
-            )
+            era5_indices = nearest_lonlat_indices(era5_lon_mesh, era5_lat_mesh, lon_pts, lat_pts)
+            era5_out[date_mask] = values_at_flat_indices(era5_alb_date[0], era5_indices)
 
             # Build myi_flight for the percentage diagnostic map:
             # original used myi+fyi+yi as denominator for percentage
             myi_fyi_yi_flight = myi_out[date_mask] + fyi_out[date_mask] + yi_out[date_mask]
 
-            plot_ecice_diagnostics(
-                date_s=date_s_str,
-                lon=lon_f, lat=lat_f,
-                lonlat_shape=lonlat_shape,
-                myi=myi_f, fyi=fyi_f, yi=yi_f, ice=ice_f, ow=ow_f,
-                brt19h=brt19h_nc, brt37h=brt37h_nc, brt37v=brt37v_nc,
-                lon_flight=lon_pts, lat_flight=lat_pts,
-                myi_flight=myi_fyi_yi_flight,
-                era5_lon_mesh=era5_lon_mesh, era5_lat_mesh=era5_lat_mesh,
-                era5_alb_date=era5_alb_date,
-                era5_alb_flight=era5_out[date_mask],
-                bb_alb_flight=season.broadband_alb_iter2[date_mask],
-                lon_all=lon_all, lat_all=lat_all,
-            )
+            if make_diagnostic_plots:
+                plot_ecice_diagnostics(
+                    date_s=date_s_str,
+                    lon=lon_f, lat=lat_f,
+                    lonlat_shape=lonlat_shape,
+                    myi=myi_f, fyi=fyi_f, yi=yi_f, ice=ice_f, ow=ow_f,
+                    brt19h=brt19h_nc, brt37h=brt37h_nc, brt37v=brt37v_nc,
+                    lon_flight=lon_pts, lat_flight=lat_pts,
+                    myi_flight=myi_fyi_yi_flight,
+                    era5_lon_mesh=era5_lon_mesh, era5_lat_mesh=era5_lat_mesh,
+                    era5_alb_date=era5_alb_date,
+                    era5_alb_flight=era5_out[date_mask],
+                    bb_alb_flight=season.broadband_alb_iter2[date_mask],
+                    lon_all=lon_all, lat_all=lat_all,
+                )
 
     season.myi_ratio = myi_out
     season.fyi_ratio = fyi_out
@@ -1172,12 +1369,13 @@ def collocate_amsr2_ice(season, data_dir):
 
         date_mask = season.dates == date_s
         if date_mask.sum() > 0:
-            ice_out[date_mask] = griddata(
-                (lon_flat, lat_flat),
-                ice_conc_pct.ravel(),
-                (season.lon[date_mask], season.lat[date_mask]),
-                method='nearest'
+            nearest_indices = nearest_lonlat_indices(
+                lon_flat,
+                lat_flat,
+                season.lon[date_mask],
+                season.lat[date_mask],
             )
+            ice_out[date_mask] = values_at_flat_indices(ice_conc_pct, nearest_indices)
 
     season.amsr2_ice_conc = ice_out
 
@@ -1187,9 +1385,9 @@ def collocate_amsr2_ice(season, data_dir):
 # ---------------------------------------------------------------------------
 
 def collocate_nsidc_ice_age(season, nsidc_lon, nsidc_lat, nsidc_ice_age, time_nc_dates,
-                             lon_all, lat_all):
+                             lon_all, lat_all, make_diagnostic_plots=True):
     """
-    Match NSIDC weekly ice age to flight track by closest date, then griddata.
+    Match NSIDC weekly ice age to flight track by closest date, then nearest-neighbor collocate.
 
     Parameters
     ----------
@@ -1219,14 +1417,19 @@ def collocate_nsidc_ice_age(season, nsidc_lon, nsidc_lat, nsidc_ice_age, time_nc
         ice_age_nc[ice_age_nc == 21] = np.nan  # near coast
 
         date_mask = season.dates == date_s
-        ice_age_mesh = griddata(
-            (nsidc_lon_f, nsidc_lat_f), ice_age_nc,
-            (season.lon[date_mask], season.lat[date_mask]),
-            method='nearest'
+        nearest_indices = nearest_lonlat_indices(
+            nsidc_lon_f,
+            nsidc_lat_f,
+            season.lon[date_mask],
+            season.lat[date_mask],
         )
-        ice_age_out[date_mask] = ice_age_mesh.copy()
+        ice_age_out[date_mask] = values_at_flat_indices(ice_age_nc, nearest_indices)
 
     ice_age_out[np.isnan(ice_age_out)] = 0  # set ice age to 0 if nan
+
+    if not make_diagnostic_plots:
+        season.ice_age = ice_age_out
+        return
 
     # Plot ice age map for each date
     for date_s in sorted(set(season.dates)):
@@ -1462,7 +1665,7 @@ def compute_grain_size_ratio(season):
 # Main combined function
 # ---------------------------------------------------------------------------
 
-def combined_atm_corr():
+def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True):
     log = logging.getLogger("atm corr combined")
 
     output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
@@ -1473,57 +1676,20 @@ def combined_atm_corr():
     combined_output_alb_file = f'{output_dir}/alb_atm_corr_combined_spring_summer.h5'
     combined_output_ssfr_file = f'{output_dir}/ssfr_atm_corrected_combined_spring_summer.h5'
 
-    if 0:#os.path.exists(combined_output_file) and os.path.exists(combined_output_alb_file):
-        print(f"Both output files found, loading from {combined_output_file} and skipping processing ...")
+    cache_outputs = [combined_output_file, combined_output_alb_file, combined_output_ssfr_file]
+    use_cache = (not force) and cache_is_fresh(cache_outputs, sfc_alb_files)
+
+    if use_cache:
+        print(f"Fresh combined outputs found; loading cache from {combined_output_file}.")
         with open(combined_output_file, 'rb') as f:
             d = pickle.load(f)
-        spring = types.SimpleNamespace(
-            name='spring',
-            wvl=d['wvl_spring'],
-            lon=d['lon_all_spring'],
-            lat=d['lat_all_spring'],
-            alt=d['alt_all_spring'],
-            time=d['time_spring_all'],
-            dates=d['dates_spring_all'],
-            conditions=d['leg_contidions_all_spring'],
-            case_tags=d['case_tags_spring_all'],
-            alb_iter2=d['alb_iter2_all_spring'],
-            broadband_alb_iter2=d['broadband_alb_iter2_spring_all'],
-            bb_alb_iter2_690_1190=d['broadband_alb_690_1190_spring_all'],
-            ice_frac=d['ice_frac_all_spring'],
-            nad_hdrf=d['nad_hdrf_spring_all'],
-            nad_rad=d['nad_rad_spring_all'],
-            myi_ratio=d['myi_ratio_spring_all'],
-            ice_ratio=d['ice_ratio_spring_all'],
-            ice_age=d['ice_age_spring_all'],
-            era5_alb=d['era5_alb_spring_all'],
-            lon_avg=d['lon_avg_spring'],
-            amsr2_ice_conc=d['amsr2_ice_conc_spring_all'],
-        )
-        summer = types.SimpleNamespace(
-            name='summer',
-            wvl=d['wvl_summer'],
-            lon=d['lon_all_summer'],
-            lat=d['lat_all_summer'],
-            alt=d['alt_all_summer'],
-            time=d['time_summer_all'],
-            dates=d['dates_summer_all'],
-            conditions=d['leg_contidions_all_summer'],
-            case_tags=d['case_tags_summer_all'],
-            alb_iter2=d['alb_iter2_all_summer'],
-            broadband_alb_iter2=d['broadband_alb_iter2_summer_all'],
-            bb_alb_iter2_690_1190=d['broadband_alb_690_1190_summer_all'],
-            ice_frac=d['ice_frac_all_summer'],
-            nad_hdrf=d['nad_hdrf_summer_all'],
-            nad_rad=d['nad_rad_summer_all'],
-            myi_ratio=d['myi_ratio_summer_all'],
-            ice_ratio=d['ice_ratio_summer_all'],
-            ice_age=d['ice_age_summer_all'],
-            era5_alb=d['era5_alb_summer_all'],
-            lon_avg=d['lon_avg_summer'],
-            amsr2_ice_conc=d['amsr2_ice_conc_summer_all'],
-        )
+        spring = season_from_combined_cache(d, 'spring')
+        summer = season_from_combined_cache(d, 'summer')
     else:
+        if force:
+            print("Forcing combined rebuild; ignoring any existing cache.")
+        else:
+            print("Combined cache is missing or older than input processed pickles; rebuilding.")
         # 1. Split files by season and build SeasonData objects
         spring_files = [f for f in sfc_alb_files if extract_date_casetag(f)[0] < '20240630']
         summer_files = [f for f in sfc_alb_files if extract_date_casetag(f)[0] >= '20240630']
@@ -1610,15 +1776,15 @@ def combined_atm_corr():
 
         collocate_ecice(spring, ecice_data_dir,
                         era5_lon_mesh, era5_lat_mesh, era5_alb, era5_time_dates_str,
-                        lon_all, lat_all)
+                        lon_all, lat_all, make_diagnostic_plots=make_collocation_plots)
         collocate_ecice(summer, ecice_data_dir,
                         era5_lon_mesh, era5_lat_mesh, era5_alb, era5_time_dates_str,
-                        lon_all, lat_all)
+                        lon_all, lat_all, make_diagnostic_plots=make_collocation_plots)
 
         collocate_nsidc_ice_age(spring, nsidc_lon, nsidc_lat, nsidc_ice_age, time_nc_dates,
-                                 lon_all, lat_all)
+                                 lon_all, lat_all, make_diagnostic_plots=make_collocation_plots)
         collocate_nsidc_ice_age(summer, nsidc_lon, nsidc_lat, nsidc_ice_age, time_nc_dates,
-                                 lon_all, lat_all)
+                                 lon_all, lat_all, make_diagnostic_plots=make_collocation_plots)
 
         # 4. Save outputs (pkl + h5)
         output_all_dict = {
@@ -1786,6 +1952,10 @@ def combined_atm_corr():
 
         write_atm_corrected_hdf5(combined_output_ssfr_file, spring_h5, summer_h5)
         print(f"Focused SSFR atmospheric-corrected HDF5 data saved to {combined_output_ssfr_file}")
+
+    if not make_plots:
+        print("Summary plot creation disabled.")
+        return {'spring': spring, 'summer': summer}
 
     # --- ERA5 vs broadband scatter (all seasons combined) ---
 
@@ -2495,25 +2665,31 @@ def combined_atm_corr():
     plt.close(fig)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Combine processed SSFR atmospheric-correction products.')
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Ignore fresh combined outputs and rebuild from processed case pickles.',
+    )
+    parser.add_argument(
+        '--no-plots',
+        action='store_true',
+        help='Write/load combined products without generating summary plots.',
+    )
+    parser.add_argument(
+        '--no-collocation-plots',
+        action='store_true',
+        help='Skip per-date ECICE and NSIDC diagnostic maps during a rebuild.',
+    )
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-
-
-    dir_fig = './fig'
-    os.makedirs(dir_fig, exist_ok=True)
-
-    config = FlightConfig(mission='ARCSIX',
-                            platform='P3B',
-                            data_root=_fdir_data_,
-                            root_mac=_fdir_general_,
-                            root_linux='/pl/active/vikas-arcsix/yuch8913/arcsix/data',)
-
-    """
-    # IMPORTANT
-    # need to run arcsix_gas_insitu.py first to generate gas files for each date
-    """
-
-    # surface albedo derivation
-    # ------------------------------------------
-
-
-    combined_atm_corr()
+    args = parse_args()
+    os.makedirs('./fig', exist_ok=True)
+    combined_atm_corr(
+        force=args.force,
+        make_plots=not args.no_plots,
+        make_collocation_plots=not args.no_collocation_plots,
+    )

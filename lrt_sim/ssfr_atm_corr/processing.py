@@ -773,17 +773,18 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         final_1s = iter1_1s
     elif final_iter == 2:
         final_1s = iter2_1s
-    final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
-        native_wvl,
-        final_1s,
-        record['alb_final'],
-    )
-    if n_shortwave_adjusted:
-        progress(
-            f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
-            f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
-            verbose,
-        )
+    # Disabled while reviewing 0807 shortwave behavior:
+    # final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
+    #     native_wvl,
+    #     final_1s,
+    #     record['alb_final'],
+    # )
+    # if n_shortwave_adjusted:
+    #     progress(
+    #         f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
+    #         f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
+    #         verbose,
+    #     )
 
     final_finite_rows = int(np.count_nonzero(np.any(np.isfinite(final_1s), axis=1)))
     progress(
@@ -1026,35 +1027,68 @@ def plot_postfit_diagnostics(record, output_dir, stem, title_base):
     return plot_files
 
 
-def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
-    """Plot mean final native-grid albedo across all processed legs."""
+def _plot_mean_albedo_spectrum(wvl, albedo, filename, title, xlim=(350, 2000)):
+    """Plot mean and standard deviation for one spectral albedo collection."""
     import matplotlib.pyplot as plt
 
-    wvl = np.asarray(output['native_wvl'], dtype=float)
-    alb_final = np.asarray(output['alb_final'], dtype=float)
-    if alb_final.ndim != 2 or alb_final.shape[1] != wvl.size:
+    wvl = np.asarray(wvl, dtype=float)
+    albedo = np.asarray(albedo, dtype=float)
+    if albedo.ndim != 2 or albedo.shape[1] != wvl.size:
         return None
 
-    os.makedirs(fig_dir, exist_ok=True)
-    alb_avg = np.nanmean(alb_final, axis=0)
-    alb_std = np.nanstd(alb_final, axis=0)
+    alb_avg = finite_mean_spectrum(albedo)
+    finite = np.isfinite(albedo)
+    counts = np.count_nonzero(finite, axis=0)
+    centered = np.where(finite, albedo - alb_avg[np.newaxis, :], 0.0)
+    alb_std = np.full(wvl.shape, np.nan, dtype=float)
+    valid = counts > 0
+    alb_std[valid] = np.sqrt(np.sum(centered[:, valid] ** 2, axis=0) / counts[valid])
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(wvl, alb_avg, '-', color='blue', label='Mean albedo (final)')
+    ax.plot(wvl, alb_avg, '-', color='blue', label='Mean albedo')
     ax.fill_between(wvl, alb_avg - alb_std, alb_avg + alb_std, color='blue', alpha=0.1)
     plot_gas_absorption_bands(ax)
     ax.set_xlabel('Wavelength (nm)', fontsize=14)
     ax.set_ylabel('Surface Albedo', fontsize=14)
     ax.tick_params(labelsize=12)
     ax.set_ylim(-0.05, 1.05)
-    ax.set_xlim(350, 2000)
-    ax.set_title(f'Surface Albedo (final) for {date_s} {case_tag}', fontsize=13)
+    ax.set_xlim(*xlim)
+    ax.set_title(title, fontsize=13)
     fig.tight_layout()
-
-    filename = f'{fig_dir}/arcsix_albedo_{date_s}_{case_tag}.png'
     fig.savefig(filename, bbox_inches='tight', dpi=150)
     plt.close(fig)
     return filename
+
+
+def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
+    """Plot mean final 1s native and extended albedo across all processed points."""
+    os.makedirs(fig_dir, exist_ok=True)
+    plot_files = []
+
+    native_file = _plot_mean_albedo_spectrum(
+        output['native_wvl'],
+        output['alb_final_all_1s'],
+        f'{fig_dir}/arcsix_albedo_{date_s}_{case_tag}.png',
+        f'Surface Albedo (final 1s mean) for {date_s} {case_tag}',
+        xlim=(350, 2000),
+    )
+    if native_file is not None:
+        plot_files.append(native_file)
+
+    ext_wvl = np.asarray(output.get('extension_wvl_1s', []), dtype=float)
+    ext_alb = np.asarray(output.get('alb_final_ext_all_1s', []), dtype=float)
+    if ext_wvl.size > 0 and ext_alb.size > 0:
+        ext_file = _plot_mean_albedo_spectrum(
+            ext_wvl,
+            ext_alb,
+            f'{fig_dir}/arcsix_albedo_extended_{date_s}_{case_tag}.png',
+            f'Extended Surface Albedo (final 1s mean) for {date_s} {case_tag}',
+            xlim=(250, 4050),
+        )
+        if ext_file is not None:
+            plot_files.append(ext_file)
+
+    return plot_files
 
 
 def plot_broadband_albedo_map(date_s, case_tag, output, fig_dir):
@@ -1213,9 +1247,8 @@ def plot_processing_outputs(date_s, case_tag, records, output, fig_dir='fig', pl
         )
         plot_files.extend(postfit_files)
 
-    mean_file = plot_mean_final_albedo(date_s, case_tag, output, summary_fig_dir)
-    if mean_file is not None:
-        plot_files.append(mean_file)
+    mean_files = plot_mean_final_albedo(date_s, case_tag, output, summary_fig_dir)
+    plot_files.extend(mean_files)
 
     map_file = plot_broadband_albedo_map(date_s, case_tag, output, summary_fig_dir)
     if map_file is not None:
