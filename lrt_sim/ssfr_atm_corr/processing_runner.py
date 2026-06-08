@@ -37,6 +37,7 @@ def run_processing_cases(
     make_plots=True,
     fig_dir='fig',
     plot_every=1,
+    force_row_extension=False,
 ):
     """Process one or more atmospheric-correction catalog cases."""
     if __package__:
@@ -60,6 +61,7 @@ def run_processing_cases(
             make_plots=make_plots,
             fig_dir=fig_dir,
             plot_every=plot_every,
+            force_row_extension=force_row_extension,
         )
 
 
@@ -111,6 +113,11 @@ def parse_args():
         default=1,
         help='Plot every Nth leg for per-leg diagnostics. Default: 1.',
     )
+    parser.add_argument(
+        '--force-row-extension',
+        action='store_true',
+        help='Force alb_extention(...) for every 1-second row instead of using final-extension template scaling.',
+    )
     return parser.parse_args()
 
 
@@ -138,4 +145,5 @@ if __name__ == '__main__':
         make_plots=not args.no_plots,
         fig_dir=args.fig_dir,
         plot_every=args.plot_every,
+        force_row_extension=args.force_row_extension,
     )

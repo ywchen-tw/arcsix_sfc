@@ -606,7 +606,15 @@ def infer_final_iter(albedo_native, alb_iterations):
     return best_iter
 
 
-def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl, leg_extension, clear_sky):
+def extend_final_albedo_1s(
+    native_wvl,
+    final_1s,
+    leg_native_final,
+    extension_wvl,
+    leg_extension,
+    clear_sky,
+    force_row_extension=False,
+):
     """Extend true 1s native albedo using final_extension.dat as the preferred template."""
     native_wvl = np.asarray(native_wvl, dtype=float)
     final_1s = np.asarray(final_1s, dtype=float)
@@ -622,6 +630,31 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
         and np.any(np.isfinite(leg_native_final))
     )
 
+    def cap_longwave_extension(ext_wvl, row_ext, row_native):
+        """Prevent extended albedo beyond native wavelengths from jumping above native endpoint."""
+        row_ext = np.asarray(row_ext, dtype=float).copy()
+        native_max = np.nanmax(native_wvl)
+        longwave = ext_wvl > native_max
+        endpoint_window = (native_wvl >= native_max - 50.0) & (native_wvl <= native_max)
+        finite_endpoint = endpoint_window & np.isfinite(row_native)
+        finite_native = np.isfinite(native_wvl) & np.isfinite(row_native)
+        if not np.any(longwave) or (
+            np.count_nonzero(finite_endpoint) == 0
+            and np.count_nonzero(finite_native) == 0
+        ):
+            return row_ext
+        if np.count_nonzero(finite_endpoint) > 0:
+            endpoint = np.nanmedian(row_native[finite_endpoint])
+        else:
+            endpoint = row_native[finite_native][np.argmax(native_wvl[finite_native])]
+        if not np.isfinite(endpoint):
+            return row_ext
+        row_ext[longwave] = np.minimum(row_ext[longwave], np.clip(endpoint, 0.0, 1.0))
+        return row_ext
+
+    if force_row_extension:
+        use_template = False
+
     if not use_template:
         ext_wvl = None
         extended_rows = []
@@ -634,7 +667,9 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
             row_ext_wvl, row_ext = alb_extention(native_wvl, row, clear_sky=clear_sky)
             if ext_wvl is None:
                 ext_wvl = row_ext_wvl
-            extended_rows.append(np.interp(ext_wvl, row_ext_wvl, row_ext, left=np.nan, right=np.nan))
+            row_ext = np.interp(ext_wvl, row_ext_wvl, row_ext, left=np.nan, right=np.nan)
+            row_ext = cap_longwave_extension(ext_wvl, row_ext, row)
+            extended_rows.append(row_ext)
         return ext_wvl if ext_wvl is not None else np.array([]), np.vstack(extended_rows) if extended_rows else np.empty((0, 0))
 
     extended = np.full((final_1s.shape[0], extension_wvl.size), np.nan, dtype=float)
@@ -656,6 +691,7 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
                     left=np.nan,
                     right=np.nan,
                 )
+            row_ext = cap_longwave_extension(extension_wvl, row_ext, row)
             extended[irow] = np.clip(row_ext, 0.0, 1.0)
             continue
 
@@ -677,11 +713,21 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
                 left=np.nan,
                 right=np.nan,
             )
+        row_ext = cap_longwave_extension(extension_wvl, row_ext, row)
         extended[irow] = np.clip(row_ext, 0.0, 1.0)
     return extension_wvl, extended
 
 
-def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=None, verbose=True):
+def build_record_albedo_1s(
+    record,
+    fdir_lrt,
+    stem_time,
+    native_wvl,
+    clear_sky,
+    date_s=None,
+    verbose=True,
+    force_row_extension=False,
+):
     """Build true 1s iter1, iter2, final, and final-extension albedo for one record."""
     fup = np.asarray(record['ssfr_fup'], dtype=float)
     fdn = np.asarray(record['ssfr_fdn'], dtype=float)
@@ -792,7 +838,8 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         f'post-fit diagnostics stored={len(postfit_diagnostics)}',
         verbose,
     )
-    progress(f'  leg {record["leg_index"]:03d}: extending final 1s albedo', verbose)
+    extension_mode = 'alb_extention per 1s row' if force_row_extension else 'final-extension template scaling'
+    progress(f'  leg {record["leg_index"]:03d}: extending final 1s albedo ({extension_mode})', verbose)
     ext_wvl_1s, final_ext_1s = extend_final_albedo_1s(
         native_wvl,
         final_1s,
@@ -800,6 +847,7 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         record['extension_wvl'],
         record['alb_final_extension'],
         clear_sky,
+        force_row_extension=force_row_extension,
     )
     progress(
         f'  leg {record["leg_index"]:03d}: extension grid shape={final_ext_1s.shape}',
@@ -1268,6 +1316,7 @@ def process_atm_corr_case(
     fig_dir='fig',
     plot_every=1,
     verbose=True,
+    force_row_extension=False,
 ):
     """Collect final atmospheric-correction products for one case."""
     try:
@@ -1521,6 +1570,7 @@ def process_atm_corr_case(
                 clear_sky,
                 date_s=date_s,
                 verbose=verbose,
+                force_row_extension=force_row_extension,
             )
         )
         adjusted_ext_wvl = np.asarray(record['extension_wvl_1s'], dtype=float)
@@ -1774,7 +1824,16 @@ def process_atm_corr_case(
     return output_file
 
 
-def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_dir='fig', plot_every=1, verbose=True):
+def process_catalog_case(
+    config,
+    case_id,
+    output_dir=None,
+    make_plots=True,
+    fig_dir='fig',
+    plot_every=1,
+    verbose=True,
+    force_row_extension=False,
+):
     """Process one active atmospheric-correction catalog case by id."""
     try:
         from .case_catalog import get_case
@@ -1795,4 +1854,5 @@ def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_
         fig_dir=fig_dir,
         plot_every=plot_every,
         verbose=verbose,
+        force_row_extension=force_row_extension,
     )

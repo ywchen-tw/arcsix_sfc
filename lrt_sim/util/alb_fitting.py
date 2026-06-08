@@ -741,8 +741,8 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     
 
     interp_ori_spec_alb = np.interp(alb_wvl_ext, ori_spec_wvl, ori_spec_alb)
+    interp_snicar_unscaled = interp_ori_spec_alb.copy()
 
-    
     long_fit_alb_max = np.nanmax(best_fit_spectrum)
     long_fit_alb_max_wvl = long_wvl[np.argmax(best_fit_spectrum)]
     long_fit_alb_r = best_fit_spectrum[-1]
@@ -775,15 +775,16 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     alb_corr_fitted_ext[long_ext_sel] = alb_corr_fitted_ext_long[long_ext_sel].copy()
     
     
-    # fit on short wavelength side
+    # fit on short wavelength side using SNICAR shape anchored at 355 nm
     short_wvl_sel = (alb_wvl >= short_wvl_start) & (alb_wvl <= short_wvl_end)
-    short_wvl = alb_wvl[short_wvl_sel]
     short_wvl_alb = alb_corr_fitted[short_wvl_sel]
-    
 
-    fit_2nd = np.poly1d(np.polyfit(short_wvl, short_wvl_alb, 2))
-    ext_array = fit_2nd(alb_wvl_ext[alb_wvl_ext < short_wvl_start])
-    alb_corr_fitted_ext[alb_wvl_ext < short_wvl_start] = ext_array.copy()
+    anchor_idx = np.argmin(np.abs(alb_wvl_ext - short_wvl_start))
+    offset = short_wvl_alb[0] - interp_snicar_unscaled[anchor_idx]
+    short_ext_sel = alb_wvl_ext < short_wvl_start
+    alb_corr_fitted_ext[short_ext_sel] = np.clip(
+        interp_snicar_unscaled[short_ext_sel] + offset, 0.0, 1.0
+    )
     
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
