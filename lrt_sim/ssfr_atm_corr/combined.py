@@ -2088,7 +2088,7 @@ def combined_atm_corr():
                     markersize=3, markerfacecolor='none',
                     elinewidth=1.5, capsize=1.5, zorder=2)
         ax22.scatter(date_ice_frac, date_broadband_alb, s=50, c=color_series, zorder=3)
-        ax22.set_xlabel('Sea Ice Fraction', fontsize=14)
+        ax22.set_xlabel('NSIDC Sea Ice Fraction', fontsize=14)
         ax22.set_ylabel('Broadband Albedo', fontsize=14)
         ax22.tick_params(labelsize=12)
         ax22.set_xlim(0.0, 1.10)

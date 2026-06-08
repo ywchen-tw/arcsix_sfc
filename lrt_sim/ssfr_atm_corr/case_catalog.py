@@ -738,16 +738,16 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.62,
   'manual_cloud_cot': 16.21,},
  
- {'id': 'case_061',
-  'date': '2024-08-08',
-  'case_tag': 'clear_atm_corr_1',
-  'tmhr_ranges_select': [
-                        [12.990, 13.180], # 180m, clear
-                        ],
-  'simulation_interval': 0.5,
-  'clear_sky': True,
-  'levels': None,
-  },
+#  {'id': 'case_061',
+#   'date': '2024-08-08',
+#   'case_tag': 'clear_atm_corr_1',
+#   'tmhr_ranges_select': [
+#                         [12.990, 13.180], # 180m, clear
+#                         ],
+#   'simulation_interval': 0.5,
+#   'clear_sky': True,
+#   'levels': None,
+#   },
  
 #  {'id': 'case_062',
 #   'date': '2024-08-08',
@@ -760,16 +760,16 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
 #   'levels': None,
 #   },
  
- {'id': 'case_063',
-  'date': '2024-08-08',
-  'case_tag': 'clear_atm_corr_3',
-  'tmhr_ranges_select': [
-                        [16.471, 16.601], # 180m, clear
-                        ],
-  'simulation_interval': 0.5,
-  'clear_sky': True,
-  'levels': None,
-  },
+#  {'id': 'case_063',
+#   'date': '2024-08-08',
+#   'case_tag': 'clear_atm_corr_3',
+#   'tmhr_ranges_select': [
+#                         [16.471, 16.601], # 180m, clear
+#                         ],
+#   'simulation_interval': 0.5,
+#   'clear_sky': True,
+#   'levels': None,
+#   },
  
  {'id': 'case_064',
   'date': '2024-08-08',
@@ -831,17 +831,17 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.34,
   'manual_cloud_cot': 13.93,},
  
- {'id': 'case_067',
-  'date': '2024-08-09',
-  'case_tag': 'clear_atm_corr',
-  'tmhr_ranges_select': [
-                        [14.750, 15.060], # 100m, clear
-                        [15.622, 15.887], # 100m, clear
-                        ],
-  'simulation_interval': 0.5,
-  'clear_sky': True,
-  'levels': None,
-  },
+#  {'id': 'case_067',
+#   'date': '2024-08-09',
+#   'case_tag': 'clear_atm_corr',
+#   'tmhr_ranges_select': [
+#                         [14.750, 15.060], # 100m, clear
+#                         [15.622, 15.887], # 100m, clear
+#                         ],
+#   'simulation_interval': 0.5,
+#   'clear_sky': True,
+#   'levels': None,
+#   },
  
  {'id': 'case_068',
   'date': '2024-08-09',

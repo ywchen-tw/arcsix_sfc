@@ -30,9 +30,9 @@ CLEAR_SKY_CASE_ID_LIST = [
     'case_029', 'case_030', 'case_031', 'case_034', 'case_035',
     'case_036', 'case_038', 'case_041', 'case_042', 'case_043',
     'case_047', 'case_051', 'case_052', 'case_054', 'case_055',
-    'case_056', 'case_057', 'case_058', 'case_061', 
-    #'case_062',
-    'case_063', 'case_067', 'case_069',
+    'case_056', 'case_057', 'case_058', 
+    # 'case_061', 'case_062', 'case_063', 'case_067', 
+    'case_069',
 ]
 
 CLOUDY_CASE_ID_LIST = [

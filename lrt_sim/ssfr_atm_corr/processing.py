@@ -32,11 +32,10 @@ from scipy.ndimage import uniform_filter1d
 from alb_fitting import alb_extention, snowice_alb_fitting
 
 DATE_H2O_6_END = {
-    '20240603': {'mask': 1650, 'fit': 1650},
     '20240807': {'mask': 1550, 'fit': 1570},
 }
-POSTFIT_H2O6_H2O7_DATES = {'20240603', '20240807', '20240808', '20240809'}
-REFIT_H2O6_AFTER_POSTFIT_DATES = {'20240603'}
+POSTFIT_0603_DATES = {'20240603'}
+POSTFIT_H2O6_H2O7_DATES = {'20240807', '20240808', '20240809'}
 POSTFIT_DIAGNOSTIC_STRIDE = 100
 
 try:
@@ -357,7 +356,28 @@ def _postfit_h2o6_h2o7_window(native_wvl, fitted_row):
     return np.clip(values, 0.0, 1.0)
 
 
-def _refit_h2o6_band_from_postfit(native_wvl, fitted_row):
+def _linear_fit_window(wvl, values, start_wvl, end_wvl):
+    """Return a robust first-order fit for finite values in one wavelength window."""
+    window = (wvl >= start_wvl) & (wvl <= end_wvl) & np.isfinite(values)
+    x = wvl[window]
+    y = values[window]
+    if x.size < 2:
+        return None
+
+    coeffs = np.polyfit(x, y, 1)
+    if x.size >= 5:
+        fitted = np.poly1d(coeffs)(x)
+        resid = y - fitted
+        mad = np.nanmedian(np.abs(resid - np.nanmedian(resid)))
+        sigma = 1.4826 * mad if mad > 0 else np.nanstd(resid)
+        if np.isfinite(sigma) and sigma > 0:
+            keep = np.abs(resid) <= 3 * sigma
+            if np.count_nonzero(keep) >= 2:
+                coeffs = np.polyfit(x[keep], y[keep], 1)
+    return np.poly1d(coeffs)
+
+
+def _refit_h2o6_band_from_postfit(native_wvl, fitted_row, right_wvl=None, right_value=None):
     """Refit the default H2O-6 band using neighboring post-fit albedo anchors."""
     wvl = np.asarray(native_wvl, dtype=float)
     values = np.asarray(fitted_row, dtype=float).copy()
@@ -370,18 +390,49 @@ def _refit_h2o6_band_from_postfit(native_wvl, fitted_row):
 
     finite = np.isfinite(values)
     left_candidates = np.flatnonzero(finite & (wvl < h2o_6_start))
-    right_candidates = np.flatnonzero(finite & (wvl > h2o_6_end))
-    if left_candidates.size == 0 or right_candidates.size == 0:
+    if left_candidates.size == 0:
         return np.clip(values, 0.0, 1.0)
 
     left_ind = left_candidates[-1]
-    right_ind = right_candidates[0]
+    if right_wvl is None or right_value is None or not np.isfinite(right_value):
+        right_candidates = np.flatnonzero(finite & (wvl > h2o_6_end))
+        if right_candidates.size == 0:
+            return np.clip(values, 0.0, 1.0)
+        right_ind = right_candidates[0]
+        right_wvl = wvl[right_ind]
+        right_value = values[right_ind]
+
     values[band] = _linear_between(
         wvl[left_ind],
         values[left_ind],
-        wvl[right_ind],
-        values[right_ind],
+        right_wvl,
+        right_value,
         wvl[band],
+    )
+    return np.clip(values, 0.0, 1.0)
+
+
+def _postfit_0603_before_1650_correction(native_wvl, fitted_row):
+    """0603-only correction using the clean 1650-1740 nm continuum as anchor."""
+    wvl = np.asarray(native_wvl, dtype=float)
+    values = np.asarray(fitted_row, dtype=float).copy()
+    if values.size != wvl.size or np.all(~np.isfinite(values)):
+        return values
+
+    continuum_fit = _linear_fit_window(wvl, values, 1650, 1740)
+    if continuum_fit is None:
+        return np.clip(values, 0.0, 1.0)
+
+    continuum = (wvl > h2o_6_end) & (wvl <= 1740)
+    if np.any(continuum):
+        values[continuum] = continuum_fit(wvl[continuum])
+
+    h2o6_end_value = float(continuum_fit(h2o_6_end))
+    values = _refit_h2o6_band_from_postfit(
+        wvl,
+        values,
+        right_wvl=h2o_6_end,
+        right_value=h2o6_end_value,
     )
     return np.clip(values, 0.0, 1.0)
 
@@ -401,8 +452,8 @@ def fit_albedo_1s(
     date_key = str(date_s)
     h2o_override = DATE_H2O_6_END.get(date_key, {})
     fit_kwargs = {'h2o_6_end': h2o_override['fit']} if 'fit' in h2o_override else {}
-    apply_postfit_cleanup = date_key in POSTFIT_H2O6_H2O7_DATES
-    refit_h2o6_after_postfit = date_key in REFIT_H2O6_AFTER_POSTFIT_DATES
+    apply_0603_cleanup = date_key in POSTFIT_0603_DATES
+    apply_postfit_cleanup = date_key in POSTFIT_H2O6_H2O7_DATES or apply_0603_cleanup
     for irow in range(corrected_1s.shape[0]):
         row = corrected_1s[irow]
         if np.all(~np.isfinite(row)):
@@ -414,9 +465,10 @@ def fit_albedo_1s(
                 raise ValueError('all non-finite fitted albedo')
             if apply_postfit_cleanup:
                 before_postfit = fitted_row.copy()
-                fitted_row = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
-                if refit_h2o6_after_postfit:
-                    fitted_row = _refit_h2o6_band_from_postfit(native_wvl, fitted_row)
+                if apply_0603_cleanup:
+                    fitted_row = _postfit_0603_before_1650_correction(native_wvl, fitted_row)
+                else:
+                    fitted_row = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
                 if (
                     postfit_diagnostics is not None
                     and irow % POSTFIT_DIAGNOSTIC_STRIDE == 0
