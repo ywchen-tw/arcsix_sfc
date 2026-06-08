@@ -165,6 +165,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                      iter=0,
                      final_sim=False,
                      final_status='closure_passed',
+                     final_extension_rt=False,
                     ):
     
     log = logging.getLogger("lrt")
@@ -218,10 +219,14 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         f'{levels.size} levels from {levels[0]:.3f} to {levels[-1]:.3f} km'
     )
 
-    if final_sim:
+    if final_sim and final_extension_rt:
         effective_wvl = write_final_sw_support_files()
         wavelength_grid_file = os.path.abspath('wvl_grid_final_sw.dat')
         solar_file = os.path.abspath('arcsix_ssfr_solar_flux_raw_final.dat')
+    elif final_sim:
+        effective_wvl = np.array([])
+        wavelength_grid_file = None
+        solar_file = None
     else:
         effective_wvl = write_ssfr_support_files(iter=iter, clear_sky=clear_sky)
         wavelength_grid_file = os.path.abspath('wvl_grid_test.dat')
@@ -346,17 +351,23 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 and os.path.exists(native_iteration_albedo_name)
                 and not os.path.exists(final_extension_albedo_name)
             ):
-                alb_data = np.loadtxt(native_iteration_albedo_name, comments='#')
-                final_alb_wvl, final_alb = alb_extention(alb_data[:, 0], alb_data[:, 1], clear_sky=clear_sky)
-                final_alb = np.clip(final_alb, 0.0, 1.0)
-                write_2col_file(
-                    final_extension_albedo_name,
-                    final_alb_wvl,
-                    final_alb,
-                    header=(f'# SSFR final extended sfc albedo {date_s} iteration {iter}\n'
-                            '# wavelength (nm)      albedo (unitless)\n'),
+                print(
+                    f"Warning: final-extension RT output exists but adjusted extended "
+                    f"albedo is missing: {final_extension_albedo_name}. "
+                    "Run processing before the final-extension RT pass."
                 )
-                print(f"Saving final extended albedo to {final_extension_albedo_name}")
+            if not final_extension_rt:
+                print(
+                    f"Final native-grid products prepared for leg {ileg+1}; "
+                    "skipping final-extension RT in the regular workflow."
+                )
+                continue
+            if not os.path.exists(final_extension_albedo_name):
+                raise FileNotFoundError(
+                    f"Missing adjusted final-extension albedo: {final_extension_albedo_name}\n"
+                    "Run processing first so it can extend the adjusted albedo, then "
+                    "rerun with final_extension_rt=True."
+                )
 
         
         if not os.path.exists(output_csv_name) or overwrite_lrt:
@@ -477,21 +488,10 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 final_alb_wvl = None
                 final_alb = None
                 if final_sim:
+                    albedo_file = final_extension_albedo_name
                     alb_data = np.loadtxt(albedo_file, comments='#')
-                    alb_wvl_for_ext = alb_data[:, 0]
-                    alb_val_for_ext = alb_data[:, 1]
-                    final_alb_wvl, final_alb = alb_extention(alb_wvl_for_ext, alb_val_for_ext, clear_sky=clear_sky)
-                    final_alb = np.clip(final_alb, 0.0, 1.0)
-                    albedo_file = (
-                        final_extension_albedo_name
-                    )
-                    write_2col_file(
-                        albedo_file,
-                        final_alb_wvl,
-                        final_alb,
-                        header=(f'# SSFR final extended sfc albedo {date_s} iteration {iter}\n'
-                                '# wavelength (nm)      albedo (unitless)\n'),
-                    )
+                    final_alb_wvl = alb_data[:, 0]
+                    final_alb = np.clip(alb_data[:, 1], 0.0, 1.0)
                 input_dict_extra_general = {
                                     'crs_model': 'rayleigh Bodhaine29',
                                     'albedo_file': albedo_file,

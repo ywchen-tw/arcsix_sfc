@@ -72,6 +72,7 @@ def run_cases(
     min_closure_iteration=2,
     max_additional_iterations=5,
     run_final_sim=True,
+    run_final_extension_rt=False,
     skip_missing_cloud_observations=True,
 ):
     """Run one or more surface-albedo atmospheric-correction catalog cases."""
@@ -96,6 +97,7 @@ def run_cases(
             min_closure_iteration=min_closure_iteration,
             max_additional_iterations=max_additional_iterations,
             run_final_sim=run_final_sim,
+            run_final_extension_rt=run_final_extension_rt,
             skip_missing_cloud_observations=skip_missing_cloud_observations,
         )
 
@@ -153,6 +155,14 @@ def parse_args():
         help=(
             'Force rerun/overwrite of existing simulation products before final outputs. '
             'This bypasses resume shortcuts that would otherwise reuse existing CSVs.'
+        ),
+    )
+    parser.add_argument(
+        '--final-extension-rt',
+        action='store_true',
+        help=(
+            'Run the extended-grid final RT pass from existing native final products. '
+            'Run processing first so adjusted *_final_extension.dat albedo files exist.'
         ),
     )
     return parser.parse_args()
@@ -219,6 +229,7 @@ def main():
             overwrite_lrt=overwrite_lrt,
             rerun_simulation=args.rerun_simulation,
             iterations=range(args.iterations),
+            run_final_extension_rt=args.final_extension_rt,
         )
 
 if __name__ == '__main__':

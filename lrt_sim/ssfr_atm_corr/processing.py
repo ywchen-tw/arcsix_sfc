@@ -3,9 +3,11 @@
 This module consumes products written by ``ssfr_atm_corr.workflow``:
 
 * ``*_final.csv`` on the native SSFR wavelength grid.
-* ``*_final_extension.csv`` on the extended 300-4000 nm grid.
+* optional ``*_final_extension.csv`` on the extended 300-4000 nm grid.
 * ``sfc_alb_*_final.dat`` on the native albedo grid.
-* ``sfc_alb_*_final_extension.dat`` on the extended albedo grid.
+
+It also writes the adjusted ``sfc_alb_*_final_extension.dat`` products used by
+the optional later final-extension RT pass.
 """
 
 import datetime
@@ -39,10 +41,10 @@ POSTFIT_H2O6_H2O7_DATES = {'20240807', '20240808', '20240809'}
 POSTFIT_DIAGNOSTIC_STRIDE = 100
 
 try:
-    from .helpers import gas_abs_masking
+    from .helpers import gas_abs_masking, write_2col_file
     from .settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start
 except ImportError:
-    from helpers import gas_abs_masking
+    from helpers import gas_abs_masking, write_2col_file
     from settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start
 
 
@@ -151,6 +153,34 @@ def weighted_broadband_albedo_rows(albedo, weight, wvl):
             / denominator
         )
     return broadband
+
+
+def finite_mean_spectrum(rows):
+    """Return a column mean without warning on all-NaN wavelengths."""
+    rows = np.asarray(rows, dtype=float)
+    if rows.ndim != 2 or rows.size == 0:
+        return np.array([])
+    finite = np.isfinite(rows)
+    counts = np.count_nonzero(finite, axis=0)
+    sums = np.sum(np.where(finite, rows, 0.0), axis=0)
+    mean = np.full(rows.shape[1], np.nan, dtype=float)
+    valid = counts > 0
+    mean[valid] = sums[valid] / counts[valid]
+    return mean
+
+
+def same_spectrum(wvl_a, alb_a, wvl_b, alb_b, atol=5e-4):
+    """Return True when two written albedo spectra are effectively identical."""
+    wvl_a = np.asarray(wvl_a, dtype=float)
+    alb_a = np.asarray(alb_a, dtype=float)
+    wvl_b = np.asarray(wvl_b, dtype=float)
+    alb_b = np.asarray(alb_b, dtype=float)
+    return (
+        wvl_a.shape == wvl_b.shape
+        and alb_a.shape == alb_b.shape
+        and np.allclose(wvl_a, wvl_b, equal_nan=True)
+        and np.allclose(alb_a, alb_b, rtol=1e-5, atol=atol, equal_nan=True)
+    )
 
 
 def dataframe_weight(df, preferred_columns, expected_length):
@@ -883,6 +913,15 @@ def plot_postfit_diagnostics(record, output_dir, stem, title_base):
         target_iter = diag.get('target_iter')
         time_value = diag.get('time', np.nan)
         max_abs_change = diag.get('max_abs_change', np.nan)
+        final_1s = None
+        final_1s_all = np.asarray(record.get('alb_final_all_1s', []), dtype=float)
+        if (
+            final_1s_all.ndim == 2
+            and 0 <= row < final_1s_all.shape[0]
+            and final_1s_all.shape[1] == wvl.size
+            and np.any(np.isfinite(final_1s_all[row]))
+        ):
+            final_1s = final_1s_all[row]
 
         fig, (ax, ax_diff) = plt.subplots(
             2,
@@ -893,6 +932,8 @@ def plot_postfit_diagnostics(record, output_dir, stem, title_base):
         )
         ax.plot(wvl, before, '-', color='black', linewidth=1.3, label='before post-fit')
         ax.plot(wvl, after, '-', color='red', linewidth=1.1, label='after post-fit')
+        if final_1s is not None:
+            ax.plot(wvl, final_1s, '--', color='green', linewidth=1.2, label='alb_final_all_1s row')
         ax.axvspan(h2o_6_start, h2o_6_end, color='gray', alpha=0.2, label='H2O-6 refit band')
         ax.axvspan(1650, 1710, color='orange', alpha=0.14, label='1650-1710 check')
         ax.set_ylabel('Surface Albedo', fontsize=12)
@@ -900,13 +941,23 @@ def plot_postfit_diagnostics(record, output_dir, stem, title_base):
         ax.legend(fontsize=9, loc='center left', bbox_to_anchor=(1.02, 0.5))
 
         diff = after - before
-        ax_diff.plot(wvl, diff, '-', color='purple', linewidth=1.0)
+        ax_diff.plot(wvl, diff, '-', color='purple', linewidth=1.0, label='after - before')
+        if final_1s is not None:
+            ax_diff.plot(
+                wvl,
+                final_1s - before,
+                '--',
+                color='green',
+                linewidth=1.0,
+                label='final 1s - before',
+            )
         ax_diff.axhline(0.0, color='gray', linestyle='--', linewidth=0.8)
         ax_diff.axvspan(h2o_6_start, h2o_6_end, color='gray', alpha=0.2)
         ax_diff.axvspan(1650, 1710, color='orange', alpha=0.14)
         ax_diff.set_xlabel('Wavelength (nm)', fontsize=12)
-        ax_diff.set_ylabel('After - before', fontsize=11)
+        ax_diff.set_ylabel('Difference', fontsize=11)
         ax_diff.set_xlim(1200, 1850)
+        ax_diff.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.02, 0.5))
 
         subtitle = f'row {row}, iter {target_iter}, max change {max_abs_change:.4f}'
         if np.isfinite(time_value):
@@ -1232,10 +1283,25 @@ def process_atm_corr_case(
         extension_weight = np.array([])
         broadband_extension = np.nan
         df_extension = None
+        final_extension_flux_warning = None
+        final_extension_csv_mtime = (
+            os.path.getmtime(final_extension_csv)
+            if os.path.exists(final_extension_csv)
+            else None
+        )
+        final_extension_albedo_mtime = (
+            os.path.getmtime(alb_paths['final_extension'])
+            if os.path.exists(alb_paths['final_extension'])
+            else None
+        )
+        existing_ext_alb_wvl, existing_ext_alb = maybe_read_two_column_file(
+            alb_paths['final_extension'],
+            'alb',
+        )
         if os.path.exists(final_extension_csv):
             progress(f'Leg {ileg:03d}: reading final extension CSV', verbose)
             df_extension = pd.read_csv(final_extension_csv)
-            ext_alb_wvl, ext_alb = maybe_read_two_column_file(alb_paths['final_extension'], 'alb')
+            ext_alb_wvl, ext_alb = existing_ext_alb_wvl, existing_ext_alb
             if ext_alb_wvl is not None:
                 extension_wvl = ext_alb_wvl
                 albedo_extension = ext_alb
@@ -1349,6 +1415,7 @@ def process_atm_corr_case(
             'alb_final_extension': albedo_extension,
             'extension_weight': extension_weight,
             'broadband_alb_final_extension': broadband_extension,
+            'final_extension_flux_warning': final_extension_flux_warning,
             'hsr1_wvl': hsr1_wvl,
             'hsr1_diffuse_ratio': hsr1_diffuse_ratio,
             'final_csv': final_csv,
@@ -1371,6 +1438,72 @@ def process_atm_corr_case(
                 verbose=verbose,
             )
         )
+        adjusted_ext_wvl = np.asarray(record['extension_wvl_1s'], dtype=float)
+        adjusted_ext_albedo = np.clip(
+            finite_mean_spectrum(record['alb_final_ext_all_1s']),
+            0.0,
+            1.0,
+        )
+        if (
+            adjusted_ext_wvl.size > 0
+            and adjusted_ext_albedo.size == adjusted_ext_wvl.size
+        ):
+            if final_extension_csv_mtime is not None:
+                adjusted_changed_existing = True
+                if existing_ext_alb_wvl is not None and existing_ext_alb is not None:
+                    adjusted_changed_existing = not same_spectrum(
+                        existing_ext_alb_wvl,
+                        existing_ext_alb,
+                        adjusted_ext_wvl,
+                        adjusted_ext_albedo,
+                    )
+                if final_extension_albedo_mtime is None:
+                    final_extension_flux_warning = (
+                        f'{final_extension_csv} exists, but no previous '
+                        f'{alb_paths["final_extension"]} was available before processing wrote '
+                        'the adjusted extended albedo. Extended-grid simulated flux may not '
+                        'match the adjusted albedo; rerun final-extension RT and processing.'
+                    )
+                elif final_extension_csv_mtime < final_extension_albedo_mtime:
+                    final_extension_flux_warning = (
+                        f'{final_extension_csv} is older than '
+                        f'{alb_paths["final_extension"]}. Extended-grid simulated flux may be stale; '
+                        'rerun final-extension RT and processing.'
+                    )
+                elif adjusted_changed_existing:
+                    final_extension_flux_warning = (
+                        f'Processing changed {alb_paths["final_extension"]} after '
+                        f'{final_extension_csv} was generated. Extended-grid simulated flux may be '
+                        'stale; rerun final-extension RT and processing.'
+                    )
+                if final_extension_flux_warning is not None:
+                    print(f'WARNING: {final_extension_flux_warning}')
+                    record['final_extension_flux_warning'] = final_extension_flux_warning
+
+            write_2col_file(
+                alb_paths['final_extension'],
+                adjusted_ext_wvl,
+                adjusted_ext_albedo,
+                header=(
+                    f'# SSFR adjusted final extended sfc albedo {date_s}\n'
+                    '# wavelength (nm)      albedo (unitless)\n'
+                ),
+            )
+            record['extension_wvl'] = adjusted_ext_wvl
+            record['alb_final_extension'] = adjusted_ext_albedo
+            adjusted_ext_weight = np.asarray(record['extension_weight'], dtype=float)
+            if adjusted_ext_weight.size != adjusted_ext_albedo.size:
+                adjusted_ext_weight = np.ones(adjusted_ext_albedo.size, dtype=float)
+            record['broadband_alb_final_extension'] = weighted_broadband_albedo(
+                adjusted_ext_albedo,
+                adjusted_ext_weight,
+                adjusted_ext_wvl,
+            )
+            progress(
+                f'Leg {ileg:03d}: wrote adjusted final-extension albedo to '
+                f'{alb_paths["final_extension"]}',
+                verbose,
+            )
         progress(f'Leg {ileg:03d}: computing broadband 1s products', verbose)
         gas_mask = np.isfinite(gas_abs_masking(native_wvl, np.ones_like(native_wvl, dtype=float), alt=1))
         record['broadband_alb_iter1_all_1s'] = weighted_broadband_albedo_rows(
@@ -1459,6 +1592,11 @@ def process_atm_corr_case(
             record['final_albedo_warning']
             for record in records
             if record['final_albedo_warning'] is not None
+        ],
+        'final_extension_flux_warnings': [
+            record['final_extension_flux_warning']
+            for record in records
+            if record['final_extension_flux_warning'] is not None
         ],
         'albedo_iteration_files': np.array([record['albedo_iteration_files'] for record in records], dtype=object),
         'records': records,

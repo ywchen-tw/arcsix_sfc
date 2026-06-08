@@ -1114,6 +1114,7 @@ def run_catalog_case(
     min_closure_iteration=2,
     max_additional_iterations=5,
     run_final_sim=True,
+    run_final_extension_rt=False,
     skip_missing_cloud_observations=True,
 ):
     """Run one atmospheric-correction catalog case."""
@@ -1149,7 +1150,7 @@ def run_catalog_case(
         raise FileNotFoundError(message)
 
     def run_final_iteration(iter, final_status, final_overwrite_lrt=None):
-        if not run_final_sim:
+        if not (run_final_sim or run_final_extension_rt):
             return
         if not final_iteration_is_allowed(iter):
             raise ValueError(
@@ -1176,6 +1177,7 @@ def run_catalog_case(
             iter=iter,
             final_sim=True,
             final_status=final_status,
+            final_extension_rt=run_final_extension_rt,
         )
 
     def run_track_iteration(iter):
@@ -1198,12 +1200,10 @@ def run_catalog_case(
         )
 
     native_final_files, missing_native_final_patterns = final_native_output_files(case, date_s)
-    missing_final_extension_files = missing_final_extension_outputs(native_final_files)
     if (
-        run_final_sim
+        run_final_extension_rt
         and not rerun_simulation
         and native_final_files
-        and missing_final_extension_files
         and not missing_native_final_patterns
     ):
         final_iter = infer_final_iteration_from_native_final(native_final_files[0])
@@ -1217,19 +1217,18 @@ def run_catalog_case(
                 )
             else:
                 print(
-                    f'{case_id}: found native final output(s) but missing '
-                    f'{len(missing_final_extension_files)} final-extension file(s); '
+                    f'{case_id}: found native final output(s); '
                     f'running extension-only final simulation from iteration {final_iter}.'
                 )
                 run_final_iteration(
                     final_iter,
                     final_status='extension_only_from_existing_final',
-                    final_overwrite_lrt=False,
+                    final_overwrite_lrt=overwrite_lrt,
                 )
                 return True
         if final_iter is None:
             print(
-                f'{case_id}: native final output(s) exist and final-extension file(s) are missing, '
+                f'{case_id}: native final output(s) exist, '
                 'but final iteration could not be inferred; continuing with normal iteration flow.'
             )
 
@@ -1264,8 +1263,7 @@ def run_catalog_case(
                 else:
                     print(
                         f'{case_id}: found albedo and native output file(s) for max-limit '
-                        f'iteration {last_iter}; running final copy and final-extension '
-                        'simulation from that iteration.'
+                        f'iteration {last_iter}; running final native copy from that iteration.'
                     )
                 run_final_iteration(
                     last_iter,
