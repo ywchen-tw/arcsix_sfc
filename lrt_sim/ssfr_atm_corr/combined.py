@@ -247,6 +247,25 @@ def first_present(mapping, keys, default=None, required=True):
     return default
 
 
+def require_processed_1s_keys(mapping, filepath):
+    """Fail fast when a processed product predates the true-1s albedo fields."""
+    required_keys = (
+        'alb_iter1_all_1s',
+        'alb_final_all_1s',
+        'broadband_alb_iter1_all_1s',
+        'broadband_alb_final_all_1s',
+        'broadband_alb_iter1_all_filter_1s',
+        'broadband_alb_final_all_filter_1s',
+    )
+    missing = [key for key in required_keys if key not in mapping]
+    if missing:
+        raise KeyError(
+            f"{filepath} is missing true-1s processed albedo keys: "
+            f"{', '.join(missing)}. Rerun lrt_sim.ssfr_atm_corr.processing_runner "
+            "with the updated processing.py before running combined.py."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Helper: load one season worth of files and return a SeasonData
 # ---------------------------------------------------------------------------
@@ -287,6 +306,7 @@ def load_season(files, name):
         print(f"Processing surface albedo file: {filepath}")
         with open(filepath, 'rb') as f:
             d = pickle.load(f)
+        require_processed_1s_keys(d, filepath)
 
         date_s, case_tag = extract_date_casetag(filepath)
 
@@ -326,23 +346,19 @@ def load_season(files, name):
         fdns.append(first_present(d, ('fdn_all',)))
         fups.append(first_present(d, ('fup_all',)))
         toa_expands.append(first_present(d, ('toa_expand_all',)))
-        alb_iter1s.append(first_present(d, ('alb_iter1_all_1s', 'alb_iter1_all')))
-        alb_iter2s.append(first_present(d, ('alb_final_all_1s', 'alb_final_all', 'alb_iter2_all_1s', 'alb_iter2_all')))
-        bb_alb_iter1 = first_present(d, ('broadband_alb_iter1_all_1s', 'broadband_alb_iter1_all'), required=True)
-        bb_alb_iter2 = first_present(
-            d,
-            ('broadband_alb_final_all_1s', 'broadband_alb_final_all', 'broadband_alb_iter2_all_1s', 'broadband_alb_iter2_all'),
-            required=True,
-        )
+        alb_iter1s.append(first_present(d, ('alb_iter1_all_1s',)))
+        alb_iter2s.append(first_present(d, ('alb_final_all_1s',)))
+        bb_alb_iter1 = first_present(d, ('broadband_alb_iter1_all_1s',), required=True)
+        bb_alb_iter2 = first_present(d, ('broadband_alb_final_all_1s',), required=True)
         bb_alb_iter1_list.append(bb_alb_iter1)
         bb_alb_iter2_list.append(bb_alb_iter2)
         bb_alb_iter1_filter_list.append(
-            first_present(d, ('broadband_alb_iter1_all_filter_1s', 'broadband_alb_iter1_all_filter'), bb_alb_iter1, required=False)
+            first_present(d, ('broadband_alb_iter1_all_filter_1s',), bb_alb_iter1, required=False)
         )
         bb_alb_iter2_filter_list.append(
             first_present(
                 d,
-                ('broadband_alb_final_all_filter_1s', 'broadband_alb_iter2_all_filter_1s', 'broadband_alb_iter2_all_filter'),
+                ('broadband_alb_final_all_filter_1s',),
                 bb_alb_iter2,
                 required=False,
             )
