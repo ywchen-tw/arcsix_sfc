@@ -605,17 +605,15 @@ def _snowice_alb_fitting_from_best(
     # plt.show()
     # sys.exit()
     
-    # fit and smoothing the shortwave part
-    short_wvl_end = 550
-    short_wvl_sel = alb_wvl <= short_wvl_end
-    short_wvl = alb_wvl[short_wvl_sel]
-    short_wvl_alb = alb_corr_fit[short_wvl_sel]
-    
-    fit_2nd = np.poly1d(np.polyfit(short_wvl, short_wvl_alb, 2))
-    replace_wvl_end = 450
-    replace_wvl = alb_wvl[alb_wvl < replace_wvl_end]
-    replace_array = fit_2nd(replace_wvl)
-    alb_corr_fit[alb_wvl < replace_wvl_end] = replace_array.copy()
+    # shortwave blend: progressively trust SNICAR below 450 nm to suppress
+    # detector noise while preserving inter-row (physical) variation
+    anchor_sel = (alb_wvl >= 450) & (alb_wvl <= 550)
+    if np.any(anchor_sel) and np.any(np.isfinite(alb_corr_fit[anchor_sel])) and np.any(np.isfinite(best_fit_spectrum[anchor_sel])):
+        offset = np.nanmean(alb_corr_fit[anchor_sel]) - np.nanmean(best_fit_spectrum[anchor_sel])
+        snicar_anchored = np.clip(best_fit_spectrum + offset, 0.0, 1.0)
+        replace_sel = alb_wvl < 450
+        alpha = np.clip((alb_wvl[replace_sel] - 350.0) / (450.0 - 350.0), 0.0, 1.0)
+        alb_corr_fit[replace_sel] = alpha * alb_corr_fit[replace_sel] + (1.0 - alpha) * snicar_anchored[replace_sel]
     
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     alb_corr_fit = _smooth_h2o6_h2o7_continuum(alb_wvl, alb_corr_fit, h2o_6_end)
