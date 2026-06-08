@@ -1681,7 +1681,7 @@ def combined_atm_corr():
             vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c=color_vals, cmap='jet',
                             transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
             cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
         # also plot all sampled points along legs (optional, lighter marker)
@@ -1738,7 +1738,7 @@ def combined_atm_corr():
             vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c=color_vals, cmap='jet',
                             transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
             cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
         # also plot all sampled points along legs (optional, lighter marker)
@@ -1798,7 +1798,7 @@ def combined_atm_corr():
         vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
@@ -1858,7 +1858,7 @@ def combined_atm_corr():
         vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
@@ -1914,7 +1914,7 @@ def combined_atm_corr():
         vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
@@ -1969,7 +1969,7 @@ def combined_atm_corr():
         vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)

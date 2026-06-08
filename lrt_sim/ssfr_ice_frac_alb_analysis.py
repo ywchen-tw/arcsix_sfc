@@ -96,6 +96,17 @@ gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h
                 (final_start, final_end)]
 
 
+def asymmetric_error(values, lower, upper):
+    """Return nonnegative asymmetric error magnitudes for Matplotlib errorbar."""
+    values = np.asarray(values)
+    lower = np.asarray(lower)
+    upper = np.asarray(upper)
+    return [
+        np.maximum(0.0, values - lower),
+        np.maximum(0.0, upper - values),
+    ]
+
+
 def linear_regression_with_confidence(x, y, confidence=0.95):
     """
     Performs linear regression and calculates the confidence interval for the regression line.
@@ -865,7 +876,7 @@ def combined_atm_corr():
     ]:
         if len(alb_vals) == 0:
             continue
-        alb_unc = [(u - l) / 2 for u, l in zip(alb_upper, alb_lower)]
+        alb_unc = [max(0.0, (u - l) / 2) for u, l in zip(alb_upper, alb_lower)]
         alb_colors = colors[:len(alb_vals)]
         plt.close('all')
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -902,7 +913,7 @@ def combined_atm_corr():
         plt.close('all')
         fig, ax = plt.subplots(figsize=(7, 6))
         ax.errorbar(x_arr, bb_arr,
-                    xerr=[x_arr - x_lo, x_hi - x_arr],
+                    xerr=asymmetric_error(x_arr, x_lo, x_hi),
                     yerr=bb_unc,
                     fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)
         ax.scatter(x_arr, bb_arr, c=colors[:len(x_arr)], alpha=0.8, s=60, zorder=2)
@@ -1057,7 +1068,7 @@ def combined_atm_corr():
         plt.close('all')
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.errorbar(x_arr, y_arr,
-                    xerr=[x_arr - x_lo, x_hi - x_arr],
+                    xerr=asymmetric_error(x_arr, x_lo, x_hi),
                     yerr=y_unc_arr,
                     fmt='o', ecolor='lightgray', capsize=5,
                     markerfacecolor='none', zorder=1)
@@ -1123,7 +1134,7 @@ def combined_atm_corr():
         plt.close('all')
         fig, (ax, ax2) = plt.subplots(1, 2, figsize=(15, 5), gridspec_kw={ 'wspace': 0.2})
         ax.errorbar(x1_arr, y_arr,
-                    xerr=[x1_arr - x1_lo, x1_hi - x1_arr],
+                    xerr=asymmetric_error(x1_arr, x1_lo, x1_hi),
                     yerr=y_unc_arr,
                     fmt='o', ecolor='lightgray', capsize=5,
                     markerfacecolor='none', zorder=1)
@@ -1138,7 +1149,7 @@ def combined_atm_corr():
         ax.set_xlabel(x1label, fontsize=14)
         
         ax2.errorbar(x2_arr, y_arr,
-                    xerr=[x2_arr - x2_lo, x2_hi - x2_arr],
+                    xerr=asymmetric_error(x2_arr, x2_lo, x2_hi),
                     yerr=y_unc_arr,
                     fmt='o', ecolor='lightgray', capsize=5,
                     markerfacecolor='none', zorder=1)
@@ -1188,6 +1199,16 @@ def combined_atm_corr():
                           x1label='Median KT-19 Surface Temperature ($^o$C)', 
                           x2label='Mean MYI Ratio (%)',
                           savename='arcsix_albedo_broadband_vs_kt19_myi_ratio.png', 
+                          fig_dir=fig_dir)
+    _plot_alb_vs_var1var2(kt19_high_hdrf_date_cond,
+                          kt19_high_hdrf_date_cond_lower,
+                          kt19_high_hdrf_date_cond_upper,
+                          myi_ratio_date_cond, myi_lower, myi_upper,
+                          broadband_alb_date_cond, broadband_alb_date_cond_unc,
+                          colors,
+                          x1label='Median KT-19 Surface Temperature over ice ($^o$C)',
+                          x2label='Mean MYI Ratio (%)',
+                          savename='arcsix_albedo_broadband_vs_kt19_over_ice_myi_ratio.png',
                           fig_dir=fig_dir)
     _plot_alb_vs_var(
         brt19h, brt19h_lower, brt19h_upper,
@@ -1299,8 +1320,8 @@ def combined_atm_corr():
     plt.close('all')
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.errorbar(myi_arr, kt19_arr,
-                xerr=[myi_arr - np.array(myi_lower), np.array(myi_upper) - myi_arr],
-                yerr=[kt19_arr - kt19_lo, kt19_hi - kt19_arr],
+                xerr=asymmetric_error(myi_arr, myi_lower, myi_upper),
+                yerr=asymmetric_error(kt19_arr, kt19_lo, kt19_hi),
                 fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)
     ax.scatter(myi_arr, kt19_arr, c=colors, alpha=0.8, s=60, zorder=2)
     if finite_mk.sum() >= 3:

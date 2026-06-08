@@ -202,6 +202,19 @@ class SeasonData:
     bb_alb_iter2_690_1190: np.ndarray    # (n_pts,) TOA-weighted broadband albedo 690–1190 nm
     kt19_sfc_T: np.ndarray               # (n_pts,)  surface temperature from KT19 (deg C)
     sza: np.ndarray                      # (n_pts,)
+    ext_wvl: np.ndarray                  # (n_ext_wvl,) extended atmospheric-corrected grid
+    hsr1_wvl: np.ndarray                 # (n_hsr1_wvl,) HSR1 wavelength grid
+    alb_atm_corrected_ext: np.ndarray    # (n_pts, n_ext_wvl)
+    broadband_alb_atm_corrected_ext: np.ndarray  # (n_pts,)
+    hsr1_diffuse_ratio: np.ndarray       # (n_pts, n_hsr1_wvl)
+    simu_fdn_sfc_native: np.ndarray      # (n_pts, n_wvl)
+    simu_fup_sfc_native: np.ndarray      # (n_pts, n_wvl)
+    simu_fdn_aircraft_native: np.ndarray # (n_pts, n_wvl)
+    simu_fup_aircraft_native: np.ndarray # (n_pts, n_wvl)
+    simu_fdn_sfc_ext: np.ndarray         # (n_pts, n_ext_wvl)
+    simu_fup_sfc_ext: np.ndarray         # (n_pts, n_ext_wvl)
+    simu_fdn_aircraft_ext: np.ndarray    # (n_pts, n_ext_wvl)
+    simu_fup_aircraft_ext: np.ndarray    # (n_pts, n_ext_wvl)
     # filled later by collocation:
     ice_frac: np.ndarray = None          # (n_pts,)
     nad_hdrf: np.ndarray = None          # (n_pts,)
@@ -247,6 +260,28 @@ def first_present(mapping, keys, default=None, required=True):
     return default
 
 
+def optional_2d(mapping, keys, n_rows, n_cols):
+    """Return an optional 2-D array, or a NaN-filled fallback with a known shape."""
+    value = first_present(mapping, keys, required=False)
+    if value is None:
+        return np.full((n_rows, n_cols), np.nan, dtype=float)
+    value = np.asarray(value, dtype=float)
+    if value.shape == (n_rows, n_cols):
+        return value
+    return np.full((n_rows, n_cols), np.nan, dtype=float)
+
+
+def optional_1d(mapping, keys, n_rows):
+    """Return an optional 1-D array, or a NaN-filled fallback with a known length."""
+    value = first_present(mapping, keys, required=False)
+    if value is None:
+        return np.full(n_rows, np.nan, dtype=float)
+    value = np.asarray(value, dtype=float)
+    if value.shape == (n_rows,):
+        return value
+    return np.full(n_rows, np.nan, dtype=float)
+
+
 def require_processed_1s_keys(mapping, filepath):
     """Fail fast when a processed product predates the true-1s albedo fields."""
     required_keys = (
@@ -256,11 +291,23 @@ def require_processed_1s_keys(mapping, filepath):
         'broadband_alb_final_all_1s',
         'broadband_alb_iter1_all_filter_1s',
         'broadband_alb_final_all_filter_1s',
+        'alb_final_ext_all_1s',
+        'broadband_alb_final_ext_all_1s',
+        'hsr1_wvl',
+        'hsr1_diffuse_ratio_all',
+        'simu_fdn_sfc_native_all',
+        'simu_fup_sfc_native_all',
+        'simu_fdn_aircraft_native_all',
+        'simu_fup_aircraft_native_all',
+        'simu_fdn_sfc_ext_all',
+        'simu_fup_sfc_ext_all',
+        'simu_fdn_aircraft_ext_all',
+        'simu_fup_aircraft_ext_all',
     )
     missing = [key for key in required_keys if key not in mapping]
     if missing:
         raise KeyError(
-            f"{filepath} is missing true-1s processed albedo keys: "
+            f"{filepath} is missing processed fields required for the focused SSFR HDF5 product: "
             f"{', '.join(missing)}. Rerun lrt_sim.ssfr_atm_corr.processing_runner "
             "with the updated processing.py before running combined.py."
         )
@@ -290,12 +337,20 @@ def load_season(files, name):
 
     # Collect lists of per-file arrays
     wvl = None
+    ext_wvl = None
+    hsr1_wvl = None
     lons, lats, alts, times = [], [], [], []
     dates_all, conditions_all, case_tags_all, case_tags_leg_all = [], [], [], []
     lon_avgs, lat_avgs, alt_avgs = [], [], []
     icings, icing_pres = [], []
     fdns, fups, toa_expands = [], [], []
     alb_iter1s, alb_iter2s = [], []
+    alb_exts, bb_alb_exts = [], []
+    hsr1_diffuse_ratios = []
+    simu_fdn_sfc_native_list, simu_fup_sfc_native_list = [], []
+    simu_fdn_aircraft_native_list, simu_fup_aircraft_native_list = [], []
+    simu_fdn_sfc_ext_list, simu_fup_sfc_ext_list = [], []
+    simu_fdn_aircraft_ext_list, simu_fup_aircraft_ext_list = [], []
     # also keep broadband_alb_iter1 arrays (from file) for saving
     bb_alb_iter1_list, bb_alb_iter2_list = [], []
     bb_alb_iter1_filter_list, bb_alb_iter2_filter_list = [], []
@@ -324,9 +379,18 @@ def load_season(files, name):
 
         if wvl is None:
             wvl = native_wvl
+        ext_wvl_file = np.asarray(first_present(d, ('extension_wvl_1s', 'ext_wvl'), np.array([]), required=False))
+        hsr1_wvl_file = np.asarray(first_present(d, ('hsr1_wvl',), np.array([]), required=False))
+        if ext_wvl is None or (ext_wvl.size == 0 and ext_wvl_file.size > 0):
+            ext_wvl = ext_wvl_file
+        if hsr1_wvl is None or (hsr1_wvl.size == 0 and hsr1_wvl_file.size > 0):
+            hsr1_wvl = hsr1_wvl_file
 
         n_pts = len(lon_all)
         n_legs = len(first_present(d, ('lon_avg',)))
+        n_wvl = len(native_wvl)
+        n_ext_wvl = len(ext_wvl)
+        n_hsr1_wvl = len(hsr1_wvl)
 
         lons.append(lon_all)
         lats.append(lat_all)
@@ -348,6 +412,19 @@ def load_season(files, name):
         toa_expands.append(first_present(d, ('toa_expand_all',)))
         alb_iter1s.append(first_present(d, ('alb_iter1_all_1s',)))
         alb_iter2s.append(first_present(d, ('alb_final_all_1s',)))
+        alb_exts.append(optional_2d(d, ('alb_final_ext_all_1s', 'alb_iter2_ext_all'), n_pts, n_ext_wvl))
+        bb_alb_exts.append(
+            optional_1d(d, ('broadband_alb_final_ext_all_1s', 'broadband_alb_iter2_ext_all'), n_pts)
+        )
+        hsr1_diffuse_ratios.append(optional_2d(d, ('hsr1_diffuse_ratio_all',), n_pts, n_hsr1_wvl))
+        simu_fdn_sfc_native_list.append(optional_2d(d, ('simu_fdn_sfc_native_all',), n_pts, n_wvl))
+        simu_fup_sfc_native_list.append(optional_2d(d, ('simu_fup_sfc_native_all',), n_pts, n_wvl))
+        simu_fdn_aircraft_native_list.append(optional_2d(d, ('simu_fdn_aircraft_native_all',), n_pts, n_wvl))
+        simu_fup_aircraft_native_list.append(optional_2d(d, ('simu_fup_aircraft_native_all',), n_pts, n_wvl))
+        simu_fdn_sfc_ext_list.append(optional_2d(d, ('simu_fdn_sfc_ext_all',), n_pts, n_ext_wvl))
+        simu_fup_sfc_ext_list.append(optional_2d(d, ('simu_fup_sfc_ext_all',), n_pts, n_ext_wvl))
+        simu_fdn_aircraft_ext_list.append(optional_2d(d, ('simu_fdn_aircraft_ext_all',), n_pts, n_ext_wvl))
+        simu_fup_aircraft_ext_list.append(optional_2d(d, ('simu_fup_aircraft_ext_all',), n_pts, n_ext_wvl))
         bb_alb_iter1 = first_present(d, ('broadband_alb_iter1_all_1s',), required=True)
         bb_alb_iter2 = first_present(d, ('broadband_alb_final_all_1s',), required=True)
         bb_alb_iter1_list.append(bb_alb_iter1)
@@ -428,6 +505,19 @@ def load_season(files, name):
         bb_alb_iter2_690_1190=bb_alb_iter2_690_1190,
         kt19_sfc_T=np.concatenate(kt19_sfc_T_list, axis=0),
         sza=np.concatenate(sza_list, axis=0),
+        ext_wvl=ext_wvl if ext_wvl is not None else np.array([]),
+        hsr1_wvl=hsr1_wvl if hsr1_wvl is not None else np.array([]),
+        alb_atm_corrected_ext=np.concatenate(alb_exts, axis=0),
+        broadband_alb_atm_corrected_ext=np.concatenate(bb_alb_exts, axis=0),
+        hsr1_diffuse_ratio=np.concatenate(hsr1_diffuse_ratios, axis=0),
+        simu_fdn_sfc_native=np.concatenate(simu_fdn_sfc_native_list, axis=0),
+        simu_fup_sfc_native=np.concatenate(simu_fup_sfc_native_list, axis=0),
+        simu_fdn_aircraft_native=np.concatenate(simu_fdn_aircraft_native_list, axis=0),
+        simu_fup_aircraft_native=np.concatenate(simu_fup_aircraft_native_list, axis=0),
+        simu_fdn_sfc_ext=np.concatenate(simu_fdn_sfc_ext_list, axis=0),
+        simu_fup_sfc_ext=np.concatenate(simu_fup_sfc_ext_list, axis=0),
+        simu_fdn_aircraft_ext=np.concatenate(simu_fdn_aircraft_ext_list, axis=0),
+        simu_fup_aircraft_ext=np.concatenate(simu_fup_aircraft_ext_list, axis=0),
     )
     # Attach extra broadband arrays (from files) for saving
     season._bb_alb_iter1        = np.concatenate(bb_alb_iter1_list, axis=0)
@@ -436,6 +526,96 @@ def load_season(files, name):
     season._bb_alb_iter2_filter = np.concatenate(bb_alb_iter2_filter_list, axis=0)
 
     return season
+
+
+def _h5_write_dataset(group, name, value, attrs=None):
+    """Write one HDF5 dataset with string handling and light compression."""
+    if value is None:
+        return
+    arr = np.asarray(value)
+    kwargs = {}
+    if arr.dtype.kind in {'U', 'S', 'O'}:
+        data = arr.astype(str)
+        kwargs['dtype'] = h5py.string_dtype(encoding='utf-8')
+    else:
+        data = arr
+        if arr.ndim > 0 and arr.size > 100:
+            kwargs.update(compression='gzip', compression_opts=4, shuffle=True)
+    dset = group.create_dataset(name, data=data, **kwargs)
+    if attrs:
+        for attr_name, attr_value in attrs.items():
+            dset.attrs[attr_name] = attr_value
+
+
+def _write_season_hdf5(hf, season):
+    """Write the focused atmospheric-corrected SSFR product for one season."""
+    root = hf.create_group(season.name)
+
+    coordinates = root.create_group('coordinates')
+    _h5_write_dataset(coordinates, 'time', season.time, {'units': 'decimal hour UTC'})
+    _h5_write_dataset(coordinates, 'lon', season.lon, {'units': 'degrees_east'})
+    _h5_write_dataset(coordinates, 'lat', season.lat, {'units': 'degrees_north'})
+    _h5_write_dataset(coordinates, 'alt', season.alt, {'units': 'km'})
+    _h5_write_dataset(coordinates, 'sza', season.sza, {'units': 'degrees'})
+
+    metadata = root.create_group('metadata')
+    _h5_write_dataset(metadata, 'dates', season.dates.astype(str), {'format': 'YYYYMMDD'})
+    _h5_write_dataset(metadata, 'case_tags', season.case_tags)
+    _h5_write_dataset(metadata, 'conditions', season.conditions)
+
+    wavelength = root.create_group('wavelength')
+    _h5_write_dataset(wavelength, 'native', season.wvl, {'units': 'nm'})
+    _h5_write_dataset(wavelength, 'extended', season.ext_wvl, {'units': 'nm'})
+    _h5_write_dataset(wavelength, 'hsr1', season.hsr1_wvl, {'units': 'nm'})
+
+    ssfr = root.create_group('ssfr')
+    _h5_write_dataset(ssfr, 'measured_downward', season.fdn)
+    _h5_write_dataset(ssfr, 'measured_upward', season.fup)
+    _h5_write_dataset(ssfr, 'toa', season.toa_expand)
+
+    quality = root.create_group('quality')
+    _h5_write_dataset(quality, 'icing', season.icing.astype(bool))
+    _h5_write_dataset(quality, 'icing_pre', season.icing_pre.astype(bool))
+
+    albedo = root.create_group('albedo')
+    _h5_write_dataset(albedo, 'atm_corrected', season.alb_iter2, {'units': 'unitless'})
+    _h5_write_dataset(albedo, 'atm_corrected_extended', season.alb_atm_corrected_ext, {'units': 'unitless'})
+    _h5_write_dataset(albedo, 'broadband_atm_corrected', season._bb_alb_iter2_file, {'units': 'unitless'})
+    _h5_write_dataset(
+        albedo,
+        'broadband_atm_corrected_extended',
+        season.broadband_alb_atm_corrected_ext,
+        {'units': 'unitless'},
+    )
+
+    hsr1 = root.create_group('hsr1')
+    _h5_write_dataset(hsr1, 'downward_diffuse_ratio', season.hsr1_diffuse_ratio, {'units': 'unitless'})
+
+    simulation = root.create_group('simulation')
+    native = simulation.create_group('native')
+    _h5_write_dataset(native, 'surface_downward', season.simu_fdn_sfc_native)
+    _h5_write_dataset(native, 'surface_upward', season.simu_fup_sfc_native)
+    _h5_write_dataset(native, 'aircraft_downward', season.simu_fdn_aircraft_native)
+    _h5_write_dataset(native, 'aircraft_upward', season.simu_fup_aircraft_native)
+
+    extended = simulation.create_group('extended')
+    _h5_write_dataset(extended, 'surface_downward', season.simu_fdn_sfc_ext)
+    _h5_write_dataset(extended, 'surface_upward', season.simu_fup_sfc_ext)
+    _h5_write_dataset(extended, 'aircraft_downward', season.simu_fdn_aircraft_ext)
+    _h5_write_dataset(extended, 'aircraft_upward', season.simu_fup_aircraft_ext)
+
+
+def write_atm_corrected_hdf5(filename, spring, summer):
+    """Write the final focused atmospheric-corrected SSFR HDF5 product."""
+    with h5py.File(filename, 'w') as hf:
+        hf.attrs['title'] = 'ARCSIX SSFR atmospheric-corrected albedo and flux product'
+        hf.attrs['description'] = (
+            'Contains atmospheric-corrected albedo, extended atmospheric-corrected albedo, '
+            'measured SSFR fluxes, HSR1 diffuse ratio, icing flags, and simulated fluxes.'
+        )
+        hf.attrs['note'] = 'Dataset names avoid workflow-internal final/iteration terminology.'
+        _write_season_hdf5(hf, spring)
+        _write_season_hdf5(hf, summer)
 
 
 # ---------------------------------------------------------------------------
@@ -1229,6 +1409,7 @@ def combined_atm_corr():
     
     combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
     combined_output_alb_file = f'{output_dir}/alb_atm_corr_combined_spring_summer.h5'
+    combined_output_ssfr_file = f'{output_dir}/ssfr_atm_corrected_combined_spring_summer.h5'
 
     if 0:#os.path.exists(combined_output_file) and os.path.exists(combined_output_alb_file):
         print(f"Both output files found, loading from {combined_output_file} and skipping processing ...")
@@ -1539,6 +1720,9 @@ def combined_atm_corr():
                 hf.create_dataset(key, data=value)
         print(f"Combined surface albedo HDF5 data saved to {combined_output_alb_file}")
 
+        write_atm_corrected_hdf5(combined_output_ssfr_file, spring, summer)
+        print(f"Focused SSFR atmospheric-corrected HDF5 data saved to {combined_output_ssfr_file}")
+
     # --- ERA5 vs broadband scatter (all seasons combined) ---
 
     plt.close('all')
@@ -1663,7 +1847,7 @@ def combined_atm_corr():
     print("date_alb length:", len(date_alb))
     print("date_alb_wvl length:", len(date_alb_wvl))
 
-    if 0:
+    if 1:
         plt.close('all')
         n_dates        = len(date_all_list)
         n_dates_clear  = len(date_clear_all)

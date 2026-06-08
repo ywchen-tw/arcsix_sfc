@@ -131,6 +131,13 @@ def dataframe_weight(df, preferred_columns, expected_length):
     return np.ones(expected_length, dtype=float)
 
 
+def dataframe_column(df, column, expected_length):
+    """Return one numeric DataFrame column or a NaN-filled spectrum."""
+    if df is not None and column in df and len(df[column]) == expected_length:
+        return pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
+    return np.full(expected_length, np.nan, dtype=float)
+
+
 def stack_or_object(values):
     """Stack equal-shaped arrays; otherwise keep an object array."""
     if not values:
@@ -877,6 +884,32 @@ def process_atm_corr_case(
             albedo_native['final'] = fallback_albedo
             broadband_native['final'] = weighted_broadband_albedo(albedo_native['final'], native_weight, native_wvl)
 
+        simulated_native = {
+            'simu_fdn_sfc_native': dataframe_column(df_final, 'simu_fdn_sfc_mean', len(native_wvl)),
+            'simu_fup_sfc_native': dataframe_column(df_final, 'simu_fup_sfc_mean', len(native_wvl)),
+            'simu_fdn_aircraft_native': dataframe_column(df_final, 'simu_fdn_mean', len(native_wvl)),
+            'simu_fup_aircraft_native': dataframe_column(df_final, 'simu_fup_mean', len(native_wvl)),
+        }
+        simulated_extension = {
+            'simu_fdn_sfc_ext': dataframe_column(df_extension, 'simu_fdn_sfc_final', len(extension_wvl)),
+            'simu_fup_sfc_ext': dataframe_column(df_extension, 'simu_fup_sfc_final', len(extension_wvl)),
+            'simu_fdn_aircraft_ext': dataframe_column(df_extension, 'simu_fdn_p3_final', len(extension_wvl)),
+            'simu_fup_aircraft_ext': dataframe_column(df_extension, 'simu_fup_p3_final', len(extension_wvl)),
+        }
+
+        hsr1_wvl = np.asarray(cld_leg.get('hsr1_wvl', np.array([])), dtype=float)
+        hsr1_tot = np.asarray(cld_leg.get('hsr1_tot', np.empty((len(cld_leg['time']), 0))), dtype=float)
+        hsr1_dif = np.asarray(cld_leg.get('hsr1_dif', np.empty((len(cld_leg['time']), 0))), dtype=float)
+        if hsr1_tot.shape == hsr1_dif.shape and hsr1_tot.ndim == 2:
+            hsr1_diffuse_ratio = np.divide(
+                hsr1_dif,
+                hsr1_tot,
+                out=np.full(hsr1_tot.shape, np.nan, dtype=float),
+                where=np.isfinite(hsr1_tot) & (hsr1_tot != 0),
+            )
+        else:
+            hsr1_diffuse_ratio = np.empty((len(cld_leg['time']), 0), dtype=float)
+
         record = {
             'leg_index': ileg,
             'final_iter': final_iter,
@@ -915,11 +948,15 @@ def process_atm_corr_case(
             'alb_final_extension': albedo_extension,
             'extension_weight': extension_weight,
             'broadband_alb_final_extension': broadband_extension,
+            'hsr1_wvl': hsr1_wvl,
+            'hsr1_diffuse_ratio': hsr1_diffuse_ratio,
             'final_csv': final_csv,
             'final_extension_csv': final_extension_csv if os.path.exists(final_extension_csv) else None,
             'albedo_files': alb_paths,
             'albedo_iteration_files': alb_iteration_files,
         }
+        record.update(simulated_native)
+        record.update(simulated_extension)
 
         record.update(build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky))
         gas_mask = np.isfinite(gas_abs_masking(native_wvl, np.ones_like(native_wvl, dtype=float), alt=1))
@@ -993,6 +1030,7 @@ def process_atm_corr_case(
         'alb_final_extension': stack_or_object([record['alb_final_extension'] for record in records]),
         'broadband_alb_final_extension': np.array([record['broadband_alb_final_extension'] for record in records]),
         'extension_wvl_1s': first_nonempty_array(records, 'extension_wvl_1s'),
+        'hsr1_wvl': first_nonempty_array(records, 'hsr1_wvl'),
         'final_iter': np.array([
             np.nan if record['final_iter'] is None else record['final_iter']
             for record in records
@@ -1045,6 +1083,15 @@ def process_atm_corr_case(
         'broadband_alb_final_all_filter_1s': concatenate_record_arrays(records, 'broadband_alb_final_all_filter_1s'),
         'alb_final_ext_all_1s': concatenate_record_arrays(records, 'alb_final_ext_all_1s'),
         'broadband_alb_final_ext_all_1s': concatenate_record_arrays(records, 'broadband_alb_final_ext_all_1s'),
+        'hsr1_diffuse_ratio_all': concatenate_record_arrays(records, 'hsr1_diffuse_ratio'),
+        'simu_fdn_sfc_native_all': repeat_spectral_by_time(records, 'simu_fdn_sfc_native', output['native_wvl']),
+        'simu_fup_sfc_native_all': repeat_spectral_by_time(records, 'simu_fup_sfc_native', output['native_wvl']),
+        'simu_fdn_aircraft_native_all': repeat_spectral_by_time(records, 'simu_fdn_aircraft_native', output['native_wvl']),
+        'simu_fup_aircraft_native_all': repeat_spectral_by_time(records, 'simu_fup_aircraft_native', output['native_wvl']),
+        'simu_fdn_sfc_ext_all': repeat_spectral_by_time(records, 'simu_fdn_sfc_ext', output['extension_wvl_1s']),
+        'simu_fup_sfc_ext_all': repeat_spectral_by_time(records, 'simu_fup_sfc_ext', output['extension_wvl_1s']),
+        'simu_fdn_aircraft_ext_all': repeat_spectral_by_time(records, 'simu_fdn_aircraft_ext', output['extension_wvl_1s']),
+        'simu_fup_aircraft_ext_all': repeat_spectral_by_time(records, 'simu_fup_aircraft_ext', output['extension_wvl_1s']),
     })
     output.update({
         'alb_final_all': output['alb_final_all_1s'],
