@@ -35,7 +35,7 @@ DATE_H2O_6_END = {
     '20240603': {'mask': 1650, 'fit': 1650},
     '20240807': {'mask': 1550, 'fit': 1570},
 }
-POSTFIT_H2O6_H2O7_DATES = set(DATE_H2O_6_END)
+POSTFIT_H2O6_H2O7_DATES = {'20240603', '20240807', '20240808', '20240809'}
 
 try:
     from .helpers import gas_abs_masking
