@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import uniform_filter1d
 
-from alb_fitting import alb_extention, snowice_alb_fitting
+from alb_fitting import alb_extention, snowice_alb_fitting, snowice_alb_fitting_batch
 
 DATE_H2O_6_END = {
     '20240807': {'mask': 1550, 'fit': 1570},
@@ -454,13 +454,28 @@ def fit_albedo_1s(
     fit_kwargs = {'h2o_6_end': h2o_override['fit']} if 'fit' in h2o_override else {}
     apply_0603_cleanup = date_key in POSTFIT_0603_DATES
     apply_postfit_cleanup = date_key in POSTFIT_H2O6_H2O7_DATES or apply_0603_cleanup
+    batch_fitted = None
+    try:
+        batch_fitted = snowice_alb_fitting_batch(
+            native_wvl,
+            corrected_1s,
+            alt=alt_1s,
+            clear_sky=clear_sky,
+            **fit_kwargs,
+        )
+    except Exception:
+        batch_fitted = None
+
     for irow in range(corrected_1s.shape[0]):
         row = corrected_1s[irow]
         if np.all(~np.isfinite(row)):
             continue
         alt = float(alt_1s[irow]) if np.isfinite(alt_1s[irow]) else np.nan
         try:
-            fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky, **fit_kwargs)
+            if batch_fitted is None:
+                fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky, **fit_kwargs)
+            else:
+                fitted_row = batch_fitted[irow]
             if np.all(~np.isfinite(fitted_row)):
                 raise ValueError('all non-finite fitted albedo')
             if apply_postfit_cleanup:

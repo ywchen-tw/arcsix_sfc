@@ -1,28 +1,137 @@
-import os
-import sys
-import glob
-import copy
 import pickle
+from functools import lru_cache
 from pathlib import Path
 import numpy as np
-import pandas as pd
 from scipy.ndimage import uniform_filter1d
-import matplotlib.pyplot as plt
 
 _PKL_DIR = Path(__file__).resolve().parent.parent
 
 # mpl.use('Agg')
 
 
-def gas_abs_masking(
-    wvl,
-    alb,
-    alt,
-    h2o_6_end=1509,
-    interp_nan=True,
-    altitude_dependent=False,
-):
-    """Mask all gas bands by default, with optional reduced low-altitude masking."""
+def _array_cache_key(values):
+    """Return a hashable wavelength key for repeated fixed-grid calculations."""
+    return tuple(np.asarray(values, dtype=float).ravel())
+
+
+def _snicar_filename(clear_sky):
+    if clear_sky:
+        return str(_PKL_DIR / 'snicar_model_results_direct.pkl')
+    return str(_PKL_DIR / 'snicar_model_results_diffuse.pkl')
+
+
+@lru_cache(maxsize=2)
+def _load_snicar_library(clear_sky):
+    """Load each SNICAR library once per process."""
+    with open(_snicar_filename(clear_sky), 'rb') as f:
+        snicar_data = pickle.load(f)
+
+    keys = tuple(snicar_data.keys())
+    model_wvls_nm = tuple(
+        np.asarray(snicar_data[key]['wvl'], dtype=float) * 1000.0
+        for key in keys
+    )
+    model_albedos = tuple(
+        np.asarray(snicar_data[key]['albedo'], dtype=float).copy()
+        for key in keys
+    )
+    return keys, model_wvls_nm, model_albedos
+
+
+@lru_cache(maxsize=32)
+def _interpolated_snicar_library(clear_sky, obs_wvl_key):
+    """Cache the SNICAR library interpolated onto one observed wavelength grid."""
+    obs_wvl = np.asarray(obs_wvl_key, dtype=float)
+    keys, model_wvls_nm, model_albedos = _load_snicar_library(clear_sky)
+    spectra = np.vstack([
+        np.interp(obs_wvl, model_wvl, model_alb)
+        for model_wvl, model_alb in zip(model_wvls_nm, model_albedos)
+    ])
+    return keys, spectra
+
+
+def _best_fit_from_matrix(keys, spectra, obs_albedo):
+    """Vectorized best-fit lookup for a pre-interpolated model matrix."""
+    obs_albedo = np.asarray(obs_albedo, dtype=float)
+    valid = np.isfinite(obs_albedo)
+    if np.count_nonzero(valid) == 0:
+        return None, None, np.inf, None
+
+    diff = spectra[:, valid] - obs_albedo[valid]
+    with np.errstate(invalid='ignore'):
+        rmse = np.sqrt(np.nanmean(diff * diff, axis=1))
+    finite_rmse = np.isfinite(rmse)
+    if not np.any(finite_rmse):
+        return None, None, np.inf, None
+
+    best_index = int(np.nanargmin(rmse))
+    return keys[best_index], spectra[best_index], float(rmse[best_index]), best_index
+
+
+def _find_best_fit_cached(clear_sky, obs_wvl, obs_albedo):
+    """Find the best cached SNICAR spectrum on the requested wavelength grid."""
+    obs_wvl_key = _array_cache_key(obs_wvl)
+    keys, spectra = _interpolated_snicar_library(clear_sky, obs_wvl_key)
+    best_fit_key, best_fit_spectrum, min_rmse, best_index = _best_fit_from_matrix(
+        keys,
+        spectra,
+        obs_albedo,
+    )
+    if best_index is None:
+        return best_fit_key, best_fit_spectrum, min_rmse, None, None
+
+    _, model_wvls_nm, model_albedos = _load_snicar_library(clear_sky)
+    return (
+        best_fit_key,
+        best_fit_spectrum,
+        min_rmse,
+        model_wvls_nm[best_index],
+        model_albedos[best_index],
+    )
+
+
+def _best_fit_indices_from_matrix(spectra, obs_albedo_2d, chunk_size=256):
+    """Return best model indices for many observed spectra without a 3-D diff array."""
+    obs_albedo_2d = np.asarray(obs_albedo_2d, dtype=float)
+    spectra_sq = spectra * spectra
+    best_indices = np.full(obs_albedo_2d.shape[0], -1, dtype=int)
+    min_rmse = np.full(obs_albedo_2d.shape[0], np.inf, dtype=float)
+
+    for start in range(0, obs_albedo_2d.shape[0], chunk_size):
+        stop = min(start + chunk_size, obs_albedo_2d.shape[0])
+        obs = obs_albedo_2d[start:stop]
+        valid = np.isfinite(obs)
+        counts = np.count_nonzero(valid, axis=1)
+        has_valid = counts > 0
+        if not np.any(has_valid):
+            continue
+
+        obs_zero = np.where(valid, obs, 0.0)
+        sse = (
+            valid.astype(float) @ spectra_sq.T
+            + np.sum(obs_zero * obs_zero, axis=1)[:, np.newaxis]
+            - 2.0 * (obs_zero @ spectra.T)
+        )
+        sse = np.maximum(sse, 0.0)
+        rmse = np.full_like(sse, np.inf, dtype=float)
+        rmse[has_valid] = np.sqrt(sse[has_valid] / counts[has_valid, np.newaxis])
+
+        finite = np.isfinite(rmse)
+        rmse[~finite] = np.inf
+        chunk_best_indices = np.argmin(rmse, axis=1)
+        chunk_min_rmse = rmse[np.arange(rmse.shape[0]), chunk_best_indices]
+        good = np.isfinite(chunk_min_rmse)
+        row_indices = np.arange(start, stop)[good]
+        best_indices[row_indices] = chunk_best_indices[good]
+        min_rmse[row_indices] = chunk_min_rmse[good]
+
+    return best_indices, min_rmse
+
+
+@lru_cache(maxsize=128)
+def _gas_absorption_mask(wvl_key, h2o_6_end, reduced_low_altitude):
+    """Cache the fixed gas-absorption mask for one wavelength grid."""
+    wvl = np.asarray(wvl_key, dtype=float)
     o2a_1_start, o2a_1_end = 748, 780
     h2o_1_start, h2o_1_end = 650, 706
     h2o_2_start, h2o_2_end = 705, 760
@@ -33,7 +142,7 @@ def gas_abs_masking(
     h2o_7_start, h2o_7_end = 1748, 2050
     h2o_8_start, h2o_8_end = 801, 843
     final_start, final_end = 2110, 2200
-    
+
     full_mask = (
         ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
         | ((wvl >= h2o_1_start) & (wvl <= h2o_1_end))
@@ -47,8 +156,10 @@ def gas_abs_masking(
         | ((wvl >= final_start) & (wvl <= final_end))
     )
 
-    # Future option: retain O2 masking but omit short-path H2O bands below 0.5 km.
-    reduced_low_altitude_mask = (
+    if not reduced_low_altitude:
+        return full_mask
+
+    return (
         ((wvl >= o2a_1_start) & (wvl <= o2a_1_end))
         | ((wvl >= h2o_3_start) & (wvl <= h2o_3_end))
         | ((wvl >= h2o_4_start) & (wvl <= h2o_4_end))
@@ -57,34 +168,98 @@ def gas_abs_masking(
         | ((wvl >= h2o_7_start) & (wvl <= h2o_7_end))
         | ((wvl >= final_start) & (wvl <= final_end))
     )
-    mask = reduced_low_altitude_mask if altitude_dependent and alt <= 0.5 else full_mask
+
+
+def _fill_nan_ffill_bfill(values, limit=2):
+    """Fill NaNs with repeated limited forward/backward fill using NumPy."""
+    filled = np.asarray(values, dtype=float).copy()
+    if not np.any(np.isnan(filled)) or np.all(np.isnan(filled)):
+        return filled
+
+    max_iter = max(1, int(np.ceil(filled.size / max(limit, 1))) + 1)
+    for _ in range(max_iter):
+        n_missing_before = np.count_nonzero(np.isnan(filled))
+
+        last = np.nan
+        n_from_last = 0
+        for i, value in enumerate(filled):
+            if np.isfinite(value):
+                last = value
+                n_from_last = 0
+            elif np.isfinite(last) and n_from_last < limit:
+                filled[i] = last
+                n_from_last += 1
+
+        last = np.nan
+        n_from_last = 0
+        for i in range(filled.size - 1, -1, -1):
+            value = filled[i]
+            if np.isfinite(value):
+                last = value
+                n_from_last = 0
+            elif np.isfinite(last) and n_from_last < limit:
+                filled[i] = last
+                n_from_last += 1
+
+        if not np.any(np.isnan(filled)):
+            break
+        if np.count_nonzero(np.isnan(filled)) == n_missing_before:
+            break
+
+    return filled
+
+
+@lru_cache(maxsize=64)
+def _snowice_band_masks(wvl_key, h2o_6_end):
+    """Cache fixed wavelength bands used by snowice_alb_fitting."""
+    alb_wvl = np.asarray(wvl_key, dtype=float)
+    alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 800
+    alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
+    alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
+    alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
+    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1520, 2100
+    if h2o_6_end > 1520:
+        alb_wvl_sep_6th_s = h2o_6_end + 5
+
+    return (
+        (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e),
+        (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e),
+        (alb_wvl >= alb_wvl_sep_3rd_s) & (alb_wvl < alb_wvl_sep_3rd_e),
+        (alb_wvl >= alb_wvl_sep_4th_s) & (alb_wvl < alb_wvl_sep_4th_e),
+        (alb_wvl >= 1185) & (alb_wvl < 1290),
+        (alb_wvl >= 1285) & (alb_wvl < 1520),
+        (alb_wvl >= 1515) & (alb_wvl < 1700),
+        (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e),
+    )
+
+
+def gas_abs_masking(
+    wvl,
+    alb,
+    alt,
+    h2o_6_end=1509,
+    interp_nan=True,
+    altitude_dependent=False,
+):
+    """Mask all gas bands by default, with optional reduced low-altitude masking."""
+    wvl = np.asarray(wvl, dtype=float)
+    alb = np.asarray(alb, dtype=float)
+    reduced_low_altitude = bool(altitude_dependent and alt <= 0.5)
+    mask = _gas_absorption_mask(_array_cache_key(wvl), float(h2o_6_end), reduced_low_altitude)
 
     effective_mask_ = np.ones_like(alb)
     alb_mask = alb.copy()
     alb_mask[mask] = np.nan
     effective_mask_[mask] = np.nan
     
-    before_interp = alb_mask.copy()
     # interpolation if nan in effective_mask_ range
     if interp_nan and np.sum(~np.isnan(effective_mask_)) != np.isfinite(alb_mask).sum():
-        eff_wvl_real_mask = np.logical_and(~np.isnan(effective_mask_), np.isfinite(alb_mask))
         fit_wvl_mask = np.logical_and(~np.isnan(effective_mask_), np.isnan(alb_mask))
-        # effective_mask_func = interp1d(wvl[eff_wvl_real_mask], effective_mask_[eff_wvl_real_mask], bounds_error=False, fill_value=np.nan)
-        
-        
-        # alb_mask[fit_wvl_mask] = effective_mask_func(wvl[fit_wvl_mask])
-        
-        s = pd.Series(alb_mask[effective_mask_==1])
-        s_mask = np.isnan(alb_mask[effective_mask_==1])
-        # Fills NaN with the value immediately preceding it
-        s_ffill = s.fillna(method='ffill', limit=2)
-        s_ffill = s_ffill.fillna(method='bfill', limit=2)
-        while np.any(np.isnan(s_ffill)):
-            s_ffill = s_ffill.fillna(method='ffill', limit=2)
-            s_ffill = s_ffill.fillna(method='bfill', limit=2)
-        
-        
-        alb_mask[fit_wvl_mask] = np.array(s_ffill)[s_mask]
+        unmasked_values = alb_mask[effective_mask_ == 1]
+        unmasked_nan = np.isnan(unmasked_values)
+        if np.any(unmasked_nan):
+            filled = _fill_nan_ffill_bfill(unmasked_values, limit=2)
+            alb_mask[fit_wvl_mask] = filled[unmasked_nan]
         
     # plt.close('all')
     # plt.plot(wvl, before_interp, '-o', label='Before fill')
@@ -106,44 +281,29 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
     at *only* the provided obs_wvl points.
     """
     
-    best_fit_params = None
-    best_fit_spectrum = None
-    ori_model_spectrum = None
-    min_rmse = np.inf
-    
-    obs_wvl_nanmask = np.isfinite(obs_albedo)
-    
-    # Loop through every pre-run model spectrum in your library
-    for key in model_library.keys():
-        
-        model_run = model_library[key]
-        model_wvl = model_run['wvl']      # Full wvl (0.2-5.0 um)
-        model_wvl *= 1000  # Convert to nm
-        model_albedo = model_run['albedo']  # Full albedo spectrum
-        
-        # -----------------------------------------------------------------
-        # THIS IS THE KEY STEP:
-        # It takes the full model (model_wvl, model_albedo) and
-        # interpolates it, pulling out *only* the values at the
-        # exact points you have in obs_wvl.
-        # -----------------------------------------------------------------
-        
-        interpolated_model_albedo = np.interp(obs_wvl, model_wvl, model_albedo)
-        
-        
-        # The gaps (0.9-1.1, 1.3-1.5) are automatically
-        # and correctly ignored in the next step.
-        
-        # 3. Calculate RMSE *only* on the valid, non-gap data
-        rmse = np.sqrt(np.mean((interpolated_model_albedo[obs_wvl_nanmask] - obs_albedo[obs_wvl_nanmask])**2))
-        
-        # 4. Check if this is the best fit so far
-        if rmse < min_rmse:
-            min_rmse = rmse
-            best_fit_params = key
-            # best_fit_spectrum = model_run # Store the whole run
-            best_fit_spectrum = interpolated_model_albedo # Store the interpolation
-            ori_model_spectrum = model_albedo.copy()
+    obs_wvl = np.asarray(obs_wvl, dtype=float)
+    keys = tuple(model_library.keys())
+    model_wvls = tuple(
+        np.asarray(model_library[key]['wvl'], dtype=float) * 1000.0
+        for key in keys
+    )
+    model_albedos = tuple(
+        np.asarray(model_library[key]['albedo'], dtype=float)
+        for key in keys
+    )
+    spectra = np.vstack([
+        np.interp(obs_wvl, model_wvl, model_alb)
+        for model_wvl, model_alb in zip(model_wvls, model_albedos)
+    ])
+    best_fit_params, best_fit_spectrum, min_rmse, best_index = _best_fit_from_matrix(
+        keys,
+        spectra,
+        obs_albedo,
+    )
+    if best_index is None:
+        return None, None, np.inf, None, None
+    model_wvl = model_wvls[best_index]
+    ori_model_spectrum = model_albedos[best_index].copy()
         
     # plt.close('all')
     # plt.plot(obs_wvl, best_fit_spectrum, '-', color='r', label='Best Fit Model')
@@ -189,30 +349,17 @@ def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
     return np.clip(smoothed, 0, 1)
 
 
-def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
-    # snicar_albedo_list = []
-    if clear_sky:
-        snicar_filename = str(_PKL_DIR / 'snicar_model_results_direct.pkl')
-    else:
-        snicar_filename = str(_PKL_DIR / 'snicar_model_results_diffuse.pkl')
-    with open(snicar_filename, 'rb') as f:
-        snicar_data = pickle.load(f)
-    #     wvl = list(snicar_data.values())[0]['wvl']
-    #     for key in snicar_data:
-    #         snicar_albedo_list.append((key, snicar_data[key]['albedo']))
-    # snicar_albedo_arr = np.array(snicar_albedo_list)  
-          
-    alb_corr_mask = alb_corr.copy()
-    alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr_mask, alt=alt, h2o_6_end=h2o_6_end)
-    best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
-        model_library=snicar_data,
-        obs_wvl=alb_wvl,
-        obs_albedo=alb_corr_mask
-    )
-    
-    alb_corr_best_fit = np.copy(alb_corr_mask)
-    mask_bands = np.isnan(alb_corr_mask)
-    alb_corr_best_fit[mask_bands] = best_fit_spectrum[mask_bands]
+def _snowice_alb_fitting_from_best(
+    alb_wvl,
+    alb_corr,
+    alb_corr_mask,
+    best_fit_spectrum,
+    h2o_6_end=1509,
+):
+    alb_wvl = np.asarray(alb_wvl, dtype=float)
+    alb_corr = np.asarray(alb_corr, dtype=float)
+    alb_corr_mask = np.asarray(alb_corr_mask, dtype=float)
+    best_fit_spectrum = np.asarray(best_fit_spectrum, dtype=float)
     
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
@@ -230,25 +377,18 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     
     
     
-    # alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 795
-    alb_wvl_sep_1nd_s, alb_wvl_sep_1nd_e = 370, 800
-    alb_wvl_sep_2nd_s, alb_wvl_sep_2nd_e = 795, 850
-    alb_wvl_sep_3rd_s, alb_wvl_sep_3rd_e = 850, 1050
-    alb_wvl_sep_4th_s, alb_wvl_sep_4th_e = 1050, 1210
-    alb_wvl_sep_6th_s, alb_wvl_sep_6th_e = 1520, 2100
-    if h2o_6_end > 1520:
-        alb_wvl_sep_6th_s = h2o_6_end+5
-
-    band_1_fit = (alb_wvl >= alb_wvl_sep_1nd_s) & (alb_wvl < alb_wvl_sep_1nd_e)
-    band_2_fit = (alb_wvl >= alb_wvl_sep_2nd_s) & (alb_wvl < alb_wvl_sep_2nd_e)
-    band_3_fit = (alb_wvl >= alb_wvl_sep_3rd_s) & (alb_wvl < alb_wvl_sep_3rd_e)
-    band_4_fit = (alb_wvl >= alb_wvl_sep_4th_s) & (alb_wvl < alb_wvl_sep_4th_e)
-    band_5a_fit = (alb_wvl >= 1185) & (alb_wvl < 1290)   # bridges h2o_5 (1230–1286) only
-    band_5b_fit = (alb_wvl >= 1285) & (alb_wvl < 1520)   # bridges h2o_6 (1290–1509) only
-    band_5c_fit = (alb_wvl >= 1515) & (alb_wvl < 1700)   # clean window, no internal gap
-    band_6_fit = (alb_wvl >= alb_wvl_sep_6th_s) & (alb_wvl <= alb_wvl_sep_6th_e)
+    (
+        band_1_fit,
+        band_2_fit,
+        band_3_fit,
+        band_4_fit,
+        band_5a_fit,
+        band_5b_fit,
+        band_5c_fit,
+        band_6_fit,
+    ) = _snowice_band_masks(_array_cache_key(alb_wvl), float(h2o_6_end))
     
-    alb_corr_fit = copy.deepcopy(alb_corr_mask)
+    alb_corr_fit = alb_corr_mask.copy()
     
     for bands_fit in [
                       band_1_fit, 
@@ -266,6 +406,8 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
         bandfit_nan_ind = np.where(bandfit_nan)[0]
         if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
             bandfit_nan_ind = bandfit_nan_ind[:-1]
+        if bandfit_nan_ind.size == 0:
+            continue
         left_mean_ind_num = 5 
         if bandfit_nan_ind[0] < left_mean_ind_num:
             left_mean_ind_num = bandfit_nan_ind[0]
@@ -283,9 +425,9 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
         fit_2nd = np.poly1d(np.polyfit(alb_wvl[bands_fit][~bandfit_nan][wvl550nm_ind:],
                                         alb_corr_mask[bands_fit][~bandfit_nan][wvl550nm_ind:], 2))
         replace_array = fit_2nd(alb_wvl[bands_fit][bandfit_nan])
-        alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
-        alb_corr_fit_replace[bandfit_nan] = copy.deepcopy(replace_array)
-        alb_corr_fit[bands_fit] = copy.deepcopy(alb_corr_fit_replace)
+        alb_corr_fit_replace = alb_corr_fit[bands_fit].copy()
+        alb_corr_fit_replace[bandfit_nan] = replace_array.copy()
+        alb_corr_fit[bands_fit] = alb_corr_fit_replace
         
         # plt.close('all')
         # fig, ax = plt.subplots(figsize=(9, 5))
@@ -362,7 +504,7 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
             else:
                 replace_array = np.full(np.sum(bandfit_nan), anchor_obs)
 
-        alb_corr_fit_replace = copy.deepcopy(alb_corr_fit[bands_fit])
+        alb_corr_fit_replace = alb_corr_fit[bands_fit].copy()
         alb_corr_fit_replace[bandfit_nan] = replace_array
         alb_corr_fit[bands_fit] = alb_corr_fit_replace
         # plt.close('all')
@@ -433,6 +575,88 @@ def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509)
     
     return alb_corr_fit_smooth
 
+
+def snowice_alb_fitting(alb_wvl, alb_corr, alt, clear_sky=False, h2o_6_end=1509):
+    alb_wvl = np.asarray(alb_wvl, dtype=float)
+    alb_corr = np.asarray(alb_corr, dtype=float)
+    alb_corr_mask = gas_abs_masking(alb_wvl, alb_corr.copy(), alt=alt, h2o_6_end=h2o_6_end)
+    _, best_fit_spectrum, _, _, _ = _find_best_fit_cached(
+        clear_sky=clear_sky,
+        obs_wvl=alb_wvl,
+        obs_albedo=alb_corr_mask
+    )
+    return _snowice_alb_fitting_from_best(
+        alb_wvl,
+        alb_corr,
+        alb_corr_mask,
+        best_fit_spectrum,
+        h2o_6_end=h2o_6_end,
+    )
+
+
+def snowice_alb_fitting_batch(
+    alb_wvl,
+    alb_corr_2d,
+    alt,
+    clear_sky=False,
+    h2o_6_end=1509,
+    chunk_size=256,
+):
+    """Apply snowice_alb_fitting to many spectra with batched SNICAR selection."""
+    alb_wvl = np.asarray(alb_wvl, dtype=float)
+    alb_corr_2d = np.asarray(alb_corr_2d, dtype=float)
+    if alb_corr_2d.ndim == 1:
+        return snowice_alb_fitting(
+            alb_wvl,
+            alb_corr_2d,
+            alt=alt,
+            clear_sky=clear_sky,
+            h2o_6_end=h2o_6_end,
+        )
+
+    alt_arr = np.asarray(alt, dtype=float)
+    if alt_arr.ndim == 0:
+        alt_arr = np.full(alb_corr_2d.shape[0], float(alt_arr), dtype=float)
+
+    masked = np.full_like(alb_corr_2d, np.nan, dtype=float)
+    all_nonfinite = np.all(~np.isfinite(alb_corr_2d), axis=1)
+    for irow in np.flatnonzero(~all_nonfinite):
+        row_alt = alt_arr[irow] if irow < alt_arr.size else np.nan
+        masked[irow] = gas_abs_masking(
+            alb_wvl,
+            alb_corr_2d[irow].copy(),
+            alt=row_alt,
+            h2o_6_end=h2o_6_end,
+        )
+
+    wvl_key = _array_cache_key(alb_wvl)
+    _, spectra = _interpolated_snicar_library(clear_sky, wvl_key)
+    best_indices, _ = _best_fit_indices_from_matrix(
+        spectra,
+        masked,
+        chunk_size=chunk_size,
+    )
+
+    fitted = np.full_like(alb_corr_2d, np.nan, dtype=float)
+    for irow in np.flatnonzero(~all_nonfinite):
+        best_index = best_indices[irow]
+        if best_index < 0:
+            fitted[irow] = np.clip(alb_corr_2d[irow], 0, 1)
+            continue
+        try:
+            fitted[irow] = _snowice_alb_fitting_from_best(
+                alb_wvl,
+                alb_corr_2d[irow],
+                masked[irow],
+                spectra[best_index],
+                h2o_6_end=h2o_6_end,
+            )
+        except Exception:
+            fitted[irow] = np.clip(alb_corr_2d[irow], 0, 1)
+
+    return np.clip(fitted, 0, 1)
+
+
 def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     # Extend albedo spectrum to 2.5 um with constant albedo at the last wavelength
     ext_wvl_start = 250
@@ -443,14 +667,6 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     alb_wvl_ext = np.concatenate((ext_wvl[ext_wvl < alb_wvl[0]], alb_wvl, ext_wvl[ext_wvl > alb_wvl[-1]]))
     alb_corr_fitted_ext = np.concatenate((ext_alb[ext_wvl < alb_wvl[0]], alb_corr_fitted, ext_alb[ext_wvl > alb_wvl[-1]]))
 
-    # snicar_albedo_list = []
-    if clear_sky:
-        snicar_filename = str(_PKL_DIR / 'snicar_model_results_direct.pkl')
-    else:
-        snicar_filename = str(_PKL_DIR / 'snicar_model_results_diffuse.pkl')
-    with open(snicar_filename, 'rb') as f:
-        snicar_data = pickle.load(f)
-        
     short_wvl_start, short_wvl_end = 355, 550
     long_wvl_start, long_wvl_end = 1500, 2000
     
@@ -458,8 +674,8 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     long_wvl_sel = (alb_wvl >= long_wvl_start) & (alb_wvl <= long_wvl_end)
     long_wvl = alb_wvl[long_wvl_sel]
     long_wvl_alb = alb_corr_fitted[long_wvl_sel]
-    best_fit_key, best_fit_spectrum, min_rmse, ori_spec_wvl, ori_spec_alb = find_best_fit(
-        model_library=snicar_data,
+    best_fit_key, best_fit_spectrum, min_rmse, ori_spec_wvl, ori_spec_alb = _find_best_fit_cached(
+        clear_sky=clear_sky,
         obs_wvl=long_wvl,
         obs_albedo=long_wvl_alb
     )
