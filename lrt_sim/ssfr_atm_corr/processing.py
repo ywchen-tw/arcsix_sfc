@@ -95,6 +95,13 @@ def maybe_read_two_column_file(filename, value_name):
     return read_two_column_file(filename, value_name)
 
 
+def progress(message, enabled=True):
+    """Print one timestamped progress message when enabled."""
+    if enabled:
+        now = datetime.datetime.now().strftime('%H:%M:%S')
+        print(f'[{now}] {message}', flush=True)
+
+
 def weighted_broadband_albedo(albedo, weight, wvl):
     """Return wavelength-integrated albedo weighted by spectral irradiance."""
     valid = np.isfinite(albedo) & np.isfinite(weight) & np.isfinite(wvl)
@@ -377,8 +384,8 @@ def _linear_fit_window(wvl, values, start_wvl, end_wvl):
     return np.poly1d(coeffs)
 
 
-def _refit_h2o6_band_from_postfit(native_wvl, fitted_row, right_wvl=None, right_value=None):
-    """Refit the default H2O-6 band using neighboring post-fit albedo anchors."""
+def _refit_h2o6_band_with_snowice(native_wvl, fitted_row, alt, clear_sky):
+    """Refit only the default H2O-6 band using the snow/ice fitting routine."""
     wvl = np.asarray(native_wvl, dtype=float)
     values = np.asarray(fitted_row, dtype=float).copy()
     if values.size != wvl.size or np.all(~np.isfinite(values)):
@@ -388,31 +395,25 @@ def _refit_h2o6_band_from_postfit(native_wvl, fitted_row, right_wvl=None, right_
     if np.count_nonzero(band) == 0:
         return np.clip(values, 0.0, 1.0)
 
-    finite = np.isfinite(values)
-    left_candidates = np.flatnonzero(finite & (wvl < h2o_6_start))
-    if left_candidates.size == 0:
+    try:
+        refitted = snowice_alb_fitting(
+            wvl,
+            values,
+            alt=alt,
+            clear_sky=clear_sky,
+            h2o_6_end=h2o_6_end,
+        )
+    except Exception:
         return np.clip(values, 0.0, 1.0)
-
-    left_ind = left_candidates[-1]
-    if right_wvl is None or right_value is None or not np.isfinite(right_value):
-        right_candidates = np.flatnonzero(finite & (wvl > h2o_6_end))
-        if right_candidates.size == 0:
-            return np.clip(values, 0.0, 1.0)
-        right_ind = right_candidates[0]
-        right_wvl = wvl[right_ind]
-        right_value = values[right_ind]
-
-    values[band] = _linear_between(
-        wvl[left_ind],
-        values[left_ind],
-        right_wvl,
-        right_value,
-        wvl[band],
-    )
+    refitted = np.asarray(refitted, dtype=float)
+    if refitted.shape != values.shape or np.all(~np.isfinite(refitted[band])):
+        return np.clip(values, 0.0, 1.0)
+    replace = np.isfinite(refitted) & band
+    values[replace] = refitted[replace]
     return np.clip(values, 0.0, 1.0)
 
 
-def _postfit_0603_before_1650_correction(native_wvl, fitted_row):
+def _postfit_0603_before_1650_correction(native_wvl, fitted_row, alt, clear_sky):
     """0603-only correction using the clean 1650-1740 nm continuum as anchor."""
     wvl = np.asarray(native_wvl, dtype=float)
     values = np.asarray(fitted_row, dtype=float).copy()
@@ -427,12 +428,11 @@ def _postfit_0603_before_1650_correction(native_wvl, fitted_row):
     if np.any(continuum):
         values[continuum] = continuum_fit(wvl[continuum])
 
-    h2o6_end_value = float(continuum_fit(h2o_6_end))
-    values = _refit_h2o6_band_from_postfit(
+    values = _refit_h2o6_band_with_snowice(
         wvl,
         values,
-        right_wvl=h2o_6_end,
-        right_value=h2o6_end_value,
+        alt=alt,
+        clear_sky=clear_sky,
     )
     return np.clip(values, 0.0, 1.0)
 
@@ -466,7 +466,12 @@ def fit_albedo_1s(
             if apply_postfit_cleanup:
                 before_postfit = fitted_row.copy()
                 if apply_0603_cleanup:
-                    fitted_row = _postfit_0603_before_1650_correction(native_wvl, fitted_row)
+                    fitted_row = _postfit_0603_before_1650_correction(
+                        native_wvl,
+                        fitted_row,
+                        alt=alt,
+                        clear_sky=clear_sky,
+                    )
                 else:
                     fitted_row = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
                 if (
@@ -589,13 +594,19 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
     return extension_wvl, extended
 
 
-def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=None):
+def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=None, verbose=True):
     """Build true 1s iter1, iter2, final, and final-extension albedo for one record."""
     fup = np.asarray(record['ssfr_fup'], dtype=float)
     fdn = np.asarray(record['ssfr_fdn'], dtype=float)
     with np.errstate(divide='ignore', invalid='ignore'):
         raw_1s = np.divide(fup, fdn, out=np.full_like(fup, np.nan, dtype=float), where=fdn != 0)
     raw_1s = np.clip(raw_1s, 0.0, 1.0)
+    raw_finite_rows = int(np.count_nonzero(np.any(np.isfinite(raw_1s), axis=1)))
+    progress(
+        f'  leg {record["leg_index"]:03d}: raw 1s albedo has '
+        f'{raw_finite_rows}/{raw_1s.shape[0]} rows with finite values',
+        verbose,
+    )
 
     final_iter = record['final_iter']
     if final_iter is None or not np.isfinite(final_iter):
@@ -607,6 +618,11 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         )
     final_iter = int(final_iter) if final_iter is not None and np.isfinite(final_iter) else 2
     max_target_iter = max(2, final_iter)
+    progress(
+        f'  leg {record["leg_index"]:03d}: final_iter={final_iter}, '
+        f'processing target iterations 1-{max_target_iter}',
+        verbose,
+    )
 
     current = raw_1s
     iter1_1s = np.repeat(np.asarray(record['alb_corrected'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
@@ -620,7 +636,13 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         corr_csv = f'{fdir_lrt}/ssfr_simu_flux_{stem_time}_iteration_{corr_iter}.csv'
         corr_factor = read_iteration_corr_factor(corr_csv, native_wvl)
         if corr_factor is None:
+            progress(
+                f'  leg {record["leg_index"]:03d}: missing iteration {corr_iter} '
+                f'correction CSV; stopping iteration loop',
+                verbose,
+            )
             if target_iter == 2:
+                progress(f'  leg {record["leg_index"]:03d}: fitting fallback iter2 albedo', verbose)
                 current = fit_albedo_1s(
                     native_wvl,
                     current,
@@ -634,12 +656,17 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
                 iter2_1s = current
             break
 
+        progress(
+            f'  leg {record["leg_index"]:03d}: applying correction factor from iteration {corr_iter}',
+            verbose,
+        )
         corrected = apply_corr_factor_1s(current, corr_factor)
         if target_iter == 1:
             iter1_1s = corrected
             corr0_1s = np.broadcast_to(corr_factor, corrected.shape).copy()
             current = corrected
         else:
+            progress(f'  leg {record["leg_index"]:03d}: fitting target iteration {target_iter}', verbose)
             current = fit_albedo_1s(
                 native_wvl,
                 corrected,
@@ -660,6 +687,14 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
     elif final_iter == 2:
         final_1s = iter2_1s
 
+    final_finite_rows = int(np.count_nonzero(np.any(np.isfinite(final_1s), axis=1)))
+    progress(
+        f'  leg {record["leg_index"]:03d}: final native 1s albedo has '
+        f'{final_finite_rows}/{final_1s.shape[0]} rows with finite values; '
+        f'post-fit diagnostics stored={len(postfit_diagnostics)}',
+        verbose,
+    )
+    progress(f'  leg {record["leg_index"]:03d}: extending final 1s albedo', verbose)
     ext_wvl_1s, final_ext_1s = extend_final_albedo_1s(
         native_wvl,
         final_1s,
@@ -667,6 +702,10 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         record['extension_wvl'],
         record['alb_final_extension'],
         clear_sky,
+    )
+    progress(
+        f'  leg {record["leg_index"]:03d}: extension grid shape={final_ext_1s.shape}',
+        verbose,
     )
     return {
         'raw_alb_all_1s': raw_1s,
@@ -1077,6 +1116,7 @@ def process_atm_corr_case(
     make_plots=True,
     fig_dir='fig',
     plot_every=1,
+    verbose=True,
 ):
     """Collect final atmospheric-correction products for one case."""
     try:
@@ -1096,6 +1136,13 @@ def process_atm_corr_case(
     sky_tag = 'clear' if clear_sky else 'sat_cloud'
     fdir_lrt = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_{sky_tag}'
     fdir_alb = f'{_fdir_general_}/sfc_alb'
+    progress(
+        f'Starting processing for {date_s} {case_tag} '
+        f'({sky_tag}); ranges={tmhr_ranges_select}',
+        verbose,
+    )
+    progress(f'LRT directory: {fdir_lrt}', verbose)
+    progress(f'Albedo directory: {fdir_alb}', verbose)
 
     cld_legs = load_cloud_observation_legs(
         _fdir_general_,
@@ -1108,21 +1155,35 @@ def process_atm_corr_case(
 
     records = []
     skipped = []
+    progress(f'Loaded {len(cld_legs)} observation legs for {date_s} {case_tag}', verbose)
     for ileg, cld_leg in enumerate(cld_legs):
         if cld_leg.get('skip'):
             skipped.append((ileg, f'skip-flagged: {cld_leg.get("skip_reason", "")}'))
+            progress(
+                f'Leg {ileg + 1}/{len(cld_legs)} skipped: '
+                f'{cld_leg.get("skip_reason", "")}',
+                verbose,
+            )
             continue
         time_start, time_end = cld_leg['time'][0], cld_leg['time'][-1]
         alt_avg = np.round(np.nanmean(cld_leg['alt']), 2)
         stem_time = f'{date_s}_{time_start:.3f}-{time_end:.3f}_alt-{alt_avg:.2f}km'
         stem_alb = f'{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km'
+        progress(
+            f'Leg {ileg + 1}/{len(cld_legs)} start: '
+            f'time={time_start:.3f}-{time_end:.3f}, alt={alt_avg:.2f} km, '
+            f'n_time={len(cld_leg["time"])}',
+            verbose,
+        )
 
         final_csv = f'{fdir_lrt}/ssfr_simu_flux_{stem_time}_final.csv'
         final_extension_csv = f'{fdir_lrt}/ssfr_simu_flux_{stem_time}_final_extension.csv'
         if not os.path.exists(final_csv):
             skipped.append((ileg, final_csv))
+            progress(f'Leg {ileg:03d}: missing final CSV, skipping: {final_csv}', verbose)
             continue
 
+        progress(f'Leg {ileg:03d}: reading final simulation CSV', verbose)
         df_final = pd.read_csv(final_csv)
         native_wvl = df_final['wvl'].to_numpy()
         native_weight = dataframe_weight(
@@ -1145,6 +1206,11 @@ def process_atm_corr_case(
             albedo_native[key] = native_albedo_values(alb_wvl, alb, native_wvl)
             broadband_native[key] = weighted_broadband_albedo(albedo_native[key], native_weight, native_wvl)
         alb_iterations, alb_iteration_files = collect_iteration_albedos(fdir_alb, stem_alb, native_wvl)
+        progress(
+            f'Leg {ileg:03d}: loaded native albedo files; '
+            f'numbered iterations={list(alb_iterations.keys())}',
+            verbose,
+        )
 
         extension_wvl = np.array([])
         albedo_extension = np.array([])
@@ -1152,6 +1218,7 @@ def process_atm_corr_case(
         broadband_extension = np.nan
         df_extension = None
         if os.path.exists(final_extension_csv):
+            progress(f'Leg {ileg:03d}: reading final extension CSV', verbose)
             df_extension = pd.read_csv(final_extension_csv)
             ext_alb_wvl, ext_alb = maybe_read_two_column_file(alb_paths['final_extension'], 'alb')
             if ext_alb_wvl is not None:
@@ -1172,6 +1239,8 @@ def process_atm_corr_case(
                     len(extension_wvl),
                 )
                 broadband_extension = weighted_broadband_albedo(albedo_extension, extension_weight, extension_wvl)
+        else:
+            progress(f'Leg {ileg:03d}: no final extension CSV found', verbose)
 
         final_iter = final_iteration_from_extension(df_extension)
         final_albedo_source = alb_paths['final']
@@ -1275,7 +1344,19 @@ def process_atm_corr_case(
         record.update(simulated_native)
         record.update(simulated_extension)
 
-        record.update(build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=date_s))
+        progress(f'Leg {ileg:03d}: building 1s atmospheric-corrected albedo', verbose)
+        record.update(
+            build_record_albedo_1s(
+                record,
+                fdir_lrt,
+                stem_time,
+                native_wvl,
+                clear_sky,
+                date_s=date_s,
+                verbose=verbose,
+            )
+        )
+        progress(f'Leg {ileg:03d}: computing broadband 1s products', verbose)
         gas_mask = np.isfinite(gas_abs_masking(native_wvl, np.ones_like(native_wvl, dtype=float), alt=1))
         record['broadband_alb_iter1_all_1s'] = weighted_broadband_albedo_rows(
             record['alb_iter1_all_1s'],
@@ -1317,12 +1398,18 @@ def process_atm_corr_case(
         )
 
         records.append(record)
+        progress(f'Leg {ileg:03d}: complete', verbose)
         gc.collect()
 
     if not records:
         missing = '\n'.join(path for _, path in skipped)
         raise FileNotFoundError(f'No final atmospheric-correction products found for {date_s} {case_tag}.\n{missing}')
 
+    progress(
+        f'Combining {len(records)} processed legs for {date_s} {case_tag}; '
+        f'skipped={len(skipped)}',
+        verbose,
+    )
     native_wvl = records[0]['native_wvl']
     output = {
         'date': date_s,
@@ -1424,6 +1511,7 @@ def process_atm_corr_case(
     })
 
     if make_plots:
+        progress(f'Creating processing plots for {date_s} {case_tag}', verbose)
         output['plot_files'] = plot_processing_outputs(
             date_s,
             case_tag,
@@ -1432,8 +1520,10 @@ def process_atm_corr_case(
             fig_dir=fig_dir,
             plot_every=plot_every,
         )
+        progress(f'Created {len(output["plot_files"])} plot files', verbose)
     else:
         output['plot_files'] = []
+        progress('Plot creation disabled', verbose)
 
     os.makedirs(output_dir, exist_ok=True)
     output_file = (
@@ -1442,11 +1532,11 @@ def process_atm_corr_case(
     )
     with open(output_file, 'wb') as f:
         pickle.dump(output, f, protocol=pickle.HIGHEST_PROTOCOL)
-    print(f"Saved processed atmospheric-correction product to {output_file}")
+    progress(f"Saved processed atmospheric-correction product to {output_file}", verbose)
     return output_file
 
 
-def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_dir='fig', plot_every=1):
+def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_dir='fig', plot_every=1, verbose=True):
     """Process one active atmospheric-correction catalog case by id."""
     try:
         from .case_catalog import get_case
@@ -1466,4 +1556,5 @@ def process_catalog_case(config, case_id, output_dir=None, make_plots=True, fig_
         make_plots=make_plots,
         fig_dir=fig_dir,
         plot_every=plot_every,
+        verbose=verbose,
     )

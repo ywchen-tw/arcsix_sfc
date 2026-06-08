@@ -236,6 +236,65 @@ class SeasonData:
     brt37v: np.ndarray = None            # (n_pts,)  brightness temperature 37 GHz V-pol (K)
 
 
+def _spectral_rows_all_nan(values, n_rows):
+    """Return rows where every value in a measured spectrum is NaN."""
+    values = np.asarray(values, dtype=float)
+    if values.shape[0] != n_rows:
+        return np.full(n_rows, False)
+    if values.ndim == 1:
+        return np.isnan(values)
+    return np.all(np.isnan(values).reshape(n_rows, -1), axis=1)
+
+
+def filter_all_nan_measured_ssfr_for_hdf5(season):
+    """Return a SeasonData copy excluding rows with all-NaN measured SSFR fluxes."""
+    n_rows = len(season.time)
+    missing_measured_flux = (
+        _spectral_rows_all_nan(season.fdn, n_rows)
+        & _spectral_rows_all_nan(season.fup, n_rows)
+    )
+    n_remove = int(np.count_nonzero(missing_measured_flux))
+    if n_remove == 0:
+        return season
+
+    keep = ~missing_measured_flux
+    filtered = copy.copy(season)
+    point_attrs = (
+        'lon', 'lat', 'alt', 'time', 'dates', 'conditions', 'case_tags',
+        'icing', 'icing_pre', 'fdn', 'fup', 'toa_expand', 'alb_iter1',
+        'alb_iter2', 'broadband_alb_iter2', 'bb_alb_iter2_690_1190',
+        'kt19_sfc_T', 'sza', 'alb_atm_corrected_ext',
+        'broadband_alb_atm_corrected_ext', 'hsr1_diffuse_ratio',
+        'simu_fdn_sfc_native', 'simu_fup_sfc_native',
+        'simu_fdn_aircraft_native', 'simu_fup_aircraft_native',
+        'simu_fdn_sfc_ext', 'simu_fup_sfc_ext',
+        'simu_fdn_aircraft_ext', 'simu_fup_aircraft_ext',
+        'ice_frac', 'nad_hdrf', 'nad_rad', 'myi_ratio', 'fyi_ratio',
+        'yi_ratio', 'ice_ratio', 'ow_ratio', 'ice_age', 'era5_alb',
+        'grain_size', 'grain_size_1240', 'grain_size_ratio',
+        'grain_size_ratio_1650_1020', 'grain_size_ratio_1020_865',
+        'brt19h', 'brt37h', 'brt37v', 'amsr2_ice_conc',
+        '_bb_alb_iter1', '_bb_alb_iter2_file',
+        '_bb_alb_iter1_filter', '_bb_alb_iter2_filter',
+    )
+    for attr in point_attrs:
+        if not hasattr(filtered, attr):
+            continue
+        values = getattr(filtered, attr)
+        if values is None:
+            continue
+        values = np.asarray(values)
+        if values.shape and values.shape[0] == n_rows:
+            setattr(filtered, attr, values[keep])
+
+    filtered._hdf5_removed_all_nan_measured_ssfr = n_remove
+    print(
+        f"Filtered {n_remove} {season.name} rows from HDF5 output "
+        "where measured upward and downward SSFR fluxes are all NaN."
+    )
+    return filtered
+
+
 # ---------------------------------------------------------------------------
 # Helper: extract date_s and case_tag from filename
 # ---------------------------------------------------------------------------
@@ -1691,31 +1750,33 @@ def combined_atm_corr():
             pickle.dump(output_all_dict, f)
         print(f"Combined surface albedo data saved to {combined_output_file}")
 
+        spring_h5 = filter_all_nan_measured_ssfr_for_hdf5(spring)
+        summer_h5 = filter_all_nan_measured_ssfr_for_hdf5(summer)
         output_alb_all_dict = {
-            'time_spring_all': spring.time,
-            'time_springl': spring.time,
-            'lon_spring': spring.lon,
-            'lat_spring': spring.lat,
-            'alt_spring': spring.alt,
-            'dates_spring': spring.dates,
-            'native_wvl_spring': spring.wvl,
-            'wvl_spring': spring.wvl,
-            'alb_final_spring': spring.alb_iter2,
-            'alb_atm_corr_spring': spring.alb_iter2,
-            'broadband_alb_atm_corr_spring': spring.broadband_alb_iter2,
-            'broadband_alb_alb_tm_corr_spring': spring.broadband_alb_iter2,
+            'time_spring_all': spring_h5.time,
+            'time_springl': spring_h5.time,
+            'lon_spring': spring_h5.lon,
+            'lat_spring': spring_h5.lat,
+            'alt_spring': spring_h5.alt,
+            'dates_spring': spring_h5.dates,
+            'native_wvl_spring': spring_h5.wvl,
+            'wvl_spring': spring_h5.wvl,
+            'alb_final_spring': spring_h5.alb_iter2,
+            'alb_atm_corr_spring': spring_h5.alb_iter2,
+            'broadband_alb_atm_corr_spring': spring_h5.broadband_alb_iter2,
+            'broadband_alb_alb_tm_corr_spring': spring_h5.broadband_alb_iter2,
 
-            'time_summer_all': summer.time,
-            'lon_summer': summer.lon,
-            'lat_summer': summer.lat,
-            'alt_summer': summer.alt,
-            'dates_summer': summer.dates,
-            'native_wvl_summer': summer.wvl,
-            'wvl_summer': summer.wvl,
-            'alb_final_summer': summer.alb_iter2,
-            'alb_atm_corr_summer': summer.alb_iter2,
-            'broadband_alb_atm_corr_summer': summer.broadband_alb_iter2,
-            'broadband_alb_alb_tm_corr_summer': summer.broadband_alb_iter2,
+            'time_summer_all': summer_h5.time,
+            'lon_summer': summer_h5.lon,
+            'lat_summer': summer_h5.lat,
+            'alt_summer': summer_h5.alt,
+            'dates_summer': summer_h5.dates,
+            'native_wvl_summer': summer_h5.wvl,
+            'wvl_summer': summer_h5.wvl,
+            'alb_final_summer': summer_h5.alb_iter2,
+            'alb_atm_corr_summer': summer_h5.alb_iter2,
+            'broadband_alb_atm_corr_summer': summer_h5.broadband_alb_iter2,
+            'broadband_alb_alb_tm_corr_summer': summer_h5.broadband_alb_iter2,
         }
     
         with h5py.File(combined_output_alb_file, 'w') as hf:
@@ -1723,7 +1784,7 @@ def combined_atm_corr():
                 _h5_write_dataset(hf, key, value)
         print(f"Combined surface albedo HDF5 data saved to {combined_output_alb_file}")
 
-        write_atm_corrected_hdf5(combined_output_ssfr_file, spring, summer)
+        write_atm_corrected_hdf5(combined_output_ssfr_file, spring_h5, summer_h5)
         print(f"Focused SSFR atmospheric-corrected HDF5 data saved to {combined_output_ssfr_file}")
 
     # --- ERA5 vs broadband scatter (all seasons combined) ---
