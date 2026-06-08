@@ -31,6 +31,12 @@ from scipy.ndimage import uniform_filter1d
 
 from alb_fitting import alb_extention, snowice_alb_fitting
 
+DATE_H2O_6_END = {
+    '20240603': {'mask': 1650, 'fit': 1650},
+    '20240807': {'mask': 1550, 'fit': 1570},
+}
+POSTFIT_H2O6_H2O7_DATES = set(DATE_H2O_6_END)
+
 try:
     from .helpers import gas_abs_masking
     from .settings import _fdir_data_, _fdir_general_, gas_bands
@@ -349,19 +355,25 @@ def _postfit_h2o6_h2o7_window(native_wvl, fitted_row):
     return np.clip(values, 0.0, 1.0)
 
 
-def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky):
+def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky, date_s=None):
     """Apply snow/ice fitting to each one-second corrected albedo spectrum."""
     fitted = np.full_like(corrected_1s, np.nan, dtype=float)
+    date_key = str(date_s)
+    h2o_override = DATE_H2O_6_END.get(date_key, {})
+    fit_kwargs = {'h2o_6_end': h2o_override['fit']} if 'fit' in h2o_override else {}
+    apply_postfit_cleanup = date_key in POSTFIT_H2O6_H2O7_DATES
     for irow in range(corrected_1s.shape[0]):
         row = corrected_1s[irow]
         if np.all(~np.isfinite(row)):
             continue
         alt = float(alt_1s[irow]) if np.isfinite(alt_1s[irow]) else np.nan
         try:
-            fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky)
+            fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky, **fit_kwargs)
             if np.all(~np.isfinite(fitted_row)):
                 raise ValueError('all non-finite fitted albedo')
-            fitted[irow] = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
+            if apply_postfit_cleanup:
+                fitted_row = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
+            fitted[irow] = fitted_row
         except Exception:
             fitted[irow] = row
     return np.clip(fitted, 0.0, 1.0)
@@ -461,7 +473,7 @@ def extend_final_albedo_1s(native_wvl, final_1s, leg_native_final, extension_wvl
     return extension_wvl, extended
 
 
-def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky):
+def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=None):
     """Build true 1s iter1, iter2, final, and final-extension albedo for one record."""
     fup = np.asarray(record['ssfr_fup'], dtype=float)
     fdn = np.asarray(record['ssfr_fdn'], dtype=float)
@@ -492,7 +504,7 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky):
         corr_factor = read_iteration_corr_factor(corr_csv, native_wvl)
         if corr_factor is None:
             if target_iter == 2:
-                current = fit_albedo_1s(native_wvl, current, record['alt'], clear_sky)
+                current = fit_albedo_1s(native_wvl, current, record['alt'], clear_sky, date_s=date_s)
                 iter2_1s = current
             break
 
@@ -502,7 +514,7 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky):
             corr0_1s = np.broadcast_to(corr_factor, corrected.shape).copy()
             current = corrected
         else:
-            current = fit_albedo_1s(native_wvl, corrected, record['alt'], clear_sky)
+            current = fit_albedo_1s(native_wvl, corrected, record['alt'], clear_sky, date_s=date_s)
             if target_iter == 2:
                 iter2_1s = current
         if target_iter == final_iter:
@@ -1057,7 +1069,7 @@ def process_atm_corr_case(
         record.update(simulated_native)
         record.update(simulated_extension)
 
-        record.update(build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky))
+        record.update(build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, date_s=date_s))
         gas_mask = np.isfinite(gas_abs_masking(native_wvl, np.ones_like(native_wvl, dtype=float), alt=1))
         record['broadband_alb_iter1_all_1s'] = weighted_broadband_albedo_rows(
             record['alb_iter1_all_1s'],

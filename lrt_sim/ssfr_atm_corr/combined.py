@@ -535,7 +535,10 @@ def _h5_write_dataset(group, name, value, attrs=None):
     arr = np.asarray(value)
     kwargs = {}
     if arr.dtype.kind in {'U', 'S', 'O'}:
-        data = arr.astype(str)
+        if arr.ndim == 0:
+            data = str(arr.item())
+        else:
+            data = np.asarray([str(item) for item in arr.ravel()], dtype=object).reshape(arr.shape)
         kwargs['dtype'] = h5py.string_dtype(encoding='utf-8')
     else:
         data = arr
@@ -1717,7 +1720,7 @@ def combined_atm_corr():
     
         with h5py.File(combined_output_alb_file, 'w') as hf:
             for key, value in output_alb_all_dict.items():
-                hf.create_dataset(key, data=value)
+                _h5_write_dataset(hf, key, value)
         print(f"Combined surface albedo HDF5 data saved to {combined_output_alb_file}")
 
         write_atm_corrected_hdf5(combined_output_ssfr_file, spring, summer)
