@@ -27,6 +27,7 @@ for _path in (_SSFR_ROOT, _UTIL_ROOT, _REPO_ROOT, _LRT_SIM_ROOT):
 
 import numpy as np
 import pandas as pd
+from scipy.ndimage import uniform_filter1d
 
 from alb_fitting import alb_extention, snowice_alb_fitting
 
@@ -110,14 +111,31 @@ def weighted_broadband_albedo_rows(albedo, weight, wvl):
 
     broadband = np.full(albedo.shape[0], np.nan, dtype=float)
     finite_wvl = np.isfinite(wvl)
-    for irow in range(albedo.shape[0]):
-        valid = finite_wvl & np.isfinite(albedo[irow]) & np.isfinite(weight[irow])
-        if np.count_nonzero(valid) < 2:
+    valid = finite_wvl[np.newaxis, :] & np.isfinite(albedo) & np.isfinite(weight)
+
+    fully_valid = np.all(valid[:, finite_wvl], axis=1)
+    if np.any(fully_valid):
+        denominator = np.trapz(weight[fully_valid][:, finite_wvl], x=wvl[finite_wvl], axis=1)
+        numerator = np.trapz(
+            albedo[fully_valid][:, finite_wvl] * weight[fully_valid][:, finite_wvl],
+            x=wvl[finite_wvl],
+            axis=1,
+        )
+        good = np.isfinite(denominator) & (denominator != 0)
+        fully_valid_indices = np.flatnonzero(fully_valid)
+        broadband[fully_valid_indices[good]] = numerator[good] / denominator[good]
+
+    for irow in np.flatnonzero(~fully_valid):
+        row_valid = valid[irow]
+        if np.count_nonzero(row_valid) < 2:
             continue
-        denominator = np.trapz(weight[irow, valid], x=wvl[valid])
+        denominator = np.trapz(weight[irow, row_valid], x=wvl[row_valid])
         if denominator == 0 or not np.isfinite(denominator):
             continue
-        broadband[irow] = np.trapz(albedo[irow, valid] * weight[irow, valid], x=wvl[valid]) / denominator
+        broadband[irow] = (
+            np.trapz(albedo[irow, row_valid] * weight[irow, row_valid], x=wvl[row_valid])
+            / denominator
+        )
     return broadband
 
 
@@ -250,6 +268,87 @@ def apply_corr_factor_1s(albedo_1s, corr_factor):
     return np.clip(corrected, 0.0, 1.0)
 
 
+def _linear_between(x0, y0, x1, y1, x):
+    """Return linear interpolation/extrapolation between two finite anchors."""
+    if x1 == x0:
+        return np.full_like(np.asarray(x, dtype=float), y0, dtype=float)
+    slope = (y1 - y0) / (x1 - x0)
+    return y0 + slope * (np.asarray(x, dtype=float) - x0)
+
+
+def _postfit_h2o6_h2o7_window(native_wvl, fitted_row):
+    """Mirror legacy post-fit cleanup between H2O-6 and H2O-7."""
+    wvl = np.asarray(native_wvl, dtype=float)
+    values = np.asarray(fitted_row, dtype=float).copy()
+    if values.size != wvl.size or np.all(~np.isfinite(values)):
+        return values
+
+    wvl1450_ind = int(np.argmin(np.abs(wvl - 1450)))
+    wvl1520_ind = int(np.argmin(np.abs(wvl - 1520)))
+    wvl1650_ind = int(np.argmin(np.abs(wvl - 1650)))
+    wvl1710_ind = int(np.argmin(np.abs(wvl - 1710)))
+    wvl1800_ind = int(np.argmin(np.abs(wvl - 1800)))
+
+    if wvl1450_ind >= wvl1520_ind or wvl1800_ind >= values.size:
+        return np.clip(values, 0.0, 1.0)
+
+    start_window = values[wvl1450_ind:wvl1520_ind]
+    start_valid = np.isfinite(start_window)
+    if np.count_nonzero(start_valid) == 0:
+        return np.clip(values, 0.0, 1.0)
+    start_local = np.flatnonzero(start_valid)[np.argmin(start_window[start_valid])]
+    start_wvl = wvl[wvl1450_ind:wvl1520_ind][start_local]
+    start_ind = int(np.argmin(np.abs(wvl - start_wvl))) + 1
+
+    end_window = values[wvl1800_ind:]
+    end_valid = np.isfinite(end_window)
+    if np.count_nonzero(end_valid) == 0:
+        return np.clip(values, 0.0, 1.0)
+    end_local = np.flatnonzero(end_valid)[np.argmax(end_window[end_valid])]
+    end_wvl = wvl[wvl1800_ind:][end_local]
+    end_ind = int(np.argmin(np.abs(wvl - end_wvl))) - 1
+
+    if start_ind < 0 or end_ind >= values.size or start_ind >= end_ind:
+        return np.clip(values, 0.0, 1.0)
+    if not np.isfinite(values[start_ind]) or not np.isfinite(values[end_ind]):
+        return np.clip(values, 0.0, 1.0)
+
+    def fit_1d(x):
+        return _linear_between(start_wvl, values[start_ind], end_wvl, values[end_ind], x)
+
+    interp_slice = slice(wvl1650_ind, wvl1710_ind + 1)
+    interp_wvl = wvl[interp_slice]
+    if interp_wvl.size:
+        interp_alb = np.clip(fit_1d(interp_wvl), 0.0, 1.0)
+        compare_alb = values[interp_slice]
+        valid = np.isfinite(compare_alb) & np.isfinite(interp_alb) & (np.abs(interp_alb) > 1e-12)
+        if np.any(np.abs((compare_alb[valid] - interp_alb[valid]) / interp_alb[valid]) > 0.05):
+            values[interp_slice] = interp_alb
+
+    min_val = values[start_ind]
+    segment = values[start_ind:end_ind + 1].copy()
+    segment[np.isfinite(segment) & (segment < min_val)] = min_val
+    values[start_ind:end_ind + 1] = segment
+
+    compare_alb = values[start_ind:end_ind + 1]
+    baseline = fit_1d(wvl[start_ind:end_ind + 1])
+    valid = np.isfinite(compare_alb) & np.isfinite(baseline) & (np.abs(baseline) > 1e-12)
+    if np.any(valid):
+        diff_alb = np.full(compare_alb.shape, np.nan, dtype=float)
+        diff_alb[valid] = np.abs((compare_alb[valid] - baseline[valid]) / baseline[valid])
+        diff_std = np.nanstd(diff_alb)
+        if diff_std > 0.1:
+            values[start_ind:end_ind + 1] = (compare_alb + baseline * 7.0) / 8.0
+        elif diff_std > 0.05:
+            values[start_ind:end_ind + 1] = (compare_alb + baseline * 3.0) / 4.0
+        elif diff_std > 0.02:
+            values[start_ind:end_ind + 1] = (compare_alb + baseline) / 2.0
+
+    smoothed = uniform_filter1d(values[start_ind:].copy(), size=5, mode='reflect')
+    values[start_ind:] = np.clip(smoothed, 0.0, 1.0)
+    return np.clip(values, 0.0, 1.0)
+
+
 def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky):
     """Apply snow/ice fitting to each one-second corrected albedo spectrum."""
     fitted = np.full_like(corrected_1s, np.nan, dtype=float)
@@ -262,7 +361,7 @@ def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky):
             fitted_row = snowice_alb_fitting(native_wvl, row, alt=alt, clear_sky=clear_sky)
             if np.all(~np.isfinite(fitted_row)):
                 raise ValueError('all non-finite fitted albedo')
-            fitted[irow] = fitted_row
+            fitted[irow] = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
         except Exception:
             fitted[irow] = row
     return np.clip(fitted, 0.0, 1.0)
