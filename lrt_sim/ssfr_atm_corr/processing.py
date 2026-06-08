@@ -773,18 +773,17 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         final_1s = iter1_1s
     elif final_iter == 2:
         final_1s = iter2_1s
-    # Disabled while reviewing 0807 shortwave behavior:
-    # final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
-    #     native_wvl,
-    #     final_1s,
-    #     record['alb_final'],
-    # )
-    # if n_shortwave_adjusted:
-    #     progress(
-    #         f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
-    #         f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
-    #         verbose,
-    #     )
+    final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
+        native_wvl,
+        final_1s,
+        record['alb_final'],
+    )
+    if n_shortwave_adjusted:
+        progress(
+            f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
+            f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
+            verbose,
+        )
 
     final_finite_rows = int(np.count_nonzero(np.any(np.isfinite(final_1s), axis=1)))
     progress(
