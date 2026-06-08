@@ -587,6 +587,7 @@ def plot_broadband_albedo_map(date_s, case_tag, output, fig_dir):
     """Plot broadband final albedo by leg location, with Cartesian fallback."""
     import matplotlib.pyplot as plt
 
+    broadband_albedo_color_limits = (0.1, 0.9)
     lon_avg = np.asarray(output['lon_avg'], dtype=float)
     lat_avg = np.asarray(output['lat_avg'], dtype=float)
     lon_all = np.asarray(output['lon_all'], dtype=float)
@@ -637,6 +638,8 @@ def plot_broadband_albedo_map(date_s, case_tag, output, fig_dir):
                 transform=ccrs.PlateCarree(),
                 zorder=3,
                 edgecolor='k',
+                vmin=broadband_albedo_color_limits[0],
+                vmax=broadband_albedo_color_limits[1],
             )
             cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
             cbar.set_label('Broadband Albedo (final)', fontsize=10)

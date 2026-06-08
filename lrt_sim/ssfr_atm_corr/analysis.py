@@ -95,6 +95,7 @@ except ImportError:
     from lrt_sim.ssfr_atm_corr.settings import _fdir_data_, _fdir_general_, gas_bands
 
 RUN_ALL_CASE_STUDIES = True
+BROADBAND_ALBEDO_COLOR_LIMITS = (0.1, 0.9)
 
 
 def combined_key(combined_data, preferred_key, fallback_key=None):
@@ -192,7 +193,7 @@ def maybe_stop():
     return not RUN_ALL_CASE_STUDIES
 
 
-def finite_color_limits(values, default=(0.1, 1.0)):
+def finite_color_limits(values, default=BROADBAND_ALBEDO_COLOR_LIMITS):
     """Return robust color limits for finite broadband-albedo values."""
     values = np.asarray(values, dtype=float)
     finite = values[np.isfinite(values)]
@@ -1675,9 +1676,9 @@ def combined_atm_corr():
         # color by broadband surface albedo from iteration 2 if available
         color_vals = np.array(broadband_alb_iter2_all_spring[date_mask]) if 'broadband_alb_iter2_all_spring' in globals() else None
         if color_vals is None or np.all(np.isnan(color_vals)):
-            sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+            sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
         else:
-            vmin, vmax = finite_color_limits(color_vals)
+            vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c=color_vals, cmap='jet',
                             transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
             cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
@@ -1732,9 +1733,9 @@ def combined_atm_corr():
         # color by broadband surface albedo from iteration 2 if available
         color_vals = np.array(broadband_alb_iter2_all_summer[date_mask]) if 'broadband_alb_iter2_all_summer' in globals() else None
         if color_vals is None or np.all(np.isnan(color_vals)):
-            sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+            sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
         else:
-            vmin, vmax = finite_color_limits(color_vals)
+            vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c=color_vals, cmap='jet',
                             transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
             cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
@@ -1792,9 +1793,9 @@ def combined_atm_corr():
         else None
     )
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+        sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
     else:
-        vmin, vmax = finite_color_limits(color_vals)
+        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
         cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
@@ -1852,9 +1853,9 @@ def combined_atm_corr():
         else None
     )
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+        sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
     else:
-        vmin, vmax = finite_color_limits(color_vals)
+        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
         cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
@@ -1908,9 +1909,9 @@ def combined_atm_corr():
     # color by broadband surface albedo from iteration 2 if available
     color_vals = np.array(broadband_alb_iter2_all_spring) if 'broadband_alb_iter2_all_spring' in globals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+        sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
     else:
-        vmin, vmax = finite_color_limits(color_vals)
+        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
         cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
@@ -1963,9 +1964,9 @@ def combined_atm_corr():
     # color by broadband surface albedo from iteration 2 if available
     color_vals = np.array(broadband_alb_iter2_all_summer) if 'broadband_alb_iter2_all_summer' in globals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
+        sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
     else:
-        vmin, vmax = finite_color_limits(color_vals)
+        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c=color_vals, cmap='jet',
                         transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
         cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
