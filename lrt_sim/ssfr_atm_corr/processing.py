@@ -36,13 +36,15 @@ DATE_H2O_6_END = {
     '20240807': {'mask': 1550, 'fit': 1570},
 }
 POSTFIT_H2O6_H2O7_DATES = {'20240603', '20240807', '20240808', '20240809'}
+REFIT_H2O6_AFTER_POSTFIT_DATES = {'20240603'}
+POSTFIT_DIAGNOSTIC_STRIDE = 100
 
 try:
     from .helpers import gas_abs_masking
-    from .settings import _fdir_data_, _fdir_general_, gas_bands
+    from .settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start
 except ImportError:
     from helpers import gas_abs_masking
-    from settings import _fdir_data_, _fdir_general_, gas_bands
+    from settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start
 
 
 @dataclass(frozen=True)
@@ -355,13 +357,52 @@ def _postfit_h2o6_h2o7_window(native_wvl, fitted_row):
     return np.clip(values, 0.0, 1.0)
 
 
-def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky, date_s=None):
+def _refit_h2o6_band_from_postfit(native_wvl, fitted_row):
+    """Refit the default H2O-6 band using neighboring post-fit albedo anchors."""
+    wvl = np.asarray(native_wvl, dtype=float)
+    values = np.asarray(fitted_row, dtype=float).copy()
+    if values.size != wvl.size or np.all(~np.isfinite(values)):
+        return values
+
+    band = (wvl >= h2o_6_start) & (wvl <= h2o_6_end)
+    if np.count_nonzero(band) == 0:
+        return np.clip(values, 0.0, 1.0)
+
+    finite = np.isfinite(values)
+    left_candidates = np.flatnonzero(finite & (wvl < h2o_6_start))
+    right_candidates = np.flatnonzero(finite & (wvl > h2o_6_end))
+    if left_candidates.size == 0 or right_candidates.size == 0:
+        return np.clip(values, 0.0, 1.0)
+
+    left_ind = left_candidates[-1]
+    right_ind = right_candidates[0]
+    values[band] = _linear_between(
+        wvl[left_ind],
+        values[left_ind],
+        wvl[right_ind],
+        values[right_ind],
+        wvl[band],
+    )
+    return np.clip(values, 0.0, 1.0)
+
+
+def fit_albedo_1s(
+    native_wvl,
+    corrected_1s,
+    alt_1s,
+    clear_sky,
+    date_s=None,
+    postfit_diagnostics=None,
+    time_1s=None,
+    target_iter=None,
+):
     """Apply snow/ice fitting to each one-second corrected albedo spectrum."""
     fitted = np.full_like(corrected_1s, np.nan, dtype=float)
     date_key = str(date_s)
     h2o_override = DATE_H2O_6_END.get(date_key, {})
     fit_kwargs = {'h2o_6_end': h2o_override['fit']} if 'fit' in h2o_override else {}
     apply_postfit_cleanup = date_key in POSTFIT_H2O6_H2O7_DATES
+    refit_h2o6_after_postfit = date_key in REFIT_H2O6_AFTER_POSTFIT_DATES
     for irow in range(corrected_1s.shape[0]):
         row = corrected_1s[irow]
         if np.all(~np.isfinite(row)):
@@ -372,7 +413,30 @@ def fit_albedo_1s(native_wvl, corrected_1s, alt_1s, clear_sky, date_s=None):
             if np.all(~np.isfinite(fitted_row)):
                 raise ValueError('all non-finite fitted albedo')
             if apply_postfit_cleanup:
+                before_postfit = fitted_row.copy()
                 fitted_row = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
+                if refit_h2o6_after_postfit:
+                    fitted_row = _refit_h2o6_band_from_postfit(native_wvl, fitted_row)
+                if (
+                    postfit_diagnostics is not None
+                    and irow % POSTFIT_DIAGNOSTIC_STRIDE == 0
+                    and np.any(np.isfinite(before_postfit))
+                    and np.any(np.isfinite(fitted_row))
+                ):
+                    with np.errstate(invalid='ignore'):
+                        max_abs_change = np.nanmax(np.abs(fitted_row - before_postfit))
+                    if np.isfinite(max_abs_change) and max_abs_change > 1e-6:
+                        time_value = np.nan
+                        if time_1s is not None and irow < len(time_1s):
+                            time_value = float(time_1s[irow])
+                        postfit_diagnostics.append({
+                            'row': irow,
+                            'time': time_value,
+                            'target_iter': target_iter,
+                            'before': before_postfit,
+                            'after': fitted_row.copy(),
+                            'max_abs_change': float(max_abs_change),
+                        })
             fitted[irow] = fitted_row
         except Exception:
             fitted[irow] = row
@@ -497,6 +561,7 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
     iter2_1s = np.repeat(np.asarray(record['alb_fitted_baseline'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
     final_1s = np.repeat(np.asarray(record['alb_final'], dtype=float)[np.newaxis, :], raw_1s.shape[0], axis=0)
     corr0_1s = np.full_like(raw_1s, np.nan, dtype=float)
+    postfit_diagnostics = []
 
     for target_iter in range(1, max_target_iter + 1):
         corr_iter = target_iter - 1
@@ -504,7 +569,16 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         corr_factor = read_iteration_corr_factor(corr_csv, native_wvl)
         if corr_factor is None:
             if target_iter == 2:
-                current = fit_albedo_1s(native_wvl, current, record['alt'], clear_sky, date_s=date_s)
+                current = fit_albedo_1s(
+                    native_wvl,
+                    current,
+                    record['alt'],
+                    clear_sky,
+                    date_s=date_s,
+                    postfit_diagnostics=postfit_diagnostics,
+                    time_1s=record['time'],
+                    target_iter=target_iter,
+                )
                 iter2_1s = current
             break
 
@@ -514,7 +588,16 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
             corr0_1s = np.broadcast_to(corr_factor, corrected.shape).copy()
             current = corrected
         else:
-            current = fit_albedo_1s(native_wvl, corrected, record['alt'], clear_sky, date_s=date_s)
+            current = fit_albedo_1s(
+                native_wvl,
+                corrected,
+                record['alt'],
+                clear_sky,
+                date_s=date_s,
+                postfit_diagnostics=postfit_diagnostics,
+                time_1s=record['time'],
+                target_iter=target_iter,
+            )
             if target_iter == 2:
                 iter2_1s = current
         if target_iter == final_iter:
@@ -541,6 +624,7 @@ def build_record_albedo_1s(record, fdir_lrt, stem_time, native_wvl, clear_sky, d
         'alb_final_all_1s': final_1s,
         'extension_wvl_1s': ext_wvl_1s,
         'alb_final_ext_all_1s': final_ext_1s,
+        'postfit_diagnostics': postfit_diagnostics,
     }
 
 
@@ -668,6 +752,68 @@ def plot_all_iteration_albedo_diagnostic(record, filename, title):
     fig.savefig(filename, bbox_inches='tight', dpi=150)
     plt.close(fig)
     return filename
+
+
+def plot_postfit_diagnostics(record, output_dir, stem, title_base):
+    """Plot sampled before/after post-fit spectra for one leg."""
+    import matplotlib.pyplot as plt
+
+    diagnostics = record.get('postfit_diagnostics', [])
+    if not diagnostics:
+        return []
+
+    os.makedirs(output_dir, exist_ok=True)
+    wvl = np.asarray(record['native_wvl'], dtype=float)
+    plot_files = []
+    for diag in diagnostics:
+        before = np.asarray(diag.get('before'), dtype=float)
+        after = np.asarray(diag.get('after'), dtype=float)
+        if before.size != wvl.size or after.size != wvl.size:
+            continue
+        if np.all(~np.isfinite(before)) or np.all(~np.isfinite(after)):
+            continue
+
+        row = int(diag.get('row', -1))
+        target_iter = diag.get('target_iter')
+        time_value = diag.get('time', np.nan)
+        max_abs_change = diag.get('max_abs_change', np.nan)
+
+        fig, (ax, ax_diff) = plt.subplots(
+            2,
+            1,
+            figsize=(9, 6),
+            sharex=True,
+            gridspec_kw={'height_ratios': [3, 1]},
+        )
+        ax.plot(wvl, before, '-', color='black', linewidth=1.3, label='before post-fit')
+        ax.plot(wvl, after, '-', color='red', linewidth=1.1, label='after post-fit')
+        ax.axvspan(h2o_6_start, h2o_6_end, color='gray', alpha=0.2, label='H2O-6 refit band')
+        ax.axvspan(1650, 1710, color='orange', alpha=0.14, label='1650-1710 check')
+        ax.set_ylabel('Surface Albedo', fontsize=12)
+        ax.set_ylim(-0.05, 1.05)
+        ax.legend(fontsize=9, loc='center left', bbox_to_anchor=(1.02, 0.5))
+
+        diff = after - before
+        ax_diff.plot(wvl, diff, '-', color='purple', linewidth=1.0)
+        ax_diff.axhline(0.0, color='gray', linestyle='--', linewidth=0.8)
+        ax_diff.axvspan(h2o_6_start, h2o_6_end, color='gray', alpha=0.2)
+        ax_diff.axvspan(1650, 1710, color='orange', alpha=0.14)
+        ax_diff.set_xlabel('Wavelength (nm)', fontsize=12)
+        ax_diff.set_ylabel('After - before', fontsize=11)
+        ax_diff.set_xlim(1200, 1850)
+
+        subtitle = f'row {row}, iter {target_iter}, max change {max_abs_change:.4f}'
+        if np.isfinite(time_value):
+            subtitle = f'time {time_value:.4f}, {subtitle}'
+        ax.set_title(f'{title_base}\nPost-fit diagnostic: {subtitle}', fontsize=12)
+        fig.tight_layout()
+
+        filename = f'{output_dir}/{stem}_postfit_iter-{target_iter}_row-{row:05d}.png'
+        fig.savefig(filename, bbox_inches='tight', dpi=150)
+        plt.close(fig)
+        plot_files.append(filename)
+
+    return plot_files
 
 
 def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
@@ -848,6 +994,14 @@ def plot_processing_outputs(date_s, case_tag, records, output, fig_dir='fig', pl
         )
         if all_iter_file is not None:
             plot_files.append(all_iter_file)
+
+        postfit_files = plot_postfit_diagnostics(
+            record,
+            f'{leg_fig_dir}/postfit_diagnostics',
+            stem,
+            title_base,
+        )
+        plot_files.extend(postfit_files)
 
     mean_file = plot_mean_final_albedo(date_s, case_tag, output, summary_fig_dir)
     if mean_file is not None:
