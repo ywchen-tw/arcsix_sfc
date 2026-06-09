@@ -580,14 +580,14 @@ def _snowice_alb_fitting_from_best(
     # sys.exit()
     
     # shortwave blend: moving average below 450 nm to suppress detector noise
-    replace_sel = alb_wvl < 450
-    if np.any(replace_sel):
-        # include context above 450 nm so the filter boundary is not at the edge of the data
-        context_sel = alb_wvl < 510
-        context_vals = alb_corr_fit[context_sel].copy()
-        smoothed_context = uniform_filter1d(context_vals, size=11, mode='reflect')
-        n_replace = int(np.sum(replace_sel))
-        alb_corr_fit[replace_sel] = smoothed_context[:n_replace]
+    # replace_sel = alb_wvl < 450
+    # if np.any(replace_sel):
+    #     # include context above 450 nm so the filter boundary is not at the edge of the data
+    #     context_sel = alb_wvl < 510
+    #     context_vals = alb_corr_fit[context_sel].copy()
+    #     smoothed_context = uniform_filter1d(context_vals, size=11, mode='reflect')
+    #     n_replace = int(np.sum(replace_sel))
+    #     alb_corr_fit[replace_sel] = smoothed_context[:n_replace]
 
     # --- backup: SNICAR-blend progressively trust below 450 nm ---
     # anchor_sel = (alb_wvl >= 450) & (alb_wvl <= 550)
