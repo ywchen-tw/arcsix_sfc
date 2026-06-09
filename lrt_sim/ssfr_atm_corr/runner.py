@@ -27,24 +27,30 @@ else:
 DEFAULT_CASE_ID = 'case_001'
 
 CLEAR_SKY_CASE_ID_LIST = [
-    'case_001', 'case_002', 'case_003',
-    'case_006', 'case_007', 'case_008',
-    'case_010', 'case_013', 'case_014', 'case_015',
-    'case_019', 'case_023', 'case_024',
-    'case_026', 'case_027', 'case_028', 'case_029', 'case_030',
-    'case_037',
+    'case_001', 'case_002',
+    'case_005', 'case_006', 'case_007', 'case_008', 'case_009', 'case_010', 'case_011',
+    'case_013',
+    'case_016', 'case_017',
+    'case_018', 'case_022',
+    'case_026', 'case_027', 'case_028',
+    'case_030', 'case_031',
+    'case_032', 'case_033',
+    'case_034', 'case_035',
+    'case_043', 'case_044', 'case_045',
 ]
 
 CLOUDY_CASE_ID_LIST = [
-    'case_004', 'case_005',
-    'case_011',
-    'case_016', 'case_017', 'case_018',
-    'case_020', 'case_021',
-    'case_031', 'case_032', 'case_033', 'case_034', 'case_035', 'case_036',
+    'case_003', 'case_004',
+    'case_014',
+    'case_019', 'case_020', 'case_021',
+    'case_023', 'case_024',
+    'case_036', 'case_037', 'case_038',
+    'case_039', 'case_040',
+    'case_041', 'case_042',
 ]
 
 SPIRAL_CASE_ID_LIST = [
-    'case_009', 'case_012', 'case_022', 'case_025',
+    'case_012', 'case_015', 'case_025', 'case_029',
 ]
 
 CASE_ID_LIST = sorted(CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
