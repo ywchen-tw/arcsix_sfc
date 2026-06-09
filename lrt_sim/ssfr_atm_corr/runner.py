@@ -78,7 +78,7 @@ def run_cases(
     closure_check=True,
     closure_thresholds=None,
     min_closure_iteration=2,
-    max_additional_iterations=5,
+    max_additional_iterations=3,
     run_final_sim=True,
     run_final_extension_rt=False,
     skip_missing_cloud_observations=True,
