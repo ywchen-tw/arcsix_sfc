@@ -209,6 +209,8 @@ def _postfit_h2o6_to_h2o7_from_1495(
     right_taper_nm=30.0,
     h2o7_taper_nm=30.0,
     h2o7_smooth_size=9,
+    h2o7_anchor_wvl=1835.0,
+    h2o7_anchor_start=1800.0,
 ):
     """Constrain the 1495-H2O7 continuum and smooth the H2O-7 region."""
     wvl = np.asarray(native_wvl, dtype=float)
@@ -257,6 +259,10 @@ def _postfit_h2o6_to_h2o7_from_1495(
     if not np.isfinite(right_val) or right_wvl <= min_anchor_wvl:
         return np.clip(values, 0.0, 1.0)
     right_val = max(right_val, min_anchor_val)
+    h2o7_anchor_val = float(
+        _linear_between(min_anchor_wvl, min_anchor_val, right_wvl, right_val, h2o7_anchor_wvl)
+    )
+    h2o7_anchor_val = max(h2o7_anchor_val, min_anchor_val)
 
     replace = (wvl > h2o6_end) & (wvl < h2o7_start) & np.isfinite(original)
     if np.count_nonzero(replace) == 0:
@@ -281,11 +287,25 @@ def _postfit_h2o6_to_h2o7_from_1495(
         h2o7_end=h2o7_end,
         taper_nm=h2o7_taper_nm,
         smooth_size=h2o7_smooth_size,
+        anchor_wvl=h2o7_anchor_wvl,
+        anchor_val=h2o7_anchor_val,
+        anchor_start=h2o7_anchor_start,
     )
     return np.clip(values, 0.0, 1.0)
 
 
-def _smooth_h2o7_region(wvl, values, original, h2o7_start, h2o7_end, taper_nm=30.0, smooth_size=9):
+def _smooth_h2o7_region(
+    wvl,
+    values,
+    original,
+    h2o7_start,
+    h2o7_end,
+    taper_nm=30.0,
+    smooth_size=9,
+    anchor_wvl=None,
+    anchor_val=None,
+    anchor_start=1800.0,
+):
     """Smooth fitted albedo after H2O-7 starts while blending in at the boundary."""
     values = np.asarray(values, dtype=float).copy()
     original = np.asarray(original, dtype=float)
@@ -318,6 +338,21 @@ def _smooth_h2o7_region(wvl, values, original, h2o7_start, h2o7_end, taper_nm=30
         y[spike] = continuum[spike]
 
     smoothed = uniform_filter1d(y, size=smooth_size, mode='reflect')
+    if anchor_wvl is not None and anchor_val is not None and np.isfinite(anchor_val):
+        anchor_ind = int(np.argmin(np.abs(x - anchor_wvl)))
+        if np.isfinite(smoothed[anchor_ind]):
+            offset = float(anchor_val) - float(smoothed[anchor_ind])
+            weights = np.zeros_like(smoothed)
+            if anchor_wvl > anchor_start:
+                left = (x >= anchor_start) & (x <= anchor_wvl)
+                weights[left] = (x[left] - anchor_start) / (anchor_wvl - anchor_start)
+            right_denom = h2o7_end - anchor_wvl
+            if right_denom > 0:
+                right = x > anchor_wvl
+                weights[right] = (h2o7_end - x[right]) / right_denom
+            weights = np.clip(weights, 0.0, 1.0)
+            smoothed = smoothed + offset * weights
+
     alpha = np.ones_like(smoothed)
     if taper_nm > 0:
         alpha = np.clip((x - h2o7_start) / taper_nm, 0.0, 1.0)
