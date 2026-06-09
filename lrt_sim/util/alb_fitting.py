@@ -579,15 +579,25 @@ def _snowice_alb_fitting_from_best(
     # plt.show()
     # sys.exit()
     
-    # shortwave blend: progressively trust SNICAR below 450 nm to suppress
-    # detector noise while preserving inter-row (physical) variation
-    anchor_sel = (alb_wvl >= 450) & (alb_wvl <= 550)
-    if np.any(anchor_sel) and np.any(np.isfinite(alb_corr_fit[anchor_sel])) and np.any(np.isfinite(best_fit_spectrum[anchor_sel])):
-        offset = np.nanmean(alb_corr_fit[anchor_sel]) - np.nanmean(best_fit_spectrum[anchor_sel])
-        snicar_anchored = np.clip(best_fit_spectrum + offset, 0.0, 1.0)
-        replace_sel = alb_wvl < 450
-        alpha = np.clip((alb_wvl[replace_sel] - 350.0) / (450.0 - 350.0), 0.0, 1.0)
-        alb_corr_fit[replace_sel] = alpha * alb_corr_fit[replace_sel] + (1.0 - alpha) * snicar_anchored[replace_sel]
+    # shortwave blend: moving average below 450 nm to suppress detector noise
+    replace_sel = alb_wvl < 450
+    if np.any(replace_sel):
+        # include context above 450 nm so the filter boundary is not at the edge of the data
+        context_sel = alb_wvl < 510
+        context_vals = alb_corr_fit[context_sel].copy()
+        smoothed_context = uniform_filter1d(context_vals, size=11, mode='reflect')
+        n_replace = int(np.sum(replace_sel))
+        alb_corr_fit[replace_sel] = smoothed_context[:n_replace]
+
+    # --- backup: SNICAR-blend progressively trust below 450 nm ---
+    # anchor_sel = (alb_wvl >= 450) & (alb_wvl <= 550)
+    # if np.any(anchor_sel) and np.any(np.isfinite(alb_corr_fit[anchor_sel])) and np.any(np.isfinite(best_fit_spectrum[anchor_sel])):
+    #     offset = np.nanmean(alb_corr_fit[anchor_sel]) - np.nanmean(best_fit_spectrum[anchor_sel])
+    #     snicar_anchored = np.clip(best_fit_spectrum + offset, 0.0, 1.0)
+    #     replace_sel = alb_wvl < 450
+    #     alpha = np.clip((alb_wvl[replace_sel] - 350.0) / (450.0 - 350.0), 0.0, 1.0)
+    #     alb_corr_fit[replace_sel] = alpha * alb_corr_fit[replace_sel] + (1.0 - alpha) * snicar_anchored[replace_sel]
+    # --- end backup ---
     
     alb_corr_fit = np.clip(alb_corr_fit, 0, 1)
     alb_corr_fit = _smooth_h2o6_h2o7_continuum(alb_wvl, alb_corr_fit, h2o_6_end)
