@@ -654,11 +654,8 @@ def build_record_albedo_1s(
         final_1s = iter1_1s
     elif final_iter == 2:
         final_1s = iter2_1s
-    final_1s, n_shortwave_adjusted = apply_workflow_shortwave_shape_1s(
-        native_wvl,
-        final_1s,
-        record['alb_final'],
-    )
+    # Temporarily leave the fitted 1s shortwave albedo unchanged below 550 nm.
+    n_shortwave_adjusted = 0
     if n_shortwave_adjusted:
         progress(
             f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
