@@ -265,13 +265,52 @@ def concatenate_record_arrays(records, key):
     return np.concatenate(arrays)
 
 
-def repeat_spectral_by_time(records, spectral_key, default_wvl):
+def resample_spectrum_to_wvl(spectrum, source_wvl, target_wvl):
+    """Interpolate one spectrum from its source wavelength grid to target_wvl."""
+    spectrum = np.asarray(spectrum, dtype=float)
+    source_wvl = np.asarray(source_wvl, dtype=float)
+    target_wvl = np.asarray(target_wvl, dtype=float)
+    resampled = np.full(target_wvl.shape, np.nan, dtype=float)
+    if spectrum.size == 0:
+        return resampled
+    if spectrum.size == target_wvl.size and (
+        source_wvl.size != spectrum.size
+        or np.allclose(source_wvl, target_wvl, equal_nan=True)
+    ):
+        return spectrum
+    if source_wvl.size != spectrum.size or target_wvl.size == 0:
+        return resampled
+
+    valid = np.isfinite(source_wvl) & np.isfinite(spectrum)
+    if np.count_nonzero(valid) < 2:
+        return resampled
+    order = np.argsort(source_wvl[valid])
+    sorted_wvl = source_wvl[valid][order]
+    sorted_spectrum = spectrum[valid][order]
+    unique_wvl, unique_indices = np.unique(sorted_wvl, return_index=True)
+    if unique_wvl.size < 2:
+        return resampled
+    return np.interp(
+        target_wvl,
+        unique_wvl,
+        sorted_spectrum[unique_indices],
+        left=np.nan,
+        right=np.nan,
+    )
+
+
+def repeat_spectral_by_time(records, spectral_key, default_wvl, wvl_key=None):
     """Repeat one leg-mean spectrum for every sample time in each leg."""
     repeated = []
+    default_wvl = np.asarray(default_wvl, dtype=float)
     for record in records:
         n_time = len(record['time'])
         spectrum = np.asarray(record[spectral_key], dtype=float)
         if spectrum.size == 0:
+            spectrum = np.full(default_wvl.shape, np.nan, dtype=float)
+        elif wvl_key is not None:
+            spectrum = resample_spectrum_to_wvl(spectrum, record.get(wvl_key, np.array([])), default_wvl)
+        elif spectrum.size != default_wvl.size:
             spectrum = np.full(default_wvl.shape, np.nan, dtype=float)
         repeated.append(np.repeat(spectrum[np.newaxis, :], n_time, axis=0))
     if not repeated:
@@ -1438,6 +1477,7 @@ def process_atm_corr_case(
             'broadband_alb_fitted_baseline': broadband_native['fitted_baseline'],
             'broadband_alb_final': broadband_native['final'],
             'extension_wvl': extension_wvl,
+            'simu_extension_wvl': extension_wvl.copy(),
             'alb_final_extension': albedo_extension,
             'extension_weight': extension_weight,
             'broadband_alb_final_extension': broadband_extension,
@@ -1672,10 +1712,30 @@ def process_atm_corr_case(
         'simu_fup_sfc_native_all': repeat_spectral_by_time(records, 'simu_fup_sfc_native', output['native_wvl']),
         'simu_fdn_aircraft_native_all': repeat_spectral_by_time(records, 'simu_fdn_aircraft_native', output['native_wvl']),
         'simu_fup_aircraft_native_all': repeat_spectral_by_time(records, 'simu_fup_aircraft_native', output['native_wvl']),
-        'simu_fdn_sfc_ext_all': repeat_spectral_by_time(records, 'simu_fdn_sfc_ext', output['extension_wvl_1s']),
-        'simu_fup_sfc_ext_all': repeat_spectral_by_time(records, 'simu_fup_sfc_ext', output['extension_wvl_1s']),
-        'simu_fdn_aircraft_ext_all': repeat_spectral_by_time(records, 'simu_fdn_aircraft_ext', output['extension_wvl_1s']),
-        'simu_fup_aircraft_ext_all': repeat_spectral_by_time(records, 'simu_fup_aircraft_ext', output['extension_wvl_1s']),
+        'simu_fdn_sfc_ext_all': repeat_spectral_by_time(
+            records,
+            'simu_fdn_sfc_ext',
+            output['extension_wvl_1s'],
+            wvl_key='simu_extension_wvl',
+        ),
+        'simu_fup_sfc_ext_all': repeat_spectral_by_time(
+            records,
+            'simu_fup_sfc_ext',
+            output['extension_wvl_1s'],
+            wvl_key='simu_extension_wvl',
+        ),
+        'simu_fdn_aircraft_ext_all': repeat_spectral_by_time(
+            records,
+            'simu_fdn_aircraft_ext',
+            output['extension_wvl_1s'],
+            wvl_key='simu_extension_wvl',
+        ),
+        'simu_fup_aircraft_ext_all': repeat_spectral_by_time(
+            records,
+            'simu_fup_aircraft_ext',
+            output['extension_wvl_1s'],
+            wvl_key='simu_extension_wvl',
+        ),
     })
     output.update({
         'alb_final_all': output['alb_final_all_1s'],
