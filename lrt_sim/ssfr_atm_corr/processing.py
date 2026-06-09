@@ -909,26 +909,62 @@ def plot_postfit_diagnostics(record, output_dir, stem, title_base):
     return plot_files
 
 
-def _plot_mean_albedo_spectrum(wvl, albedo, filename, title, xlim=(350, 2000)):
+def _plot_mean_albedo_spectrum(
+    wvl,
+    albedo,
+    filename,
+    title,
+    xlim=(350, 2000),
+    primary_label='Mean albedo',
+    overlay_wvl=None,
+    overlay_albedo=None,
+    overlay_label='Native-grid mean albedo',
+):
     """Plot mean and standard deviation for one spectral albedo collection."""
     import matplotlib.pyplot as plt
 
+    def mean_and_std(values, values_wvl):
+        values = np.asarray(values, dtype=float)
+        values_wvl = np.asarray(values_wvl, dtype=float)
+        if values.ndim != 2 or values.shape[1] != values_wvl.size:
+            return None, None
+
+        avg = finite_mean_spectrum(values)
+        finite = np.isfinite(values)
+        counts = np.count_nonzero(finite, axis=0)
+        centered = np.where(finite, values - avg[np.newaxis, :], 0.0)
+        std = np.full(values_wvl.shape, np.nan, dtype=float)
+        valid = counts > 0
+        std[valid] = np.sqrt(np.sum(centered[:, valid] ** 2, axis=0) / counts[valid])
+        return avg, std
+
     wvl = np.asarray(wvl, dtype=float)
-    albedo = np.asarray(albedo, dtype=float)
-    if albedo.ndim != 2 or albedo.shape[1] != wvl.size:
+    alb_avg, alb_std = mean_and_std(albedo, wvl)
+    if alb_avg is None:
         return None
 
-    alb_avg = finite_mean_spectrum(albedo)
-    finite = np.isfinite(albedo)
-    counts = np.count_nonzero(finite, axis=0)
-    centered = np.where(finite, albedo - alb_avg[np.newaxis, :], 0.0)
-    alb_std = np.full(wvl.shape, np.nan, dtype=float)
-    valid = counts > 0
-    alb_std[valid] = np.sqrt(np.sum(centered[:, valid] ** 2, axis=0) / counts[valid])
-
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(wvl, alb_avg, '-', color='blue', label='Mean albedo')
+    ax.plot(wvl, alb_avg, '-', color='blue', label=primary_label)
     ax.fill_between(wvl, alb_avg - alb_std, alb_avg + alb_std, color='blue', alpha=0.1)
+    if overlay_wvl is not None and overlay_albedo is not None:
+        overlay_wvl = np.asarray(overlay_wvl, dtype=float)
+        overlay_avg, overlay_std = mean_and_std(overlay_albedo, overlay_wvl)
+        if overlay_avg is not None and np.any(np.isfinite(overlay_avg)):
+            ax.plot(
+                overlay_wvl,
+                overlay_avg,
+                '--',
+                color='tab:orange',
+                linewidth=1.8,
+                label=overlay_label,
+            )
+            ax.fill_between(
+                overlay_wvl,
+                overlay_avg - overlay_std,
+                overlay_avg + overlay_std,
+                color='tab:orange',
+                alpha=0.12,
+            )
     plot_gas_absorption_bands(ax)
     ax.set_xlabel('Wavelength (nm)', fontsize=14)
     ax.set_ylabel('Surface Albedo', fontsize=14)
@@ -936,6 +972,8 @@ def _plot_mean_albedo_spectrum(wvl, albedo, filename, title, xlim=(350, 2000)):
     ax.set_ylim(-0.05, 1.05)
     ax.set_xlim(*xlim)
     ax.set_title(title, fontsize=13)
+    if overlay_wvl is not None and overlay_albedo is not None:
+        ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
     fig.tight_layout()
     fig.savefig(filename, bbox_inches='tight', dpi=150)
     plt.close(fig)
@@ -953,6 +991,7 @@ def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
         f'{fig_dir}/arcsix_albedo_{date_s}_{case_tag}.png',
         f'Surface Albedo (final 1s mean) for {date_s} {case_tag}',
         xlim=(350, 2000),
+        primary_label='Native-grid mean albedo',
     )
     if native_file is not None:
         plot_files.append(native_file)
@@ -966,6 +1005,10 @@ def plot_mean_final_albedo(date_s, case_tag, output, fig_dir):
             f'{fig_dir}/arcsix_albedo_extended_{date_s}_{case_tag}.png',
             f'Extended Surface Albedo (final 1s mean) for {date_s} {case_tag}',
             xlim=(250, 4050),
+            primary_label='Extended-grid mean albedo',
+            overlay_wvl=output['native_wvl'],
+            overlay_albedo=output['alb_final_all_1s'],
+            overlay_label='Native-grid mean albedo',
         )
         if ext_file is not None:
             plot_files.append(ext_file)
