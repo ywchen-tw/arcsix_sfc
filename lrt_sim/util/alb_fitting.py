@@ -698,6 +698,35 @@ def snowice_alb_fitting_batch(
     return np.clip(fitted, 0, 1)
 
 
+def _smooth_extension_tail(wvl, albedo, start_wvl=2000.0, smooth_size=101, blend_width=50.0):
+    """Smooth synthetic longwave extension while preserving the anchor at start_wvl."""
+    wvl = np.asarray(wvl, dtype=float)
+    smoothed_albedo = np.asarray(albedo, dtype=float).copy()
+    tail = wvl >= start_wvl
+    if np.count_nonzero(tail) < 5:
+        return smoothed_albedo
+
+    x = wvl[tail]
+    y = smoothed_albedo[tail].copy()
+    finite = np.isfinite(y)
+    if np.count_nonzero(finite) < 5:
+        return smoothed_albedo
+    if not np.all(finite):
+        y[~finite] = np.interp(x[~finite], x[finite], y[finite])
+
+    smooth_size = max(3, int(smooth_size))
+    if smooth_size % 2 == 0:
+        smooth_size += 1
+    y_smooth = uniform_filter1d(y, size=smooth_size, mode='nearest')
+
+    alpha = np.ones_like(y)
+    if blend_width > 0:
+        alpha = np.clip((x - start_wvl) / blend_width, 0.0, 1.0)
+    y = (1.0 - alpha) * y + alpha * y_smooth
+    smoothed_albedo[tail] = np.clip(y, 0.0, 1.0)
+    return smoothed_albedo
+
+
 def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     # Extend albedo spectrum to 2.5 um with constant albedo at the last wavelength
     ext_wvl_start = 250
@@ -709,10 +738,24 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     alb_corr_fitted_ext = np.concatenate((ext_alb[ext_wvl < alb_wvl[0]], alb_corr_fitted, ext_alb[ext_wvl > alb_wvl[-1]]))
 
     short_wvl_start, short_wvl_end = 355, 550
-    long_wvl_start, long_wvl_end = 1500, 2000
+    long_wvl_start, long_wvl_end = 1450, 1740
+    long_anchor_wvl = 1495.0
+    long_blend_start = 1900.0
+    long_scale_wvl = 2000.0
+    long_replace_start = 2000.0
     
     # fit on long wavelength side
-    long_wvl_sel = (alb_wvl >= long_wvl_start) & (alb_wvl <= long_wvl_end)
+    long_wvl_sel = (
+        (alb_wvl >= long_wvl_start)
+        & (alb_wvl <= long_wvl_end)
+        & np.isfinite(alb_corr_fitted)
+    )
+    if np.count_nonzero(long_wvl_sel) < 2:
+        long_wvl_sel = (
+            (alb_wvl >= 1500)
+            & (alb_wvl <= 2000)
+            & np.isfinite(alb_corr_fitted)
+        )
     long_wvl = alb_wvl[long_wvl_sel]
     long_wvl_alb = alb_corr_fitted[long_wvl_sel]
     best_fit_key, best_fit_spectrum, min_rmse, ori_spec_wvl, ori_spec_alb = _find_best_fit_cached(
@@ -725,16 +768,23 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     interp_ori_spec_alb = np.interp(alb_wvl_ext, ori_spec_wvl, ori_spec_alb)
     interp_snicar_unscaled = interp_ori_spec_alb.copy()
 
-    long_fit_alb_max = np.nanmax(best_fit_spectrum)
-    long_fit_alb_max_wvl = long_wvl[np.argmax(best_fit_spectrum)]
-    long_fit_alb_r = best_fit_spectrum[-1]
-    
-    long_wvl_alb_max = long_wvl_alb[np.argmax(long_wvl_alb)]
-    long_wvl_alb_r = long_wvl_alb[-1]
-    
-    scale = (long_wvl_alb_max - long_wvl_alb_r) / (long_fit_alb_max - long_fit_alb_r)
-    scale = np.abs(scale)
-    interp_ori_spec_alb = long_wvl_alb_r + (interp_ori_spec_alb - long_fit_alb_r) * scale
+    finite_alb = np.isfinite(alb_corr_fitted)
+    if np.count_nonzero(finite_alb) >= 2:
+        obs_anchor = np.interp(
+            long_anchor_wvl,
+            alb_wvl[finite_alb],
+            alb_corr_fitted[finite_alb],
+        )
+    elif np.count_nonzero(finite_alb) == 1:
+        obs_anchor = alb_corr_fitted[finite_alb][0]
+    else:
+        obs_anchor = np.nan
+    model_anchor = np.interp(long_anchor_wvl, ori_spec_wvl, ori_spec_alb)
+    model_scale_anchor = np.interp(long_scale_wvl, ori_spec_wvl, ori_spec_alb)
+    if np.isfinite(obs_anchor) and np.isfinite(model_scale_anchor) and model_scale_anchor > 1e-6:
+        interp_ori_spec_alb = interp_ori_spec_alb * (obs_anchor / model_scale_anchor)
+    elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
+        interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
     
     
     
@@ -752,9 +802,26 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     # plt.show()
     
     alb_corr_fitted_ext_long = np.copy(alb_corr_fitted_ext)
-    long_ext_sel = (alb_wvl_ext > long_wvl_end)
+    long_blend_sel = (alb_wvl_ext > long_blend_start) & (alb_wvl_ext < long_replace_start)
+    if np.any(long_blend_sel):
+        alpha = (alb_wvl_ext[long_blend_sel] - long_blend_start) / (long_replace_start - long_blend_start)
+        alpha = np.clip(alpha, 0.0, 1.0)
+        alb_corr_fitted_ext_long[long_blend_sel] = (
+            (1.0 - alpha) * alb_corr_fitted_ext[long_blend_sel]
+            + alpha * interp_ori_spec_alb[long_blend_sel]
+        )
+    long_ext_sel = (alb_wvl_ext >= long_replace_start)
     alb_corr_fitted_ext_long[long_ext_sel] = interp_ori_spec_alb[long_ext_sel]
-    alb_corr_fitted_ext[long_ext_sel] = alb_corr_fitted_ext_long[long_ext_sel].copy()
+    alb_corr_fitted_ext[long_blend_sel | long_ext_sel] = np.clip(
+        alb_corr_fitted_ext_long[long_blend_sel | long_ext_sel],
+        0.0,
+        1.0,
+    )
+    alb_corr_fitted_ext = _smooth_extension_tail(
+        alb_wvl_ext,
+        alb_corr_fitted_ext,
+        start_wvl=long_replace_start,
+    )
     
     
     # fit on short wavelength side using SNICAR shape anchored at 355 nm

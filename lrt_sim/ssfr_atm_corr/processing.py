@@ -1328,19 +1328,18 @@ def process_atm_corr_case(
         if os.path.exists(final_extension_csv):
             progress(f'Leg {ileg:03d}: reading final extension CSV', verbose)
             df_extension = pd.read_csv(final_extension_csv)
-            ext_alb_wvl, ext_alb = existing_ext_alb_wvl, existing_ext_alb
-            if ext_alb_wvl is not None:
-                extension_wvl = ext_alb_wvl
-                albedo_extension = ext_alb
+            if {'wvl', 'sfc_alb_final'}.issubset(df_extension.columns):
+                extension_wvl = df_extension['wvl'].to_numpy()
+                albedo_extension = df_extension['sfc_alb_final'].to_numpy()
                 extension_weight = dataframe_weight(
                     df_extension,
                     ('simu_fdn_sfc_final', 'simu_fdn_sfc_mean', 'simu_fdn_toa_final'),
                     len(extension_wvl),
                 )
                 broadband_extension = weighted_broadband_albedo(albedo_extension, extension_weight, extension_wvl)
-            elif {'wvl', 'sfc_alb_final'}.issubset(df_extension.columns):
-                extension_wvl = df_extension['wvl'].to_numpy()
-                albedo_extension = df_extension['sfc_alb_final'].to_numpy()
+            elif existing_ext_alb_wvl is not None:
+                extension_wvl = existing_ext_alb_wvl
+                albedo_extension = existing_ext_alb
                 extension_weight = dataframe_weight(
                     df_extension,
                     ('simu_fdn_sfc_final', 'simu_fdn_sfc_mean', 'simu_fdn_toa_final'),
