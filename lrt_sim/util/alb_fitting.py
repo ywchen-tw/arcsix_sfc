@@ -785,11 +785,19 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
         interp_ori_spec_alb = interp_ori_spec_alb * (obs_anchor / model_scale_anchor)
     elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
         interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
-    
-    
-    
-  
-    
+
+    # Enforce physical constraint: local max beyond 2000 nm must not exceed local max
+    # in the 1650-1900 nm window (the last clean spectral window before strong ice absorption).
+    # The cross-wavelength scaling above can artificially amplify the post-2000 nm SNICAR shape.
+    window_1750 = (alb_wvl >= 1650) & (alb_wvl <= 1900) & np.isfinite(alb_corr_fitted)
+    if np.count_nonzero(window_1750) >= 2:
+        lm_1750 = float(np.nanmax(alb_corr_fitted[window_1750]))
+        post2000_mask = alb_wvl_ext >= long_replace_start
+        if np.any(post2000_mask) and np.any(np.isfinite(interp_ori_spec_alb[post2000_mask])):
+            lm_post2000 = float(np.nanmax(interp_ori_spec_alb[post2000_mask]))
+            if np.isfinite(lm_post2000) and lm_post2000 > lm_1750 > 1e-6:
+                interp_ori_spec_alb[post2000_mask] *= lm_1750 / lm_post2000
+
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
     # plt.plot(alb_wvl, alb_corr_fitted, '-', color='gray', label='Corrected Albedo', linewidth=1)
@@ -824,16 +832,51 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     )
     
     
-    # fit on short wavelength side using SNICAR shape anchored at 355 nm
-    short_wvl_sel = (alb_wvl >= short_wvl_start) & (alb_wvl <= short_wvl_end)
-    short_wvl_alb = alb_corr_fitted[short_wvl_sel]
+    # SW extension: 2nd-order polynomial fit to 450-600 nm gives a noise-free anchor
+    # and is used to suppress detector-edge noise in the 350-450 nm native range.
+    poly_win = (alb_wvl >= 450) & (alb_wvl <= 600) & np.isfinite(alb_corr_fitted)
+    poly_fn = None
+    poly_anchor_val = None
+    if np.count_nonzero(poly_win) >= 3:
+        coeffs = np.polyfit(alb_wvl[poly_win], alb_corr_fitted[poly_win], 2)
+        poly_fn = np.poly1d(coeffs)
+        poly_anchor_val = float(np.clip(poly_fn(short_wvl_start), 0.0, 1.0))
 
+        # Step 2: blend polynomial into native 350-450 nm region.
+        # Weight: 100% polynomial at 350 nm → 100% observed at 450 nm.
+        blend_native_mask = (alb_wvl >= short_wvl_start) & (alb_wvl <= 450)
+        if np.any(blend_native_mask):
+            bwvl = alb_wvl[blend_native_mask]
+            alpha_n = np.clip((bwvl - short_wvl_start) / (450.0 - short_wvl_start), 0.0, 1.0)
+            blended_n = (
+                (1.0 - alpha_n) * np.clip(poly_fn(bwvl), 0.0, 1.0)
+                + alpha_n * alb_corr_fitted[blend_native_mask]
+            )
+            n_below = int(np.sum(alb_wvl_ext < alb_wvl[0]))
+            alb_corr_fitted_ext[n_below + np.where(blend_native_mask)[0]] = np.clip(blended_n, 0.0, 1.0)
+
+    # Step 3: anchor SNICAR extension at short_wvl_start using polynomial value if available,
+    # otherwise fall back to the raw single point (original behaviour).
     anchor_idx = np.argmin(np.abs(alb_wvl_ext - short_wvl_start))
-    offset = short_wvl_alb[0] - interp_snicar_unscaled[anchor_idx]
+    if poly_anchor_val is not None:
+        offset = poly_anchor_val - interp_snicar_unscaled[anchor_idx]
+    else:
+        short_wvl_sel = (alb_wvl >= short_wvl_start) & (alb_wvl <= short_wvl_end)
+        offset = alb_corr_fitted[short_wvl_sel][0] - interp_snicar_unscaled[anchor_idx]
+
+    # Step 4: fill extension below short_wvl_start with SNICAR+offset, blended near the
+    # boundary toward the polynomial extrapolation for slope continuity.
     short_ext_sel = alb_wvl_ext < short_wvl_start
-    alb_corr_fitted_ext[short_ext_sel] = np.clip(
-        interp_snicar_unscaled[short_ext_sel] + offset, 0.0, 1.0
-    )
+    ext_wvl_below = alb_wvl_ext[short_ext_sel]
+    snicar_below = np.clip(interp_snicar_unscaled[short_ext_sel] + offset, 0.0, 1.0)
+    if poly_fn is not None:
+        blend_ext_width = 50.0  # nm below short_wvl_start over which to blend
+        alpha_ext = np.clip((short_wvl_start - ext_wvl_below) / blend_ext_width, 0.0, 1.0)
+        poly_below = np.clip(poly_fn(ext_wvl_below), 0.0, 1.0)
+        # alpha_ext=0 at boundary (pure polynomial for continuity) → 1 farther away (SNICAR shape)
+        alb_corr_fitted_ext[short_ext_sel] = (1.0 - alpha_ext) * poly_below + alpha_ext * snicar_below
+    else:
+        alb_corr_fitted_ext[short_ext_sel] = snicar_below
     
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
