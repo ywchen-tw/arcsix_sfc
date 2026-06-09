@@ -211,6 +211,8 @@ def _postfit_h2o6_to_h2o7_from_1495(
     h2o7_smooth_size=9,
     h2o7_anchor_wvl=1835.0,
     h2o7_anchor_start=1800.0,
+    left_blend_start_wvl=None,
+    apply_h2o7_smoothing=True,
 ):
     """Constrain the 1495-H2O7 continuum and smooth the H2O-7 region."""
     wvl = np.asarray(native_wvl, dtype=float)
@@ -219,6 +221,9 @@ def _postfit_h2o6_to_h2o7_from_1495(
     if values.size != wvl.size or np.all(~np.isfinite(values)):
         return values
     if not np.isfinite(h2o6_end) or not np.isfinite(h2o7_start) or h2o6_end >= h2o7_start:
+        return np.clip(values, 0.0, 1.0)
+    replace_start = h2o6_end if left_blend_start_wvl is None else left_blend_start_wvl
+    if not np.isfinite(replace_start) or replace_start >= h2o7_start:
         return np.clip(values, 0.0, 1.0)
 
     min_ind = int(np.argmin(np.abs(wvl - min_wvl)))
@@ -264,7 +269,7 @@ def _postfit_h2o6_to_h2o7_from_1495(
     )
     h2o7_anchor_val = max(h2o7_anchor_val, min_anchor_val)
 
-    replace = (wvl > h2o6_end) & (wvl < h2o7_start) & np.isfinite(original)
+    replace = (wvl > replace_start) & (wvl < h2o7_start) & np.isfinite(original)
     if np.count_nonzero(replace) == 0:
         return np.clip(values, 0.0, 1.0)
 
@@ -274,11 +279,14 @@ def _postfit_h2o6_to_h2o7_from_1495(
     alpha = np.ones(np.count_nonzero(replace), dtype=float)
     replace_wvl = wvl[replace]
     if left_taper_nm > 0:
-        alpha = np.minimum(alpha, np.clip((replace_wvl - h2o6_end) / left_taper_nm, 0.0, 1.0))
+        alpha = np.minimum(alpha, np.clip((replace_wvl - replace_start) / left_taper_nm, 0.0, 1.0))
     if right_taper_nm > 0:
         alpha = np.minimum(alpha, np.clip((h2o7_start - replace_wvl) / right_taper_nm, 0.0, 1.0))
 
     values[replace] = (1.0 - alpha) * original[replace] + alpha * baseline
+    if not apply_h2o7_smoothing:
+        return np.clip(values, 0.0, 1.0)
+
     values = _smooth_h2o7_region(
         wvl,
         values,
@@ -292,6 +300,23 @@ def _postfit_h2o6_to_h2o7_from_1495(
         anchor_start=h2o7_anchor_start,
     )
     return np.clip(values, 0.0, 1.0)
+
+
+def _postfit_0603_after_1495_blend(native_wvl, fitted_row, h2o6_blend_end=None):
+    """Blend 0603 spectra from 1495 nm through the H2O-7 start."""
+    blend_end = h2o_6_end if h2o6_blend_end is None else h2o6_blend_end
+    if not np.isfinite(blend_end) or blend_end <= 1495.0:
+        blend_end = h2o_6_end
+    left_taper_nm = max(float(blend_end) - 1495.0, 1.0)
+    return _postfit_h2o6_to_h2o7_from_1495(
+        native_wvl,
+        fitted_row,
+        h2o6_end=blend_end,
+        h2o7_start=h2o_7_start,
+        left_taper_nm=left_taper_nm,
+        left_blend_start_wvl=1495.0,
+        apply_h2o7_smoothing=False,
+    )
 
 
 def _smooth_h2o7_region(
@@ -392,5 +417,10 @@ def apply_postfit_correction(
             corrected,
             alt=alt,
             clear_sky=clear_sky,
+        )
+        corrected = _postfit_0603_after_1495_blend(
+            native_wvl,
+            corrected,
+            h2o6_blend_end=window_start,
         )
     return np.clip(corrected, 0.0, 1.0)
