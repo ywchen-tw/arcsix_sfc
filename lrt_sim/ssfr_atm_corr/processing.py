@@ -716,7 +716,7 @@ def build_record_albedo_1s(
     elif final_iter == 2:
         final_1s = iter2_1s
     poly_win_mask = (native_wvl >= 450) & (native_wvl <= 600)
-    blend_mask = (native_wvl >= 355) & (native_wvl <= 450)
+    blend_mask = (native_wvl >= native_wvl[0]) & (native_wvl <= 450)
     blend_wvl = native_wvl[blend_mask]
     alpha_blend = np.clip((blend_wvl - 355.0) / (450.0 - 355.0), 0.0, 1.0)
     n_shortwave_adjusted = 0
