@@ -72,6 +72,7 @@ try:
         apply_postfit_correction,
         postfit_h2o_6_fit_end,
         postfit_h2o_6_mask_end,
+        use_full_postfit_window,
     )
     from .setup import (
         default_atm_levels,
@@ -89,6 +90,7 @@ except ImportError:
         apply_postfit_correction,
         postfit_h2o_6_fit_end,
         postfit_h2o_6_mask_end,
+        use_full_postfit_window,
     )
     from setup import (
         default_atm_levels,
@@ -735,6 +737,9 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     date_s=date_s,
                     alt=alt_avg,
                     clear_sky=clear_sky,
+                    preserve_outside_window=not use_full_postfit_window(date_s),
+                    window_start=fit_h2o_6_end,
+                    window_end=h2o_7_start,
                 )
             except Exception as err:
                 print(

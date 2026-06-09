@@ -12,9 +12,9 @@ if _UTIL_ROOT not in sys.path:
 from alb_fitting import snowice_alb_fitting
 
 try:
-    from .settings import h2o_6_end, h2o_6_start
+    from .settings import h2o_6_end, h2o_6_start, h2o_7_start
 except ImportError:
-    from settings import h2o_6_end, h2o_6_start
+    from settings import h2o_6_end, h2o_6_start, h2o_7_start
 
 
 DATE_H2O_6_END = {
@@ -33,6 +33,12 @@ def postfit_h2o_6_fit_end(date_s, default_end):
     """Return date-aware H2O-6 fit end for snow/ice albedo fitting."""
     override = DATE_H2O_6_END.get(str(date_s), {}).get('fit')
     return default_end if override is None else override
+
+
+def use_full_postfit_window(date_s):
+    """Return True for dates whose post-fit cleanup may touch the full legacy span."""
+    date_key = str(date_s)
+    return date_key in POSTFIT_0603_DATES or date_key in DATE_H2O_6_END
 
 
 def _linear_between(x0, y0, x1, y1, x):
@@ -190,9 +196,26 @@ def _postfit_0603_before_1650_correction(native_wvl, fitted_row, alt, clear_sky)
     return np.clip(values, 0.0, 1.0)
 
 
-def apply_postfit_correction(native_wvl, fitted_row, date_s=None, alt=np.nan, clear_sky=False):
+def apply_postfit_correction(
+    native_wvl,
+    fitted_row,
+    date_s=None,
+    alt=np.nan,
+    clear_sky=False,
+    preserve_outside_window=False,
+    window_start=None,
+    window_end=None,
+):
     """Apply the standard post-fit cleanup, plus date-specific cleanup when needed."""
+    wvl = np.asarray(native_wvl, dtype=float)
+    original = np.asarray(fitted_row, dtype=float)
     corrected = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
+    if preserve_outside_window and corrected.shape == original.shape and corrected.shape == wvl.shape:
+        start = h2o_6_end if window_start is None else window_start
+        end = h2o_7_start if window_end is None else window_end
+        outside = (wvl <= start) | (wvl >= end)
+        corrected = corrected.copy()
+        corrected[outside] = original[outside]
     if str(date_s) in POSTFIT_0603_DATES:
         corrected = _postfit_0603_before_1650_correction(
             native_wvl,
