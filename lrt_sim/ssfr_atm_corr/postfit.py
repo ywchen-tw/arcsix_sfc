@@ -12,9 +12,9 @@ if _UTIL_ROOT not in sys.path:
 from alb_fitting import snowice_alb_fitting
 
 try:
-    from .settings import h2o_6_end, h2o_6_start, h2o_7_start
+    from .settings import h2o_6_end, h2o_6_start, h2o_7_end, h2o_7_start
 except ImportError:
-    from settings import h2o_6_end, h2o_6_start, h2o_7_start
+    from settings import h2o_6_end, h2o_6_start, h2o_7_end, h2o_7_start
 
 
 DATE_H2O_6_END = {
@@ -201,13 +201,16 @@ def _postfit_h2o6_to_h2o7_from_1495(
     fitted_row,
     h2o6_end,
     h2o7_start,
+    h2o7_end=h2o_7_end,
     min_wvl=1495.0,
     right_anchor_start=1700.0,
     right_anchor_end=1740.0,
     left_taper_nm=30.0,
     right_taper_nm=30.0,
+    h2o7_taper_nm=30.0,
+    h2o7_smooth_size=9,
 ):
-    """Constrain the H2O-6/H2O-7 continuum using the 1495 nm snow/ice minimum."""
+    """Constrain the 1495-H2O7 continuum and smooth the H2O-7 region."""
     wvl = np.asarray(native_wvl, dtype=float)
     original = np.asarray(fitted_row, dtype=float)
     values = original.copy()
@@ -270,7 +273,60 @@ def _postfit_h2o6_to_h2o7_from_1495(
         alpha = np.minimum(alpha, np.clip((h2o7_start - replace_wvl) / right_taper_nm, 0.0, 1.0))
 
     values[replace] = (1.0 - alpha) * original[replace] + alpha * baseline
+    values = _smooth_h2o7_region(
+        wvl,
+        values,
+        original,
+        h2o7_start=h2o7_start,
+        h2o7_end=h2o7_end,
+        taper_nm=h2o7_taper_nm,
+        smooth_size=h2o7_smooth_size,
+    )
     return np.clip(values, 0.0, 1.0)
+
+
+def _smooth_h2o7_region(wvl, values, original, h2o7_start, h2o7_end, taper_nm=30.0, smooth_size=9):
+    """Smooth fitted albedo after H2O-7 starts while blending in at the boundary."""
+    values = np.asarray(values, dtype=float).copy()
+    original = np.asarray(original, dtype=float)
+    h2o7 = (
+        (wvl >= h2o7_start)
+        & (wvl <= h2o7_end)
+        & np.isfinite(original)
+    )
+    if np.count_nonzero(h2o7) < 5:
+        return values
+
+    x = wvl[h2o7]
+    y = values[h2o7].copy()
+    finite = np.isfinite(y)
+    if np.count_nonzero(finite) < 5:
+        return values
+    if not np.all(finite):
+        y[~finite] = np.interp(x[~finite], x[finite], y[finite])
+
+    smooth_size = max(3, int(smooth_size))
+    if smooth_size % 2 == 0:
+        smooth_size += 1
+
+    continuum = uniform_filter1d(y, size=smooth_size, mode='reflect')
+    resid = y - continuum
+    mad = np.nanmedian(np.abs(resid - np.nanmedian(resid)))
+    sigma = 1.4826 * mad if mad > 0 else np.nanstd(resid)
+    if np.isfinite(sigma) and sigma > 0:
+        spike = np.abs(resid) > 3 * sigma
+        y[spike] = continuum[spike]
+
+    smoothed = uniform_filter1d(y, size=smooth_size, mode='reflect')
+    alpha = np.ones_like(smoothed)
+    if taper_nm > 0:
+        alpha = np.clip((x - h2o7_start) / taper_nm, 0.0, 1.0)
+        tail_taper = np.clip((h2o7_end - x) / taper_nm, 0.0, 1.0)
+        alpha = np.minimum(alpha, tail_taper)
+
+    h2o7_values = (1.0 - alpha) * original[h2o7] + alpha * smoothed
+    values[h2o7] = h2o7_values
+    return values
 
 
 def apply_postfit_correction(
