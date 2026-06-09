@@ -698,8 +698,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             alb_corr[alb_corr > 1.0] = 1.0
             
             adaptive_h2o_6_end = find_h2o_6_end(alb_wvl, alb_corr)
-            mask_h2o_6_end = postfit_h2o_6_mask_end(date_s, adaptive_h2o_6_end)
-            fit_h2o_6_end = postfit_h2o_6_fit_end(date_s, mask_h2o_6_end)
+            if date_s == '20240603':
+                mask_h2o_6_end = postfit_h2o_6_mask_end(date_s, adaptive_h2o_6_end)
+                fit_h2o_6_end = postfit_h2o_6_fit_end(date_s, mask_h2o_6_end)
+            else:
+                mask_h2o_6_end = postfit_h2o_6_mask_end('20240807', adaptive_h2o_6_end)
+                fit_h2o_6_end = postfit_h2o_6_fit_end('20240807', mask_h2o_6_end)
             if mask_h2o_6_end != h2o_6_end:
                 suffix = ' date override' if mask_h2o_6_end != adaptive_h2o_6_end else ''
                 print(

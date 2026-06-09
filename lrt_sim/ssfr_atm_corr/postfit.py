@@ -196,6 +196,83 @@ def _postfit_0603_before_1650_correction(native_wvl, fitted_row, alt, clear_sky)
     return np.clip(values, 0.0, 1.0)
 
 
+def _postfit_h2o6_to_h2o7_from_1495(
+    native_wvl,
+    fitted_row,
+    h2o6_end,
+    h2o7_start,
+    min_wvl=1495.0,
+    right_anchor_start=1700.0,
+    right_anchor_end=1740.0,
+    left_taper_nm=30.0,
+    right_taper_nm=30.0,
+):
+    """Constrain the H2O-6/H2O-7 continuum using the 1495 nm snow/ice minimum."""
+    wvl = np.asarray(native_wvl, dtype=float)
+    original = np.asarray(fitted_row, dtype=float)
+    values = original.copy()
+    if values.size != wvl.size or np.all(~np.isfinite(values)):
+        return values
+    if not np.isfinite(h2o6_end) or not np.isfinite(h2o7_start) or h2o6_end >= h2o7_start:
+        return np.clip(values, 0.0, 1.0)
+
+    min_ind = int(np.argmin(np.abs(wvl - min_wvl)))
+    if not np.isfinite(original[min_ind]):
+        local_min = (wvl >= 1400.0) & (wvl <= 1500.0) & np.isfinite(original)
+        if np.count_nonzero(local_min) == 0:
+            return np.clip(values, 0.0, 1.0)
+        local_indices = np.flatnonzero(local_min)
+        min_ind = local_indices[int(np.argmin(original[local_min]))]
+
+    min_anchor_wvl = float(wvl[min_ind])
+    min_anchor_val = float(original[min_ind])
+    right_anchor_stop = min(float(right_anchor_end), float(h2o7_start))
+    right_anchor = (
+        (wvl >= right_anchor_start)
+        & (wvl <= right_anchor_stop)
+        & np.isfinite(original)
+    )
+
+    if np.count_nonzero(right_anchor) >= 2:
+        right_fit = _linear_fit_window(wvl, original, right_anchor_start, right_anchor_stop)
+        if right_fit is None:
+            return np.clip(values, 0.0, 1.0)
+        right_wvl = right_anchor_stop
+        right_val = float(right_fit(right_wvl))
+    elif np.count_nonzero(right_anchor) == 1:
+        right_ind = np.flatnonzero(right_anchor)[0]
+        right_wvl = float(wvl[right_ind])
+        right_val = float(original[right_ind])
+    else:
+        finite_right = (wvl > min_anchor_wvl) & (wvl < h2o7_start) & np.isfinite(original)
+        if np.count_nonzero(finite_right) == 0:
+            return np.clip(values, 0.0, 1.0)
+        right_ind = np.flatnonzero(finite_right)[-1]
+        right_wvl = float(wvl[right_ind])
+        right_val = float(original[right_ind])
+
+    if not np.isfinite(right_val) or right_wvl <= min_anchor_wvl:
+        return np.clip(values, 0.0, 1.0)
+    right_val = max(right_val, min_anchor_val)
+
+    replace = (wvl > h2o6_end) & (wvl < h2o7_start) & np.isfinite(original)
+    if np.count_nonzero(replace) == 0:
+        return np.clip(values, 0.0, 1.0)
+
+    baseline = _linear_between(min_anchor_wvl, min_anchor_val, right_wvl, right_val, wvl[replace])
+    baseline = np.maximum(baseline, min_anchor_val)
+
+    alpha = np.ones(np.count_nonzero(replace), dtype=float)
+    replace_wvl = wvl[replace]
+    if left_taper_nm > 0:
+        alpha = np.minimum(alpha, np.clip((replace_wvl - h2o6_end) / left_taper_nm, 0.0, 1.0))
+    if right_taper_nm > 0:
+        alpha = np.minimum(alpha, np.clip((h2o7_start - replace_wvl) / right_taper_nm, 0.0, 1.0))
+
+    values[replace] = (1.0 - alpha) * original[replace] + alpha * baseline
+    return np.clip(values, 0.0, 1.0)
+
+
 def apply_postfit_correction(
     native_wvl,
     fitted_row,
@@ -207,15 +284,17 @@ def apply_postfit_correction(
     window_end=None,
 ):
     """Apply the standard post-fit cleanup, plus date-specific cleanup when needed."""
-    wvl = np.asarray(native_wvl, dtype=float)
-    original = np.asarray(fitted_row, dtype=float)
-    corrected = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
-    if preserve_outside_window and corrected.shape == original.shape and corrected.shape == wvl.shape:
+    if preserve_outside_window:
         start = h2o_6_end if window_start is None else window_start
         end = h2o_7_start if window_end is None else window_end
-        outside = (wvl <= start) | (wvl >= end)
-        corrected = corrected.copy()
-        corrected[outside] = original[outside]
+        corrected = _postfit_h2o6_to_h2o7_from_1495(
+            native_wvl,
+            fitted_row,
+            h2o6_end=start,
+            h2o7_start=end,
+        )
+    else:
+        corrected = _postfit_h2o6_h2o7_window(native_wvl, fitted_row)
     if str(date_s) in POSTFIT_0603_DATES:
         corrected = _postfit_0603_before_1650_correction(
             native_wvl,
