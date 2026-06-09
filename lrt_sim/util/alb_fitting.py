@@ -786,17 +786,26 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
         interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
 
-    # Enforce physical constraint: local max beyond 2000 nm must not exceed local max
-    # in the 1650-1900 nm window (the last clean spectral window before strong ice absorption).
-    # The cross-wavelength scaling above can artificially amplify the post-2000 nm SNICAR shape.
-    window_1750 = (alb_wvl >= 1650) & (alb_wvl <= 1900) & np.isfinite(alb_corr_fitted)
-    if np.count_nonzero(window_1750) >= 2:
-        lm_1750 = float(np.nanmax(alb_corr_fitted[window_1750]))
-        post2000_mask = alb_wvl_ext >= long_replace_start
-        if np.any(post2000_mask) and np.any(np.isfinite(interp_ori_spec_alb[post2000_mask])):
-            lm_post2000 = float(np.nanmax(interp_ori_spec_alb[post2000_mask]))
-            if np.isfinite(lm_post2000) and lm_post2000 > lm_1750 > 1e-6:
-                interp_ori_spec_alb[post2000_mask] *= lm_1750 / lm_post2000
+    # Cap the post-blend/replace region using the SNICAR model's own spectral ratio
+    # (1495 nm trough → post-2000 nm peak) anchored at the observed 1495 nm value.
+    # Applying the cap to both blend (1900-2000 nm) and replace (≥2000 nm) regions
+    # with the same factor avoids the step discontinuity that appeared at 2000 nm
+    # when only the replace region was scaled.
+    snicar_1495_mask   = (alb_wvl_ext >= 1400) & (alb_wvl_ext <= 1550)
+    snicar_post2000_mask = alb_wvl_ext >= long_replace_start
+    blend_and_replace_mask = alb_wvl_ext >= long_blend_start
+    if (
+        np.any(snicar_1495_mask)
+        and np.any(snicar_post2000_mask)
+        and np.isfinite(obs_anchor)
+    ):
+        model_min_1495    = float(np.nanmin(interp_snicar_unscaled[snicar_1495_mask]))
+        model_lm_post2000 = float(np.nanmax(interp_snicar_unscaled[snicar_post2000_mask]))
+        if model_min_1495 > 1e-6 and np.isfinite(model_lm_post2000):
+            ceiling = obs_anchor * model_lm_post2000 / model_min_1495
+            lm_actual = float(np.nanmax(interp_ori_spec_alb[blend_and_replace_mask]))
+            if lm_actual > ceiling > 1e-6:
+                interp_ori_spec_alb[blend_and_replace_mask] *= ceiling / lm_actual
 
     # plt.close('all')
     # plt.figure(figsize=(8, 5))

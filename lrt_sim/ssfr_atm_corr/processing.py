@@ -715,14 +715,26 @@ def build_record_albedo_1s(
         final_1s = iter1_1s
     elif final_iter == 2:
         final_1s = iter2_1s
-    # Temporarily leave the fitted 1s shortwave albedo unchanged below 550 nm.
+    poly_win_mask = (native_wvl >= 450) & (native_wvl <= 600)
+    blend_mask = (native_wvl >= 355) & (native_wvl <= 450)
+    blend_wvl = native_wvl[blend_mask]
+    alpha_blend = np.clip((blend_wvl - 355.0) / (450.0 - 355.0), 0.0, 1.0)
     n_shortwave_adjusted = 0
-    if n_shortwave_adjusted:
-        progress(
-            f'  leg {record["leg_index"]:03d}: applied workflow final shortwave shape '
-            f'below 550 nm to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
-            verbose,
-        )
+    for irow in range(final_1s.shape[0]):
+        row = final_1s[irow]
+        valid = poly_win_mask & np.isfinite(row)
+        if np.count_nonzero(valid) < 3:
+            continue
+        coeffs = np.polyfit(native_wvl[valid], row[valid], 2)
+        poly_fn = np.poly1d(coeffs)
+        blended = (1.0 - alpha_blend) * np.clip(poly_fn(blend_wvl), 0.0, 1.0) + alpha_blend * row[blend_mask]
+        final_1s[irow][blend_mask] = np.clip(blended, 0.0, 1.0)
+        n_shortwave_adjusted += 1
+    progress(
+        f'  leg {record["leg_index"]:03d}: applied SW polynomial blend 355-450 nm '
+        f'to {n_shortwave_adjusted}/{final_1s.shape[0]} rows',
+        verbose,
+    )
 
     final_finite_rows = int(np.count_nonzero(np.any(np.isfinite(final_1s), axis=1)))
     progress(
