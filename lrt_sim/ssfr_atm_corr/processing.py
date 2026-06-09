@@ -309,7 +309,11 @@ def repeat_spectral_by_time(records, spectral_key, default_wvl, wvl_key=None):
         if spectrum.size == 0:
             spectrum = np.full(default_wvl.shape, np.nan, dtype=float)
         elif wvl_key is not None:
-            spectrum = resample_spectrum_to_wvl(spectrum, record.get(wvl_key, np.array([])), default_wvl)
+            spectrum = resample_spectrum_to_wvl(
+                spectrum,
+                record.get(wvl_key, np.array([])),
+                default_wvl,
+            )
         elif spectrum.size != default_wvl.size:
             spectrum = np.full(default_wvl.shape, np.nan, dtype=float)
         repeated.append(np.repeat(spectrum[np.newaxis, :], n_time, axis=0))
