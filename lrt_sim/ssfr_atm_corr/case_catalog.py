@@ -700,7 +700,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
  
  {'id': 'case_059',
   'date': '2024-08-07',
-  'case_tag': 'clear_atm_corr_1',
+  'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [[13.344, 13.763], # 100m, cloudy
                                             ],
   'simulation_interval': 0.5,
