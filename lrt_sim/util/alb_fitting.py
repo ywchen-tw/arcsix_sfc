@@ -449,61 +449,35 @@ def _snowice_alb_fitting_from_best(
         h2o_6_end,
     )
     
-    for bands_fit in [
-                      band_1_fit, 
-                      ]:
-        
-        # if np.isnan(alb_corr_mask[bands_fit]).any():
-            # best_fit_key, best_fit_spectrum, min_rmse, _, _ = find_best_fit(
-            #     model_library=snicar_data,
-            #     obs_wvl=alb_wvl[bands_fit],
-            #     obs_albedo=alb_corr_mask[bands_fit]
-            #     )
-        bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
-        if bandfit_nan.sum() == 0:
-            continue
-        bandfit_nan_ind = np.where(bandfit_nan)[0]
-        if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
-            bandfit_nan_ind = bandfit_nan_ind[:-1]
-        if bandfit_nan_ind.size == 0:
-            continue
-        left_mean_ind_num = 5 
-        if bandfit_nan_ind[0] < left_mean_ind_num:
-            left_mean_ind_num = bandfit_nan_ind[0]
-        xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
-        right_mean_ind_num = 5
-        if (len(bandfit_nan) - bandfit_nan_ind[-1] -1) < right_mean_ind_num:
-            right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] -1
-            
-        # print("bandfit_nan_ind[-1]:", bandfit_nan_ind[-1])
-        # print("len(bandfit_nan):", len(bandfit_nan))
-        # print("xr_origin start end:", bandfit_nan_ind[-1]+1, bandfit_nan_ind[-1]+right_mean_ind_num)
-        xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
+    # --- backup: polynomial fit for band_1 anchored at 550 nm (caused unnatural std dev gap at 550 nm) ---
+    # for bands_fit in [band_1_fit]:
+    #     bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
+    #     if bandfit_nan.sum() == 0:
+    #         continue
+    #     bandfit_nan_ind = np.where(bandfit_nan)[0]
+    #     if bandfit_nan_ind[-1] == len(bandfit_nan)-1:
+    #         bandfit_nan_ind = bandfit_nan_ind[:-1]
+    #     if bandfit_nan_ind.size == 0:
+    #         continue
+    #     left_mean_ind_num = 5
+    #     if bandfit_nan_ind[0] < left_mean_ind_num:
+    #         left_mean_ind_num = bandfit_nan_ind[0]
+    #     xl_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[0]-left_mean_ind_num:bandfit_nan_ind[0]-1].mean()
+    #     right_mean_ind_num = 5
+    #     if (len(bandfit_nan) - bandfit_nan_ind[-1] - 1) < right_mean_ind_num:
+    #         right_mean_ind_num = len(bandfit_nan) - bandfit_nan_ind[-1] - 1
+    #     xr_origin = alb_corr_fit[bands_fit][bandfit_nan_ind[-1]+1:bandfit_nan_ind[-1]+right_mean_ind_num].mean()
+    #     wvl550nm_ind = np.argmin(np.abs(alb_wvl[bands_fit][~bandfit_nan]-550))
+    #     fit_2nd = np.poly1d(np.polyfit(alb_wvl[bands_fit][~bandfit_nan][wvl550nm_ind:],
+    #                                     alb_corr_mask[bands_fit][~bandfit_nan][wvl550nm_ind:], 2))
+    #     replace_array = fit_2nd(alb_wvl[bands_fit][bandfit_nan])
+    #     alb_corr_fit_replace = alb_corr_fit[bands_fit].copy()
+    #     alb_corr_fit_replace[bandfit_nan] = replace_array.copy()
+    #     alb_corr_fit[bands_fit] = alb_corr_fit_replace
+    # --- end backup ---
 
-        wvl550nm_ind = np.argmin(np.abs(alb_wvl[bands_fit][~bandfit_nan]-550))
-        fit_2nd = np.poly1d(np.polyfit(alb_wvl[bands_fit][~bandfit_nan][wvl550nm_ind:],
-                                        alb_corr_mask[bands_fit][~bandfit_nan][wvl550nm_ind:], 2))
-        replace_array = fit_2nd(alb_wvl[bands_fit][bandfit_nan])
-        alb_corr_fit_replace = alb_corr_fit[bands_fit].copy()
-        alb_corr_fit_replace[bandfit_nan] = replace_array.copy()
-        alb_corr_fit[bands_fit] = alb_corr_fit_replace
-        
-        # plt.close('all')
-        # fig, ax = plt.subplots(figsize=(9, 5))
-        # ax.plot(alb_wvl[bands_fit], alb_corr_mask[bands_fit], 'o', color='k', label='Corrected Albedo')
-        # ax.plot(alb_wvl[bands_fit], alb_corr_fit_replace, '--', color='b', label='Replace')
-        # ax.plot(alb_wvl[bands_fit][bandfit_nan], replace_array, 'x', color='m', label='Fitted Points')
-        # ax.plot(alb_wvl[bands_fit], alb_corr_fit[bands_fit], '-', color='r', label='Fitted Albedo')
-        # ax.set_xlabel('Wavelength (nm)')
-        # ax.set_ylabel('Albedo')
-        # ax.legend()
-        # plt.show()
-        
-    
-    
     for bands_fit in [
-                    #   band_1_fit,
-                      band_2_fit, band_3_fit, band_4_fit,
+                      band_1_fit, band_2_fit, band_3_fit, band_4_fit,
                       band_5a_fit, band_5b_fit, band_5c_fit, band_6_fit]:
         
         bandfit_nan = np.isnan(alb_corr_mask[bands_fit])

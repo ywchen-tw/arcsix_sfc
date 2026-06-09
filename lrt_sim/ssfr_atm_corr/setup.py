@@ -244,35 +244,49 @@ def write_ssfr_support_files(iter, clear_sky):
     return effective_wvl
 
 
-def load_cloud_observation_legs(fdir_general, mission, platform_name, date_s, case_tag, tmhr_ranges_select):
+def load_cloud_observation_leg(fdir_general, mission, platform_name, date_s, case_tag, time_start, time_end):
     fdir_cld_obs_info = f'{fdir_general}/flt_cld_obs_info'
     os.makedirs(fdir_cld_obs_info, exist_ok=True)
 
+    fname_cld_obs_info = (
+        '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl'
+        % (
+            fdir_cld_obs_info,
+            mission.lower(),
+            platform_name.lower(),
+            date_s,
+            case_tag,
+            time_start,
+            time_end,
+        )
+    )
+    print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
+    if not os.path.exists(fname_cld_obs_info):
+        raise FileNotFoundError(
+            f'Missing preprocessed cloud-observation file: {fname_cld_obs_info}\n'
+            'Run the SSFR atmospheric-correction preprocessing first, for example:\n'
+            f'  python3 -m lrt_sim.ssfr_atm_corr.preprocess_runner <case_id>\n'
+            'or, from inside lrt_sim:\n'
+            f'  python3 -m ssfr_atm_corr.preprocess_runner <case_id>'
+        )
+    with open(fname_cld_obs_info, 'rb') as f:
+        return pickle.load(f)
+
+
+def load_cloud_observation_legs(fdir_general, mission, platform_name, date_s, case_tag, tmhr_ranges_select):
     cld_legs = []
     for time_start, time_end in tmhr_ranges_select:
-        fname_cld_obs_info = (
-            '%s/%s_cld_obs_info_%s_%s_%s_time_%.3f-%.3f_atm_corr.pkl'
-            % (
-                fdir_cld_obs_info,
-                mission.lower(),
-                platform_name.lower(),
+        cld_legs.append(
+            load_cloud_observation_leg(
+                fdir_general,
+                mission,
+                platform_name,
                 date_s,
                 case_tag,
                 time_start,
                 time_end,
             )
         )
-        print('Loading cloud observation information from %s ...' % fname_cld_obs_info)
-        if not os.path.exists(fname_cld_obs_info):
-            raise FileNotFoundError(
-                f'Missing preprocessed cloud-observation file: {fname_cld_obs_info}\n'
-                'Run the SSFR atmospheric-correction preprocessing first, for example:\n'
-                f'  python3 -m lrt_sim.ssfr_atm_corr.preprocess_runner <case_id>\n'
-                'or, from inside lrt_sim:\n'
-                f'  python3 -m ssfr_atm_corr.preprocess_runner <case_id>'
-            )
-        with open(fname_cld_obs_info, 'rb') as f:
-            cld_legs.append(pickle.load(f))
     return cld_legs
 
 

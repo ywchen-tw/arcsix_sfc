@@ -28,6 +28,7 @@ This code has been tested under:
 import os
 import sys
 import platform
+import csv
 from pathlib import Path
 
 _LRT_SIM_ROOT = str(Path(__file__).resolve().parents[1])
@@ -43,47 +44,15 @@ if platform.system() == 'Linux':
     # sys.path.insert(0, module_path)
     sys.path.append("/projects/yuch8913/arcsix_sfc/lrt_sim/")  
 
-import glob
 import copy
 import shutil
-import time
-from collections import OrderedDict
 import datetime
-import multiprocessing as mp
-import pickle
-from dataclasses import dataclass
-from pathlib import Path
 import logging
 from typing import Optional
-import h5py
-from netCDF4 import Dataset
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator, griddata, NearestNDInterpolator
-from scipy import ndimage
-from scipy.optimize import curve_fit
-from scipy.signal import convolve
-from scipy.interpolate import interp1d
-from scipy.ndimage import uniform_filter1d
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.path as mpl_path
-import matplotlib.image as mpl_img
-import matplotlib.axes as maxes
-import matplotlib.patches as mpatches
-import matplotlib.gridspec as gridspec
-from matplotlib import rcParams, ticker
-from matplotlib.ticker import FixedLocator
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import cartopy
-import cartopy.crs as ccrs
 import bisect
-import pandas as pd
-import xarray as xr
-from collections import defaultdict
 import gc
-from pyproj import Transformer
 # mpl.use('Agg')
 
 
@@ -98,11 +67,10 @@ MIN_FINAL_ITERATION = 2
 
 try:
     from .settings import *
-    from .helpers import find_h2o_6_end, fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
-    from .qc_plotting import ssfr_time_series_plot
+    from .helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
     from .setup import (
         default_atm_levels,
-        load_cloud_observation_legs,
+        load_cloud_observation_leg,
         load_nearest_dropsonde,
         run_uvspec_inits,
         split_tmhr_ranges,
@@ -111,11 +79,10 @@ try:
     )
 except ImportError:
     from settings import *
-    from helpers import find_h2o_6_end, fit_1d_poly, gas_abs_masking, ssfr_flags, write_2col_file
-    from qc_plotting import ssfr_time_series_plot
+    from helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
     from setup import (
         default_atm_levels,
-        load_cloud_observation_legs,
+        load_cloud_observation_leg,
         load_nearest_dropsonde,
         run_uvspec_inits,
         split_tmhr_ranges,
@@ -146,6 +113,73 @@ def read_uvspec_flux_output(init):
     f_down_diffuse = data[:, :, 2] / 1000.0
     f_up = data[:, :, 3] / 1000.0
     return wavelength, f_down_direct + f_down_diffuse, f_down_direct, f_down_diffuse, f_up
+
+
+def interp_nan(x, y, x_new):
+    """Linearly interpolate one spectrum, returning NaN outside the source range."""
+    return np.interp(x_new, x, y, left=np.nan, right=np.nan)
+
+
+def fill_nan_nearest(values):
+    """Fill NaN gaps with nearest finite spectral neighbors."""
+    filled = np.asarray(values, dtype=float).copy()
+    missing = ~np.isfinite(filled)
+    if not np.any(missing):
+        return filled
+
+    finite = np.flatnonzero(~missing)
+    if finite.size == 0:
+        return filled
+
+    missing_indices = np.flatnonzero(missing)
+    right_pos = np.searchsorted(finite, missing_indices)
+    left_pos = np.clip(right_pos - 1, 0, finite.size - 1)
+    right_pos = np.clip(right_pos, 0, finite.size - 1)
+    left = finite[left_pos]
+    right = finite[right_pos]
+    use_right = missing_indices - left > right - missing_indices
+    nearest = np.where(use_right, right, left)
+    filled[missing] = filled[nearest]
+    return filled
+
+
+def extend_edges_with_nearest_finite(values):
+    """Fill only leading/trailing NaNs using the nearest finite values."""
+    filled = np.asarray(values, dtype=float).copy()
+    finite = np.flatnonzero(np.isfinite(filled))
+    if finite.size == 0:
+        return filled
+
+    first = finite[0]
+    last = finite[-1]
+    filled[:first] = filled[first]
+    filled[last + 1:] = filled[last]
+    return filled
+
+
+def write_column_csv(filename, columns):
+    """Write equal-length column arrays without constructing a DataFrame."""
+    headers = list(columns)
+    raw_arrays = [np.asarray(columns[name]) for name in headers]
+    if not raw_arrays:
+        raise ValueError('No columns to write.')
+
+    n_rows = next((array.shape[0] for array in raw_arrays if array.ndim > 0), None)
+    if n_rows is None:
+        raise ValueError('At least one CSV column must be non-scalar.')
+
+    arrays = [
+        np.full(n_rows, array.item()) if array.ndim == 0 else array
+        for array in raw_arrays
+    ]
+    mismatched = [name for name, array in zip(headers, arrays) if array.shape[0] != n_rows]
+    if mismatched:
+        raise ValueError(f'CSV columns have mismatched lengths: {", ".join(mismatched)}')
+
+    with open(filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerows(zip(*arrays))
 
 
 def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
@@ -184,24 +218,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
     
     tmhr_ranges_select = split_tmhr_ranges(tmhr_ranges_select, simulation_interval)
 
-    # 1) Load all instrument & satellite metadata
-    data_hsk  = load_h5(config.hsk(date_s))
-    data_ssfr = load_h5(config.ssfr(date_s))
-    data_hsr1 = load_h5(config.hsr1(date_s))
-    
- 
-    log.info("ssfr filename:", config.ssfr(date_s))
-    
-    # plot ssfr time series for checking sable legs selection
-    ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0)
-
-    # Build leg masks
-    t_hsk = np.array(data_hsk["tmhr"])
-    leg_masks = [(t_hsk>=lo)&(t_hsk<=hi) for lo,hi in tmhr_ranges_select]
-    del data_hsk, data_ssfr, data_hsr1, t_hsk
-    gc.collect()
-
-    
     data_dropsonde_legs = load_nearest_dropsonde(_fdir_general_, date, tmhr_ranges_select, log)
 
     zpt_filedir = f'{_fdir_general_}/zpt/{date_s}'
@@ -233,29 +249,22 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         solar_file = os.path.abspath('arcsix_ssfr_solar_flux_raw.dat')
             
 
-    # read satellite granule
-    #/----------------------------------------------------------------------------\#
-    cld_legs = load_cloud_observation_legs(
-        _fdir_general_,
-        _mission_,
-        _platform_,
-        date_s,
-        case_tag,
-        tmhr_ranges_select,
-    )
-     
-    # return None 
-    
-    
-    solver = 'lrt'
-    for ileg, _ in enumerate(leg_masks):
-        
-        cld_leg = cld_legs[ileg]
+    for ileg, (selected_time_start, selected_time_end) in enumerate(tmhr_ranges_select):
+        cld_leg = load_cloud_observation_leg(
+            _fdir_general_,
+            _mission_,
+            _platform_,
+            date_s,
+            case_tag,
+            selected_time_start,
+            selected_time_end,
+        )
         if cld_leg.get('skip'):
             print(
                 f"Leg {ileg+1}: flagged as skip during preprocessing "
                 f"({cld_leg.get('skip_reason', '')}); skipping."
             )
+            del cld_leg
             continue
         time_start, time_end = cld_leg['time'][0], cld_leg['time'][-1]
         lon_avg = np.round(np.mean(cld_leg['lon']), 2)
@@ -268,7 +277,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
         ssfr_nad_flux = cld_leg['ssfr_nad']
         if np.all(np.isnan(ssfr_zen_flux)) or np.all(np.isnan(ssfr_nad_flux)):
             print(f"All SSFR zenith or nadir fluxes are NaN for leg {ileg+1}, skipping atmospheric correction")
-            cld_legs[ileg] = None
             del cld_leg, ssfr_zen_flux, ssfr_nad_flux
             gc.collect()
             continue
@@ -286,18 +294,12 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 f"too many NaN wavelengths in SSFR "
                 f"(zen {zen_nan_frac:.0%}, nad {nad_nan_frac:.0%})"
             )
-            cld_legs[ileg] = None
             del cld_leg, ssfr_zen_flux, ssfr_nad_flux
             gc.collect()
             continue
 
-        # atm profile searching setting
-        boundary_from_center = 0.25 # degree
-        mod_lon = np.array([lon_avg-boundary_from_center, lon_avg+boundary_from_center])
-        mod_lat = np.array([lat_avg-boundary_from_center, lat_avg+boundary_from_center])
-        mod_extent = [mod_lon[0], mod_lon[1], mod_lat[0], mod_lat[1]]
-        
-        
+        del ssfr_zen_flux, ssfr_nad_flux
+
         if clear_sky:
             fdir_tmp = f'{_fdir_tmp_}/{date_s}_{case_tag}_clear'
             fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_clear'
@@ -411,16 +413,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 # alb_avg[np.isnan(alb_avg)] = 0.0
                 
                 if np.any(np.isnan(alb_avg)):
-                    s = pd.Series(alb_avg)
-                    s_mask = np.isnan(alb_avg)
-                    # Fills NaN with the value immediately preceding it
-                    s_ffill = s.fillna(method='ffill', limit=2)
-                    s_ffill = s_ffill.fillna(method='bfill', limit=2)
-                    while np.any(np.isnan(s_ffill)):
-                        s_ffill = s_ffill.fillna(method='ffill', limit=2)
-                        s_ffill = s_ffill.fillna(method='bfill', limit=2)
-                        
-                    alb_avg[s_mask] = s_ffill[s_mask]
+                    alb_avg = fill_nan_nearest(alb_avg)
                         
                 alb_avg_extend = np.concatenate(([alb_avg[0]], alb_avg, [alb_avg[-1]]))
 
@@ -444,7 +437,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 # plt.ylabel('Albedo (unitless)')
                 # sys.exit()
             else:
-                alb_avg = pd.read_csv(iter_0_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 1].values
+                alb_avg = np.loadtxt(iter_0_fname, comments='#')[:, 1]
                 alb_avg = alb_avg[1:-1]  # remove the extended edges
             #\----------------------------------------------------------------------------/#
             
@@ -452,245 +445,129 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             z_list = atm_z_grid
             atm_z_grid_str = ' '.join(['%.3f' % z for z in atm_z_grid])
 
-          
-            flux_output = np.zeros(np.count_nonzero(leg_masks[ileg]))
-            
-            for ix in range(1):
-                flux_key_all = []
-                
-                flux_down_results = []
-                flux_down_dir_results = []
-                flux_down_diff_results = []
-                flux_up_results = []
-                output_wvl_results = []
-                
-                flux_key = np.zeros_like(flux_output, dtype=object)
-                cloudy = 0
-                clear = 0
-                
-                # rt initialization
-                #/----------------------------------------------------------------------------\#
-                lrt_cfg = copy.deepcopy(er3t.rtm.lrt.get_lrt_cfg())
-                
-                lrt_cfg['atmosphere_file'] = atm_profile_file
-                # lrt_cfg['atmosphere_file'] = lrt_cfg['atmosphere_file'].replace('afglus.dat', 'afglss.dat')
-                lrt_cfg['solar_file'] = solar_file
-                # lrt_cfg['solar_file'] = lrt_cfg['solar_file'].replace('kurudz_0.1nm.dat', 'kurudz_1.0nm.dat')
-                import platform
-                # run less streams on Mac for testing, higher resolution on Linux cluster
-                if platform.system() == 'Darwin':
-                    lrt_cfg['number_of_streams'] = 4
-                elif platform.system() == 'Linux':
-                    lrt_cfg['number_of_streams'] = 4 if (final_sim and not clear_sky) else 8
-                lrt_cfg['mol_abs_param'] = 'reptran coarse'
-                # lrt_cfg['mol_abs_param'] = f'reptran medium'
-                albedo_file = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
-                final_alb_wvl = None
-                final_alb = None
-                if final_sim:
-                    albedo_file = final_extension_albedo_name
-                    alb_data = np.loadtxt(albedo_file, comments='#')
-                    final_alb_wvl = alb_data[:, 0]
-                    final_alb = np.clip(alb_data[:, 1], 0.0, 1.0)
-                input_dict_extra_general = {
-                                    'crs_model': 'rayleigh Bodhaine29',
-                                    'albedo_file': albedo_file,
-                                    'mol_file': 'CH4 %s' % ch4_profile_file,
-                                    'wavelength_grid_file': wavelength_grid_file,
-                                    'atm_z_grid': atm_z_grid_str,
-                                    # 'no_scattering':'mol',
-                                    # 'no_absorption':'mol',
-                                    }
-            
-                
-                Nx_effective = len(effective_wvl)
-                mute_list = ['albedo', 'wavelength', 'spline', 'slit_function_file']
-                #/----------------------------------------------------------------------------/#
-
-                
-                inits_rad = []
-                flux_key_ix = []
-                output_list = []
-                
-                if not clear_sky:
-                    input_dict_extra = copy.deepcopy(input_dict_extra_general)
-                    if manual_cloud:
-                        cer_x = manual_cloud_cer
-                        cwp_x = manual_cloud_cwp
-                        cth_x = manual_cloud_cth
-                        cbh_x = manual_cloud_cbh
-                        cot_x = manual_cloud_cot
-                        cgt_x = cth_x - cbh_x
-                        cloud_source = 'manual'
-                    else:
-                        cot_x = np.nanmean(cld_leg['cot'])
-                        cwp_x = np.nanmean(cld_leg['cwp'])
-                        cer_x = np.nanmean(cld_leg['cer'])
-                        cth_x = np.nanmean(cld_leg['cth'])
-                        cbh_x = np.nanmean(cld_leg['cbh'])
-                        cgt_x = np.nanmean(cld_leg['cgt'])
-                        cloud_source = 'satellite'
-
-                    has_cloud = (
-                        cot_x >= 0.1
-                        and np.isfinite(cwp_x)
-                        and np.isfinite(cth_x)
-                        and np.isfinite(cbh_x)
-                        and np.isfinite(cgt_x)
-                        and cgt_x > 0.0
-                    )
-                    if has_cloud:
-                        cth_ind_cld = bisect.bisect_left(z_list, cth_x)
-                        cbh_ind_cld = bisect.bisect_left(z_list, cbh_x)
-                        cloud_altitude = z_list[cbh_ind_cld:cth_ind_cld+1]
-                        if len(cloud_altitude) == 0:
-                            message = (
-                                f'No atmospheric levels selected for {cloud_source} cloud layer '
-                                f'{cbh_x:.3f}-{cth_x:.3f} km in leg {ileg+1}. '
-                                f'Check the custom levels for {date_s}_{case_tag}.'
-                            )
-                            if manual_cloud:
-                                raise ValueError(message)
-                            print(f'Warning: {message} Treating leg as clear.')
-                            cld_cfg = None
-                            dict_key = f'clear {alt_avg:.2f}'
-                            clear += 1
-                        else:
-                            fname_cld = f'{fdir_tmp}/cld_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt'
-                            try:
-                                os.remove(fname_cld)
-                            except FileNotFoundError:
-                                pass
-                            cld_cfg = er3t.rtm.lrt.get_cld_cfg()
-                            cloudy += 1
-                            cld_cfg['cloud_file'] = fname_cld
-                            cld_cfg['cloud_altitude'] = cloud_altitude
-                            cld_cfg['cloud_effective_radius']  = cer_x
-                            cld_cfg['liquid_water_content'] = cwp_x*1000/(cgt_x*1000) # convert kg/m^2 to g/m^3
-                            cld_cfg['cloud_optical_thickness'] = cot_x
-
-                            if manual_cloud:
-                                print(
-                                    f'Using manual cloud for leg {ileg+1}: '
-                                    f'CBH={cbh_x:.3f} km, CTH={cth_x:.3f} km, '
-                                    f'COT={cot_x:.3f}, CER={cer_x:.3f} um, '
-                                    f'CWP={cwp_x:.5f} kg/m^2, '
-                                    f'levels={cloud_altitude[0]:.3f}-{cloud_altitude[-1]:.3f} km '
-                                    f'({len(cloud_altitude)} points)'
-                                )
-
-                            dict_key_arr = np.concatenate(([cld_cfg['cloud_optical_thickness']], [cld_cfg['cloud_effective_radius']], cld_cfg['cloud_altitude'], [alt_avg]))
-                            dict_key = '_'.join([f'{i:.3f}' for i in dict_key_arr])
-                    else:
-                        if manual_cloud:
-                            raise ValueError(
-                                f'Invalid manual cloud for leg {ileg+1}: '
-                                f'CBH={cbh_x}, CTH={cth_x}, COT={cot_x}, CWP={cwp_x}.'
-                            )
-                        cld_cfg = None
-                        dict_key = f'clear {alt_avg:.2f}'
-                        clear += 1
-                else:
-                    cld_cfg = None
-                    dict_key = f'clear {alt_avg:.2f}'
-                    cot_x = 0.0
-                    cwp_x = 0.0
-                    cer_x = 0.0
-                    cth_x = 0.0
-                    cbh_x = 0.0
-                    cgt_x = 0.0
-                    input_dict_extra = copy.deepcopy(input_dict_extra_general)
-                    clear += 1
-                flux_key[ix] = dict_key
-                
-                if (cld_cfg is None) and (dict_key in flux_key_all):
-                    flux_key_ix.append(dict_key)
-                elif (cld_cfg is not None) and (dict_key in flux_key_all):
-                    flux_key_ix.append(dict_key)
-                else:
-                    input_dict_extra_alb = copy.deepcopy(input_dict_extra)
-                    init = er3t.rtm.lrt.lrt_init_mono_flx(
-                            input_file  = f'{fdir_tmp}/input_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt',
-                            output_file = f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt',
-                            date        = date,
-                            # surface_albedo=0.08,
-                            solar_zenith_angle = sza_avg,
-                            Nx = Nx_effective,
-                            output_altitude    = [0, alt_avg, 'toa'],
-                            input_dict_extra   = input_dict_extra_alb.copy(),
-                            mute_list          = mute_list,
-                            lrt_cfg            = lrt_cfg,
-                            cld_cfg            = cld_cfg,
-                            aer_cfg            = None,
-                            )
-                    #\----------------------------------------------------------------------------/#
-
-                    inits_rad.append(copy.deepcopy(init))
-                    output_list.append(f'{fdir_tmp}/output_{ix:04d}_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt')
-                    flux_key_all.append(dict_key)
-                    flux_key_ix.append(dict_key)
-                    
-            # # Run RT
-            print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
-            # #/----------------------------------------------------------------------------\#
-            import platform
+            lrt_cfg = copy.deepcopy(er3t.rtm.lrt.get_lrt_cfg())
+            lrt_cfg['atmosphere_file'] = atm_profile_file
+            lrt_cfg['solar_file'] = solar_file
             if platform.system() == 'Darwin':
-                ##### run several libratran calculations in parallel
-                if len(inits_rad) > 0:
-                    print('Running libratran calculations ...')
-                    run_uvspec_inits(inits_rad)
-                    for i in range(len(inits_rad)):
-                        output_wvl, flux_down, flux_down_dir, flux_down_diff, flux_up = read_uvspec_flux_output(inits_rad[i])
-                        output_wvl_results.append(output_wvl)
-                        flux_down_results.append(flux_down)
-                        flux_down_dir_results.append(flux_down_dir)
-                        flux_down_diff_results.append(flux_down_diff)
-                        flux_up_results.append(flux_up)
-            ##### run several libratran calculations one by one
-            
+                lrt_cfg['number_of_streams'] = 4
             elif platform.system() == 'Linux':
-                if len(inits_rad) > 0:
-                    print('Running libratran calculations ...')
-                    run_uvspec_inits(inits_rad)
-                    for i in range(len(inits_rad)):
-                        output_wvl, flux_down, flux_down_dir, flux_down_diff, flux_up = read_uvspec_flux_output(inits_rad[i])
-                        output_wvl_results.append(output_wvl)
-                        flux_down_results.append(flux_down)
-                        flux_down_dir_results.append(flux_down_dir)
-                        flux_down_diff_results.append(flux_down_diff)
-                        flux_up_results.append(flux_up)
-            # #\----------------------------------------------------------------------------/#
-            ###### delete input, output, cld txt files
-            # for prefix in ['input', 'output', 'cld']:
-            #     for filename in glob.glob(os.path.join(fdir_tmp, f'{prefix}_*.txt')):
-            #         os.remove(filename)
-            ###### delete atmospheric profile files for lw
+                lrt_cfg['number_of_streams'] = 4 if (final_sim and not clear_sky) else 8
+            lrt_cfg['mol_abs_param'] = 'reptran coarse'
 
+            albedo_file = f'{_fdir_general_}/sfc_alb/sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{iter}.dat'
+            final_alb_wvl = None
+            final_alb = None
+            if final_sim:
+                albedo_file = final_extension_albedo_name
+                alb_data = np.loadtxt(albedo_file, comments='#')
+                final_alb_wvl = alb_data[:, 0]
+                final_alb = np.clip(alb_data[:, 1], 0.0, 1.0)
+            input_dict_extra = {
+                'crs_model': 'rayleigh Bodhaine29',
+                'albedo_file': albedo_file,
+                'mol_file': 'CH4 %s' % ch4_profile_file,
+                'wavelength_grid_file': wavelength_grid_file,
+                'atm_z_grid': atm_z_grid_str,
+            }
 
-            if output_wvl_results:
-                output_wvl = output_wvl_results[0]
-                if output_wvl.size != effective_wvl.size or not np.allclose(output_wvl, effective_wvl):
-                    print(
-                        f'Using uvspec output wavelength grid ({output_wvl.size} points) '
-                        f'instead of requested grid ({effective_wvl.size} points).'
+            cld_cfg = None
+            if not clear_sky:
+                if manual_cloud:
+                    cer_x = manual_cloud_cer
+                    cwp_x = manual_cloud_cwp
+                    cth_x = manual_cloud_cth
+                    cbh_x = manual_cloud_cbh
+                    cot_x = manual_cloud_cot
+                    cgt_x = cth_x - cbh_x
+                    cloud_source = 'manual'
+                else:
+                    cot_x = np.nanmean(cld_leg['cot'])
+                    cwp_x = np.nanmean(cld_leg['cwp'])
+                    cer_x = np.nanmean(cld_leg['cer'])
+                    cth_x = np.nanmean(cld_leg['cth'])
+                    cbh_x = np.nanmean(cld_leg['cbh'])
+                    cgt_x = np.nanmean(cld_leg['cgt'])
+                    cloud_source = 'satellite'
+
+                has_cloud = (
+                    cot_x >= 0.1
+                    and np.isfinite(cwp_x)
+                    and np.isfinite(cth_x)
+                    and np.isfinite(cbh_x)
+                    and np.isfinite(cgt_x)
+                    and cgt_x > 0.0
+                )
+                if has_cloud:
+                    cth_ind_cld = bisect.bisect_left(z_list, cth_x)
+                    cbh_ind_cld = bisect.bisect_left(z_list, cbh_x)
+                    cloud_altitude = z_list[cbh_ind_cld:cth_ind_cld+1]
+                    if len(cloud_altitude) == 0:
+                        message = (
+                            f'No atmospheric levels selected for {cloud_source} cloud layer '
+                            f'{cbh_x:.3f}-{cth_x:.3f} km in leg {ileg+1}. '
+                            f'Check the custom levels for {date_s}_{case_tag}.'
+                        )
+                        if manual_cloud:
+                            raise ValueError(message)
+                        print(f'Warning: {message} Treating leg as clear.')
+                    else:
+                        fname_cld = f'{fdir_tmp}/cld_0000_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt'
+                        try:
+                            os.remove(fname_cld)
+                        except FileNotFoundError:
+                            pass
+                        cld_cfg = er3t.rtm.lrt.get_cld_cfg()
+                        cld_cfg['cloud_file'] = fname_cld
+                        cld_cfg['cloud_altitude'] = cloud_altitude
+                        cld_cfg['cloud_effective_radius'] = cer_x
+                        cld_cfg['liquid_water_content'] = cwp_x / cgt_x
+                        cld_cfg['cloud_optical_thickness'] = cot_x
+
+                        if manual_cloud:
+                            print(
+                                f'Using manual cloud for leg {ileg+1}: '
+                                f'CBH={cbh_x:.3f} km, CTH={cth_x:.3f} km, '
+                                f'COT={cot_x:.3f}, CER={cer_x:.3f} um, '
+                                f'CWP={cwp_x:.5f} kg/m^2, '
+                                f'levels={cloud_altitude[0]:.3f}-{cloud_altitude[-1]:.3f} km '
+                                f'({len(cloud_altitude)} points)'
+                            )
+                elif manual_cloud:
+                    raise ValueError(
+                        f'Invalid manual cloud for leg {ileg+1}: '
+                        f'CBH={cbh_x}, CTH={cth_x}, COT={cot_x}, CWP={cwp_x}.'
                     )
-                    effective_wvl = output_wvl
 
-            flux_down_results = np.array(flux_down_results)
-            flux_down_dir_results = np.array(flux_down_dir_results)
-            flux_down_diff_results = np.array(flux_down_diff_results)
-            flux_up_results = np.array(flux_up_results)
+            init = er3t.rtm.lrt.lrt_init_mono_flx(
+                input_file=f'{fdir_tmp}/input_0000_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt',
+                output_file=f'{fdir_tmp}/output_0000_{date_s}_{case_tag}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km.txt',
+                date=date,
+                solar_zenith_angle=sza_avg,
+                Nx=len(effective_wvl),
+                output_altitude=[0, alt_avg, 'toa'],
+                input_dict_extra=input_dict_extra.copy(),
+                mute_list=['albedo', 'wavelength', 'spline', 'slit_function_file'],
+                lrt_cfg=lrt_cfg,
+                cld_cfg=cld_cfg,
+                aer_cfg=None,
+            )
+
+            print(f"Start running libratran calculations for {output_csv_name.replace('.csv', '')} ")
+            print('Running libratran calculations ...')
+            run_uvspec_inits([init])
+            output_wvl, flux_down, flux_down_dir, flux_down_diff, flux_up = read_uvspec_flux_output(init)
+            if output_wvl.size != effective_wvl.size or not np.allclose(output_wvl, effective_wvl):
+                print(
+                    f'Using uvspec output wavelength grid ({output_wvl.size} points) '
+                    f'instead of requested grid ({effective_wvl.size} points).'
+                )
+                effective_wvl = output_wvl
 
             if final_sim:
                 fup_mean = np.nanmean(cld_leg['ssfr_nad'], axis=0)
                 fdn_mean = np.nanmean(cld_leg['ssfr_zen'], axis=0)
                 fup_std = np.nanstd(cld_leg['ssfr_nad'], axis=0)
                 fdn_std = np.nanstd(cld_leg['ssfr_zen'], axis=0)
-
-                f_ssfr_fup_mean = interp1d(cld_leg['ssfr_zen_wvl'], fup_mean, bounds_error=False, fill_value=np.nan)
-                f_ssfr_fdn_mean = interp1d(cld_leg['ssfr_zen_wvl'], fdn_mean, bounds_error=False, fill_value=np.nan)
-                f_ssfr_fup_std = interp1d(cld_leg['ssfr_zen_wvl'], fup_std, bounds_error=False, fill_value=np.nan)
-                f_ssfr_fdn_std = interp1d(cld_leg['ssfr_zen_wvl'], fdn_std, bounds_error=False, fill_value=np.nan)
 
                 output_dict = {
                     'wvl': effective_wvl,
@@ -701,86 +578,68 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     'time_end': np.full(effective_wvl.shape, time_end, dtype=float),
                     'alt_km': np.full(effective_wvl.shape, alt_avg, dtype=float),
                     'sza': np.full(effective_wvl.shape, sza_avg, dtype=float),
-                    'ssfr_fup_mean': f_ssfr_fup_mean(effective_wvl),
-                    'ssfr_fdn_mean': f_ssfr_fdn_mean(effective_wvl),
-                    'ssfr_fup_std': f_ssfr_fup_std(effective_wvl),
-                    'ssfr_fdn_std': f_ssfr_fdn_std(effective_wvl),
+                    'ssfr_fup_mean': interp_nan(cld_leg['ssfr_zen_wvl'], fup_mean, effective_wvl),
+                    'ssfr_fdn_mean': interp_nan(cld_leg['ssfr_zen_wvl'], fdn_mean, effective_wvl),
+                    'ssfr_fup_std': interp_nan(cld_leg['ssfr_zen_wvl'], fup_std, effective_wvl),
+                    'ssfr_fdn_std': interp_nan(cld_leg['ssfr_zen_wvl'], fdn_std, effective_wvl),
                     'sfc_alb_final': np.interp(effective_wvl, final_alb_wvl, final_alb, left=np.nan, right=np.nan),
-                    'simu_fup_sfc_final': np.nanmean(flux_up_results[:, :, 0], axis=0),
-                    'simu_fdn_sfc_final': np.nanmean(flux_down_results[:, :, 0], axis=0),
-                    'simu_fdn_sfc_direct_final': np.nanmean(flux_down_dir_results[:, :, 0], axis=0),
-                    'simu_fdn_sfc_diff_final': np.nanmean(flux_down_diff_results[:, :, 0], axis=0),
-                    'simu_fup_p3_final': np.nanmean(flux_up_results[:, :, 1], axis=0),
-                    'simu_fdn_p3_final': np.nanmean(flux_down_results[:, :, 1], axis=0),
-                    'simu_fdn_p3_direct_final': np.nanmean(flux_down_dir_results[:, :, 1], axis=0),
-                    'simu_fdn_p3_diff_final': np.nanmean(flux_down_diff_results[:, :, 1], axis=0),
-                    'simu_fup_toa_final': np.nanmean(flux_up_results[:, :, -1], axis=0),
-                    'simu_fdn_toa_final': np.nanmean(flux_down_results[:, :, -1], axis=0),
+                    'simu_fup_sfc_final': flux_up[:, 0],
+                    'simu_fdn_sfc_final': flux_down[:, 0],
+                    'simu_fdn_sfc_direct_final': flux_down_dir[:, 0],
+                    'simu_fdn_sfc_diff_final': flux_down_diff[:, 0],
+                    'simu_fup_p3_final': flux_up[:, 1],
+                    'simu_fdn_p3_final': flux_down[:, 1],
+                    'simu_fdn_p3_direct_final': flux_down_dir[:, 1],
+                    'simu_fdn_p3_diff_final': flux_down_diff[:, 1],
+                    'simu_fup_toa_final': flux_up[:, -1],
+                    'simu_fdn_toa_final': flux_down[:, -1],
                 }
-                output_df = pd.DataFrame(output_dict)
-                output_df.to_csv(output_csv_name, index=False)
+                write_column_csv(output_csv_name, output_dict)
                 print(f"Saving final extended spectral simulation to {output_csv_name}")
 
-                del output_dict, output_df
-                del flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results
-                cld_legs[ileg] = None
+                del output_dict
+                del flux_down, flux_down_dir, flux_down_diff, flux_up
                 del fup_mean, fdn_mean, fup_std, fdn_std, cld_leg
                 gc.collect()
                 continue
             
-            for flux_dn in [flux_down_results, flux_down_dir_results, flux_down_diff_results, flux_up_results]:
-                for iz in range(3):
-                    for iset in range(flux_down_results.shape[0]):
-                        flux_dn[iset, :, iz] = ssfr_slit_convolve(effective_wvl, flux_dn[iset, :, iz], wvl_joint=950)
+            for flux_arr in (flux_down, flux_down_dir, flux_down_diff, flux_up):
+                for iz in range(flux_arr.shape[1]):
+                    flux_arr[:, iz] = ssfr_slit_convolve(effective_wvl, flux_arr[:, iz], wvl_joint=950)
             
             
             # simulated fluxes at surface
-            Fup_sfc = flux_up_results[:, :, 0]
-            Fdn_sfc = flux_down_results[:, :, 0]
-            Fdn_sfc_direct = flux_down_dir_results[:, :, 0]
-            Fdn_sfc_diff = flux_down_diff_results[:, :, 0]
+            Fup_sfc = flux_up[:, 0]
+            Fdn_sfc = flux_down[:, 0]
+            Fdn_sfc_direct = flux_down_dir[:, 0]
+            Fdn_sfc_diff = flux_down_diff[:, 0]
 
             # simulated fluxes at p3 altitude
-            Fup_p3 = flux_up_results[:, :, 1]
-            Fdn_p3 = flux_down_results[:, :, 1]
-            Fdn_p3_diff_ratio = flux_down_diff_results[:, :, 1] / flux_down_results[:, :, 1]
+            Fup_p3 = flux_up[:, 1]
+            Fdn_p3 = flux_down[:, 1]
+            Fdn_p3_direct = flux_down_dir[:, 1]
+            Fdn_p3_diff = flux_down_diff[:, 1]
+            Fdn_p3_diff_ratio = Fdn_p3_diff / Fdn_p3
             
             # simulated fluxes at toa
-            Fup_toa = flux_up_results[:, :, -1]
-            Fdn_toa = flux_down_results[:, :, -1]
+            Fup_toa = flux_up[:, -1]
+            Fdn_toa = flux_down[:, -1]
             
             # interpolate the simulated fluxes to ssfr wavelength grid
             p3_up_to_dn_ratio = Fup_p3 / Fdn_p3
-            p3_up_to_dn_ratio_mean = np.nanmean(p3_up_to_dn_ratio, axis=0)
-            f_p3_up_to_dn_ratio_mean = interp1d(effective_wvl, p3_up_to_dn_ratio_mean, bounds_error=False, fill_value=np.nan)
-            p3_up_to_dn_ratio_mean = f_p3_up_to_dn_ratio_mean(cld_leg['ssfr_zen_wvl'])
-
-            f_Fup_sfc_mean = interp1d(effective_wvl, np.nanmean(Fup_sfc, axis=0), bounds_error=False, fill_value=np.nan)
-            Fup_sfc_mean_interp = f_Fup_sfc_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_sfc_mean = interp1d(effective_wvl, np.nanmean(Fdn_sfc, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_sfc_mean_interp = f_Fdn_sfc_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_sfc_direct_mean = interp1d(effective_wvl, np.nanmean(Fdn_sfc_direct, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_sfc_direct_mean_interp = f_Fdn_sfc_direct_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_sfc_diff_mean = interp1d(effective_wvl, np.nanmean(Fdn_sfc_diff, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_sfc_diff_mean_interp = f_Fdn_sfc_diff_mean(cld_leg['ssfr_zen_wvl'])
-            
-            f_Fup_p3_mean = interp1d(effective_wvl, np.nanmean(Fup_p3, axis=0), bounds_error=False, fill_value=np.nan)
-            Fup_p3_mean_interp = f_Fup_p3_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_p3_mean = interp1d(effective_wvl, np.nanmean(Fdn_p3, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_p3_mean_interp = f_Fdn_p3_mean(cld_leg['ssfr_zen_wvl'])
-            
-            f_Fdn_p3_direct_mean = interp1d(effective_wvl, np.nanmean(flux_down_dir_results[:, :, 1], axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_p3_direct_mean_interp = f_Fdn_p3_direct_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_p3_diff_mean = interp1d(effective_wvl, np.nanmean(flux_down_diff_results[:, :, 1], axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_p3_diff_mean_interp = f_Fdn_p3_diff_mean(cld_leg['ssfr_zen_wvl'])
-            
-            f_Fdn_p3_diff_ratio_mean = interp1d(effective_wvl, np.nanmean(Fdn_p3_diff_ratio, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_p3_diff_ratio_mean_interp = f_Fdn_p3_diff_ratio_mean(cld_leg['ssfr_zen_wvl'])
-            
-            f_Fup_toa_mean = interp1d(effective_wvl, np.nanmean(Fup_toa, axis=0), bounds_error=False, fill_value=np.nan)
-            Fup_toa_mean_interp = f_Fup_toa_mean(cld_leg['ssfr_zen_wvl'])
-            f_Fdn_toa_mean = interp1d(effective_wvl, np.nanmean(Fdn_toa, axis=0), bounds_error=False, fill_value=np.nan)
-            Fdn_toa_mean_interp = f_Fdn_toa_mean(cld_leg['ssfr_zen_wvl'])
+            target_wvl = cld_leg['ssfr_zen_wvl']
+            p3_up_to_dn_ratio_mean = interp_nan(effective_wvl, p3_up_to_dn_ratio, target_wvl)
+            Fup_sfc_mean_interp = interp_nan(effective_wvl, Fup_sfc, target_wvl)
+            Fdn_sfc_mean_interp = interp_nan(effective_wvl, Fdn_sfc, target_wvl)
+            Fdn_sfc_direct_mean_interp = interp_nan(effective_wvl, Fdn_sfc_direct, target_wvl)
+            Fdn_sfc_diff_mean_interp = interp_nan(effective_wvl, Fdn_sfc_diff, target_wvl)
+            Fup_p3_mean_interp = interp_nan(effective_wvl, Fup_p3, target_wvl)
+            Fdn_p3_mean_interp = interp_nan(effective_wvl, Fdn_p3, target_wvl)
+            Fdn_p3_direct_mean_interp = interp_nan(effective_wvl, Fdn_p3_direct, target_wvl)
+            Fdn_p3_diff_mean_interp = interp_nan(effective_wvl, Fdn_p3_diff, target_wvl)
+            Fdn_p3_diff_ratio_mean_interp = interp_nan(effective_wvl, Fdn_p3_diff_ratio, target_wvl)
+            Fup_toa_mean_interp = interp_nan(effective_wvl, Fup_toa, target_wvl)
+            Fdn_toa_mean_interp = interp_nan(effective_wvl, Fdn_toa, target_wvl)
 
             
             # SSFR observation
@@ -841,11 +700,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
             if np.any(np.isnan(alb_corr)):
                 if np.any(np.isfinite(alb_corr)):
-                    alb_corr_series = pd.Series(alb_corr)
-                    alb_corr_filled = alb_corr_series.ffill(limit=2).bfill(limit=2)
-                    while np.any(np.isnan(alb_corr_filled)):
-                        alb_corr_filled = alb_corr_filled.ffill(limit=2).bfill(limit=2)
-                    alb_corr[np.isnan(alb_corr)] = np.array(alb_corr_filled)[np.isnan(alb_corr)]
+                    alb_corr = fill_nan_nearest(alb_corr)
                 else:
                     alb_corr = alb_obs.copy()
 
@@ -885,8 +740,8 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             ax.fill_between(cld_leg['ssfr_zen_wvl'],
                             fdn_mean-fdn_std,
                             fdn_mean+fdn_std, color='bisque', alpha=0.75)
-            ax.plot(effective_wvl, np.nanmean(Fup_p3, axis=0), color='green', linewidth=2.0, label='Simulation upward')
-            ax.plot(effective_wvl, np.nanmean(Fdn_p3, axis=0), color='red', linewidth=2.0, label='Simulation downward')
+            ax.plot(effective_wvl, Fup_p3, color='green', linewidth=2.0, label='Simulation upward')
+            ax.plot(effective_wvl, Fdn_p3, color='red', linewidth=2.0, label='Simulation downward')
             ax.set_xlabel('Wavelength (nm)', fontsize=12)
             ax.set_ylabel('Flux (W m$^{-2}$ nm$^{-1}$)', fontsize=12)
             ax.set_xlim(cld_leg['ssfr_zen_wvl'][0], cld_leg['ssfr_zen_wvl'][-1])
@@ -1015,19 +870,14 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 'fdn_flux_weighted_relative_rmse': fdn_flux_weighted_relative_rmse,
             }
             
-            output_df = pd.DataFrame(output_dict)
-            output_df.to_csv(output_csv_name, index=False)
+            write_column_csv(output_csv_name, output_dict)
             if iter == 0:
                 alb_wvl_extend = np.concatenate(([348.0], alb_wvl, [2050.0]))
                 alb_corr_extend = np.concatenate(([alb_corr[0]], alb_corr, [alb_corr[-1]]))
                 alb_ice_fit_extend = np.concatenate(([alb_ice_fit[0]], alb_ice_fit, [alb_ice_fit[-1]]))
                 # write out the new surface albedo
                 #/----------------------------------------------------------------------------\#                    
-                alb_avg_update3 = alb_corr_extend.copy()
-                alb_avg_update3_nonnan_first_ind = np.where(~np.isnan(alb_avg_update3))[0][0]
-                alb_avg_update3[:alb_avg_update3_nonnan_first_ind] = alb_avg_update3[alb_avg_update3_nonnan_first_ind]
-                alb_avg_update3_nonnan_last_ind = np.where(~np.isnan(alb_avg_update3))[0][-1]
-                alb_avg_update3[alb_avg_update3_nonnan_last_ind:] = alb_avg_update3[alb_avg_update3_nonnan_last_ind]
+                alb_avg_update3 = extend_edges_with_nearest_finite(alb_corr_extend)
                 write_2col_file(filename=os.path.join(f'{_fdir_general_}/sfc_alb', f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_1.dat'),
                                 wvl=alb_wvl_extend,
                                 val=alb_avg_update3,
@@ -1036,11 +886,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                         )
                                 )
                     
-                alb_avg_update4 = alb_ice_fit_extend.copy()
-                alb_avg_update4_nonnan_first_ind = np.where(~np.isnan(alb_avg_update4))[0][0]
-                alb_avg_update4[:alb_avg_update4_nonnan_first_ind] = alb_avg_update4[alb_avg_update4_nonnan_first_ind]
-                alb_avg_update4_nonnan_last_ind = np.where(~np.isnan(alb_avg_update4))[0][-1]
-                alb_avg_update4[alb_avg_update4_nonnan_last_ind:] = alb_avg_update4[alb_avg_update4_nonnan_last_ind]
+                alb_avg_update4 = extend_edges_with_nearest_finite(alb_ice_fit_extend)
                 write_2col_file(filename=os.path.join(f'{_fdir_general_}/sfc_alb', f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_2.dat'),
                                 wvl=alb_wvl_extend,
                                 val=alb_avg_update4,
@@ -1054,11 +900,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                 alb_wvl_extend = np.concatenate(([348.0], alb_wvl, [2050.0]))
                 alb_ice_fit_extend = np.concatenate(([alb_ice_fit[0]], alb_ice_fit, [alb_ice_fit[-1]]))
 
-                alb_avg_update5 = alb_ice_fit_extend.copy()
-                alb_avg_update5_nonnan_first_ind = np.where(~np.isnan(alb_avg_update5))[0][0]
-                alb_avg_update5[:alb_avg_update5_nonnan_first_ind] = alb_avg_update5[alb_avg_update5_nonnan_first_ind]
-                alb_avg_update5_nonnan_last_ind = np.where(~np.isnan(alb_avg_update5))[0][-1]
-                alb_avg_update5[alb_avg_update5_nonnan_last_ind:] = alb_avg_update5[alb_avg_update5_nonnan_last_ind]
+                alb_avg_update5 = extend_edges_with_nearest_finite(alb_ice_fit_extend)
                 next_iter = iter + 1
                 write_2col_file(filename=os.path.join(f'{_fdir_general_}/sfc_alb', f'sfc_alb_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}km_iter_{next_iter}.dat'),
                                 wvl=alb_wvl_extend,
@@ -1071,11 +913,7 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             if iter > 0:
                 # write out the new simulated p3 level upward to downward ratio
                 #/----------------------------------------------------------------------------\#
-                p3_up_to_dn_ratio_update = p3_up_to_dn_ratio_mean
-                p3_up_to_dn_ratio_update_nonnan_first_ind = np.where(~np.isnan(p3_up_to_dn_ratio_update))[0][0]
-                p3_up_to_dn_ratio_update[:p3_up_to_dn_ratio_update_nonnan_first_ind] = alb_avg[p3_up_to_dn_ratio_update_nonnan_first_ind]
-                p3_up_to_dn_ratio_update_nonnan_last_ind = np.where(~np.isnan(p3_up_to_dn_ratio_update))[0][-1]
-                p3_up_to_dn_ratio_update[p3_up_to_dn_ratio_update_nonnan_last_ind:] = p3_up_to_dn_ratio_update[p3_up_to_dn_ratio_update_nonnan_last_ind]
+                p3_up_to_dn_ratio_update = extend_edges_with_nearest_finite(p3_up_to_dn_ratio_mean)
                 write_2col_file(filename=os.path.join(f'{_fdir_general_}/sfc_alb', f'p3_up_dn_ratio_{date_s}_{time_start:.3f}_{time_end:.3f}_{alt_avg:.2f}_{iter}.dat'),
                                 wvl=alb_wvl,
                                 val=p3_up_to_dn_ratio_update,
@@ -1085,13 +923,14 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                                 )
                 #\----------------------------------------------------------------------------/#
 
-            del output_dict, output_df
-            cld_legs[ileg] = None
+            del output_dict
             del cld_leg, Fup_sfc, Fdn_sfc, Fdn_sfc_direct, Fdn_sfc_diff
-            del Fup_p3, Fdn_p3
+            del Fup_p3, Fdn_p3, Fdn_p3_direct, Fdn_p3_diff
+            del flux_down, flux_down_dir, flux_down_diff, flux_up
             del Fup_sfc_mean_interp, Fdn_sfc_mean_interp
             del Fdn_sfc_direct_mean_interp, Fdn_sfc_diff_mean_interp
             del Fup_p3_mean_interp, Fdn_p3_mean_interp
+            del Fdn_p3_direct_mean_interp, Fdn_p3_diff_mean_interp
             del Fup_toa_mean_interp, Fdn_toa_mean_interp
             del fup_total_rmse, fup_average_rmse, fup_relative_rmse
             del fup_broadband_bias, fup_flux_weighted_relative_rmse
@@ -1103,7 +942,6 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
 
             gc.collect()
         else:
-            cld_legs[ileg] = None
             del cld_leg
             gc.collect()
 
