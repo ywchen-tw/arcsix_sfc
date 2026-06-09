@@ -68,6 +68,11 @@ MIN_FINAL_ITERATION = 2
 try:
     from .settings import *
     from .helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
+    from .postfit import (
+        apply_postfit_correction,
+        postfit_h2o_6_fit_end,
+        postfit_h2o_6_mask_end,
+    )
     from .setup import (
         default_atm_levels,
         load_cloud_observation_leg,
@@ -80,6 +85,11 @@ try:
 except ImportError:
     from settings import *
     from helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
+    from postfit import (
+        apply_postfit_correction,
+        postfit_h2o_6_fit_end,
+        postfit_h2o_6_mask_end,
+    )
     from setup import (
         default_atm_levels,
         load_cloud_observation_leg,
@@ -686,16 +696,19 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
             alb_corr[alb_corr > 1.0] = 1.0
             
             adaptive_h2o_6_end = find_h2o_6_end(alb_wvl, alb_corr)
-            if adaptive_h2o_6_end != h2o_6_end:
+            mask_h2o_6_end = postfit_h2o_6_mask_end(date_s, adaptive_h2o_6_end)
+            fit_h2o_6_end = postfit_h2o_6_fit_end(date_s, mask_h2o_6_end)
+            if mask_h2o_6_end != h2o_6_end:
+                suffix = ' date override' if mask_h2o_6_end != adaptive_h2o_6_end else ''
                 print(
                     f'Extending H2O-6 mask end from {h2o_6_end:.1f} '
-                    f'to {adaptive_h2o_6_end:.1f} nm.'
+                    f'to {mask_h2o_6_end:.1f} nm.{suffix}'
                 )
             alb_corr_mask = gas_abs_masking(
                 alb_wvl,
                 alb_corr,
                 alt=alt_avg,
-                h2o_6_end_override=adaptive_h2o_6_end,
+                h2o_6_end_override=mask_h2o_6_end,
             )
             alb_corr[np.isnan(alb_corr)] = alb_corr_mask[np.isnan(alb_corr)]
             if np.any(np.isnan(alb_corr)):
@@ -712,10 +725,17 @@ def flt_trk_atm_corr(date=datetime.datetime(2024, 5, 31),
                     alb_corr,
                     alt=alt_avg,
                     clear_sky=clear_sky,
-                    h2o_6_end=adaptive_h2o_6_end,
+                    h2o_6_end=fit_h2o_6_end,
                 )
                 if np.all(~np.isfinite(alb_ice_fit)):
                     raise ValueError('snow/ice fitted albedo is all non-finite')
+                alb_ice_fit = apply_postfit_correction(
+                    alb_wvl,
+                    alb_ice_fit,
+                    date_s=date_s,
+                    alt=alt_avg,
+                    clear_sky=clear_sky,
+                )
             except Exception as err:
                 print(
                     f'Warning: snow/ice albedo fitting failed for {date_s} '
