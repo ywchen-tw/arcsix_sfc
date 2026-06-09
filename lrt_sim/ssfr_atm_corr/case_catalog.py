@@ -251,7 +251,7 @@ def mean_closure_metric_status(output_files, thresholds):
     failed_checks.extend(invalid_files)
     return len(failed_checks) == 0, failed_checks, metrics
 
-ALL_CASE_CATALOG = [{'id': 'case_029',
+ALL_CASE_CATALOG = [{'id': 'case_001',
   'date': '2024-05-28',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -263,7 +263,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
                     
- {'id': 'case_030',
+ {'id': 'case_002',
   'date': '2024-05-31',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -274,7 +274,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   }
  ,
- {'id': 'case_031',
+ {'id': 'case_003',
   'date': '2024-05-31',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -285,7 +285,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_032',
+ {'id': 'case_004',
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [[13.62, 13.75],  # 300m, cloudy, camera icing
@@ -304,7 +304,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 1.41,
   'manual_cloud_cot': 21.27,},
  
- {'id': 'case_033',
+ {'id': 'case_005',
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -324,7 +324,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.5,
   'manual_cloud_cot': 24.31,},
  
- {'id': 'case_034',
+ {'id': 'case_006',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
@@ -335,7 +335,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_035',
+ {'id': 'case_007',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -346,7 +346,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_036',
+ {'id': 'case_008',
   'date': '2024-06-05',
   'case_tag': 'clear_atm_corr_3',
   'tmhr_ranges_select': [
@@ -357,7 +357,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_037',
+ {'id': 'case_009',
   'date': '2024-06-05',
   'case_tag': 'clear_sky_spiral_atm_corr',
   'tmhr_ranges_select': [
@@ -382,7 +382,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_038',
+ {'id': 'case_010',
   'date': '2024-06-06',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -396,7 +396,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_039',
+ {'id': 'case_011',
   'date': '2024-06-07',
   'case_tag': 'cloudy_atm_corr',
   'tmhr_ranges_select': [
@@ -416,7 +416,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.15,
   'manual_cloud_cot': 6.02,},
  
- {'id': 'case_040',
+ {'id': 'case_012',
   'date': '2024-06-11',
   'case_tag': 'clear_sky_spiral_atm_corr',
   'tmhr_ranges_select': [
@@ -435,7 +435,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_041',
+ {'id': 'case_013',
   'date': '2024-06-11',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
@@ -447,7 +447,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_042',
+ {'id': 'case_014',
   'date': '2024-06-11',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -459,7 +459,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_043',
+ {'id': 'case_015',
   'date': '2024-06-13',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [[13.704, 13.817], # 100-450m, clear, some cloud
@@ -469,7 +469,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_044',
+ {'id': 'case_016',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
@@ -489,7 +489,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.15,
   'manual_cloud_cot': 7.82,},
  
- {'id': 'case_045',
+ {'id': 'case_017',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -509,7 +509,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.28,
   'manual_cloud_cot': 2.39,},
  
- {'id': 'case_046',
+ {'id': 'case_018',
   'date': '2024-06-13',
   'case_tag': 'cloudy_atm_corr_3',
   'tmhr_ranges_select': [
@@ -529,7 +529,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.38,
   'manual_cloud_cot': 3.59,},
  
- {'id': 'case_047',
+ {'id': 'case_019',
   'date': '2024-06-13',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -540,7 +540,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_048',
+ {'id': 'case_020',
   'date': '2024-07-25',
   'case_tag': 'cloudy_atm_corr',
   'tmhr_ranges_select': [
@@ -560,7 +560,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.16,
   'manual_cloud_cot': 1.31,},
  
- {'id': 'case_049',
+ {'id': 'case_021',
   'date': '2024-07-25',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -580,7 +580,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.16,
   'manual_cloud_cot': 1.31,},
  
- {'id': 'case_050',
+ {'id': 'case_022',
   'date': '2024-07-29',
   'case_tag': 'clear_sky_spiral_atm_corr',
   'tmhr_ranges_select': [
@@ -598,7 +598,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_051',
+ {'id': 'case_023',
   'date': '2024-07-29',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
@@ -610,7 +610,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_052',
+ {'id': 'case_024',
   'date': '2024-07-29',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -622,7 +622,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_053',
+ {'id': 'case_025',
   'date': '2024-07-30',
   'case_tag': 'clear_sky_spiral_atm_corr',
   'tmhr_ranges_select': [
@@ -642,7 +642,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_054',
+ {'id': 'case_026',
   'date': '2024-07-30',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -654,7 +654,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_055',
+ {'id': 'case_027',
   'date': '2024-08-01',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -665,7 +665,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_056',
+ {'id': 'case_028',
   'date': '2024-08-01',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -676,7 +676,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_057',
+ {'id': 'case_029',
   'date': '2024-08-02',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
@@ -687,7 +687,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_058',
+ {'id': 'case_030',
   'date': '2024-08-02',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -698,7 +698,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'levels': None,
   },
  
- {'id': 'case_059',
+ {'id': 'case_031',
   'date': '2024-08-07',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [[13.344, 13.763], # 100m, cloudy
@@ -717,7 +717,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.69,
   'manual_cloud_cot': 1.59,},
  
- {'id': 'case_060',
+ {'id': 'case_032',
   'date': '2024-08-07',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -738,40 +738,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.62,
   'manual_cloud_cot': 16.21,},
  
-#  {'id': 'case_061',
-#   'date': '2024-08-08',
-#   'case_tag': 'clear_atm_corr_1',
-#   'tmhr_ranges_select': [
-#                         [12.990, 13.180], # 180m, clear
-#                         ],
-#   'simulation_interval': 0.5,
-#   'clear_sky': True,
-#   'levels': None,
-#   },
- 
-#  {'id': 'case_062',
-#   'date': '2024-08-08',
-#   'case_tag': 'clear_atm_corr_2',
-#   'tmhr_ranges_select': [
-#                         [14.250, 14.373], # 180m, clear
-#                         ],
-#   'simulation_interval': 0.5,
-#   'clear_sky': True,
-#   'levels': None,
-#   },
- 
-#  {'id': 'case_063',
-#   'date': '2024-08-08',
-#   'case_tag': 'clear_atm_corr_3',
-#   'tmhr_ranges_select': [
-#                         [16.471, 16.601], # 180m, clear
-#                         ],
-#   'simulation_interval': 0.5,
-#   'clear_sky': True,
-#   'levels': None,
-#   },
- 
- {'id': 'case_064',
+ {'id': 'case_033',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
@@ -791,7 +758,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.67,
   'manual_cloud_cot': 14.12,},
  
- {'id': 'case_065',
+ {'id': 'case_034',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -811,7 +778,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 1.81,
   'manual_cloud_cot': 12.41,},
  
- {'id': 'case_066',
+ {'id': 'case_035',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
@@ -831,19 +798,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.34,
   'manual_cloud_cot': 13.93,},
  
-#  {'id': 'case_067',
-#   'date': '2024-08-09',
-#   'case_tag': 'clear_atm_corr',
-#   'tmhr_ranges_select': [
-#                         [14.750, 15.060], # 100m, clear
-#                         [15.622, 15.887], # 100m, clear
-#                         ],
-#   'simulation_interval': 0.5,
-#   'clear_sky': True,
-#   'levels': None,
-#   },
- 
- {'id': 'case_068',
+ {'id': 'case_036',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -863,7 +818,7 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'manual_cloud_cbh': 0.29,
   'manual_cloud_cot': 8.93,},
  
- {'id': 'case_069',
+ {'id': 'case_037',
   'date': '2024-08-15',
   'case_tag': 'clear_atm_corr',
   'tmhr_ranges_select': [
@@ -875,6 +830,64 @@ ALL_CASE_CATALOG = [{'id': 'case_029',
   'clear_sky': True,
   'levels': None,
   }
+]
+
+
+# Bad cases from the legacy catalog. These are kept for traceability but are
+# intentionally excluded from CASE_CATALOG.
+BAD_CASE_CATALOG = [
+ {'id': 'bad_case_001',
+  'legacy_id': 'case_061',
+  'date': '2024-08-08',
+  'case_tag': 'clear_atm_corr_1',
+  'tmhr_ranges_select': [
+                        [12.990, 13.180], # 180m, clear
+                        ],
+  'simulation_interval': 0.5,
+  'clear_sky': True,
+  'levels': None,
+  'note': 'Bad case; excluded from active catalog.',
+  },
+ 
+ {'id': 'bad_case_002',
+  'legacy_id': 'case_062',
+  'date': '2024-08-08',
+  'case_tag': 'clear_atm_corr_2',
+  'tmhr_ranges_select': [
+                        [14.250, 14.373], # 180m, clear
+                        ],
+  'simulation_interval': 0.5,
+  'clear_sky': True,
+  'levels': None,
+  'note': 'Bad case; excluded from active catalog.',
+  },
+ 
+ {'id': 'bad_case_003',
+  'legacy_id': 'case_063',
+  'date': '2024-08-08',
+  'case_tag': 'clear_atm_corr_3',
+  'tmhr_ranges_select': [
+                        [16.471, 16.601], # 180m, clear
+                        ],
+  'simulation_interval': 0.5,
+  'clear_sky': True,
+  'levels': None,
+  'note': 'Bad case; excluded from active catalog.',
+  },
+ 
+ {'id': 'bad_case_004',
+  'legacy_id': 'case_067',
+  'date': '2024-08-09',
+  'case_tag': 'clear_atm_corr',
+  'tmhr_ranges_select': [
+                        [14.750, 15.060], # 100m, clear
+                        [15.622, 15.887], # 100m, clear
+                        ],
+  'simulation_interval': 0.5,
+  'clear_sky': True,
+  'levels': None,
+  'note': 'Bad case; excluded from active catalog.',
+  },
 ]
 
 

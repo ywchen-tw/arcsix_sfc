@@ -24,25 +24,27 @@ else:
     from settings import _fdir_data_, _fdir_general_
 
 
-DEFAULT_CASE_ID = 'case_029'
+DEFAULT_CASE_ID = 'case_001'
 
 CLEAR_SKY_CASE_ID_LIST = [
-    'case_029', 'case_030', 'case_031', 'case_034', 'case_035',
-    'case_036', 'case_038', 'case_041', 'case_042', 'case_043',
-    'case_047', 'case_051', 'case_052', 'case_054', 'case_055',
-    'case_056', 'case_057', 'case_058', 
-    # 'case_061', 'case_062', 'case_063', 'case_067', 
-    'case_069',
+    'case_001', 'case_002', 'case_003',
+    'case_006', 'case_007', 'case_008',
+    'case_010', 'case_013', 'case_014', 'case_015',
+    'case_019', 'case_023', 'case_024',
+    'case_026', 'case_027', 'case_028', 'case_029', 'case_030',
+    'case_037',
 ]
 
 CLOUDY_CASE_ID_LIST = [
-    'case_032', 'case_033', 'case_039', 'case_044', 'case_045',
-    'case_046', 'case_048', 'case_049', 'case_059', 'case_060',
-    'case_064', 'case_065', 'case_066', 'case_068',
+    'case_004', 'case_005',
+    'case_011',
+    'case_016', 'case_017', 'case_018',
+    'case_020', 'case_021',
+    'case_031', 'case_032', 'case_033', 'case_034', 'case_035', 'case_036',
 ]
 
 SPIRAL_CASE_ID_LIST = [
-    'case_037', 'case_040', 'case_050', 'case_053',
+    'case_009', 'case_012', 'case_022', 'case_025',
 ]
 
 CASE_ID_LIST = sorted(CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST + SPIRAL_CASE_ID_LIST)

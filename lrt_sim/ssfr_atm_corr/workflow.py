@@ -1160,6 +1160,6 @@ if __name__ == '__main__':
     except ImportError:
         from runner import run_cases
 
-    CASE_ID = 'case_043'
+    CASE_ID = 'case_015'
     ITERATIONS = range(1)
     run_cases(flt_trk_atm_corr, case_id=CASE_ID, iterations=ITERATIONS)
