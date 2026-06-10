@@ -512,8 +512,6 @@ def extend_final_albedo_1s(
         """Prevent extended albedo beyond native wavelengths from jumping above native endpoint."""
         row_ext = np.asarray(row_ext, dtype=float).copy()
         native_max = np.nanmax(native_wvl)
-        if native_max >= h2o_7_start:
-            return row_ext
         longwave = ext_wvl > native_max
         endpoint_window = (native_wvl >= native_max - 50.0) & (native_wvl <= native_max)
         finite_endpoint = endpoint_window & np.isfinite(row_native)
@@ -555,9 +553,11 @@ def extend_final_albedo_1s(
     extended = np.full((final_1s.shape[0], extension_wvl.size), np.nan, dtype=float)
     native_range = (extension_wvl >= np.nanmin(native_wvl)) & (extension_wvl <= np.nanmax(native_wvl))
     native_trust_range = native_range & (extension_wvl < h2o_7_start)
-    ratio_anchor = (
-        (native_wvl >= h2o_7_start - 50.0)
-        & (native_wvl < h2o_7_start)
+    native_max_wvl = np.nanmax(native_wvl)
+    # right-edge anchor: last 50 nm of native wavelengths — used to scale the
+    # template at the handoff point so row_ext(native_max) ≈ row(native_max)
+    right_edge_anchor = (
+        (native_wvl >= native_max_wvl - 50.0)
         & np.isfinite(leg_native_final)
         & (np.abs(leg_native_final) > 1e-6)
     )
@@ -586,10 +586,10 @@ def extend_final_albedo_1s(
         if np.count_nonzero(ratio_valid) < 2:
             ratio_valid = valid_ratio
         ratio_native = row[ratio_valid] / leg_native_final[ratio_valid]
-        row_ratio_anchor = ratio_anchor & np.isfinite(row)
+        row_right_edge = right_edge_anchor & np.isfinite(row)
         right_ratio = ratio_native[-1]
-        if np.count_nonzero(row_ratio_anchor) >= 2:
-            right_ratio = np.nanmedian(row[row_ratio_anchor] / leg_native_final[row_ratio_anchor])
+        if np.count_nonzero(row_right_edge) >= 2:
+            right_ratio = np.nanmedian(row[row_right_edge] / leg_native_final[row_right_edge])
         if not np.isfinite(right_ratio):
             right_ratio = ratio_native[-1]
         ratio_ext = np.interp(
