@@ -575,24 +575,32 @@ def extend_final_albedo_1s(
                 for tw in _debug_wvls:
                     tj = np.argmin(np.abs(ext_wvl - tw))
                     print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
-            # Bridge the native-endpoint → h2o_7_end gap with a linear blend so there
-            # is no discontinuity at the native grid edge (~1996 nm → 1997 nm).
+            # Cosine-taper blend from native endpoint into alb_extention values over
+            # a 200 nm window.  Because the blend at the right end equals
+            # row_ext[gap_region] exactly (alpha=1), the slope matches alb_extention
+            # continuously — no kink at the blend boundary.
             native_max = np.nanmax(native_wvl)
-            gap_region = (ext_wvl > native_max) & (ext_wvl <= h2o_7_end)
-            if np.any(gap_region):
-                left_idx = np.argmin(np.abs(ext_wvl - native_max))
-                right_idx = np.argmin(np.abs(ext_wvl - h2o_7_end))
-                left_val = row_ext[left_idx]
-                right_val = row_ext[right_idx]
-                if np.isfinite(left_val) and np.isfinite(right_val):
-                    row_ext[gap_region] = np.interp(
-                        ext_wvl[gap_region],
-                        [native_max, h2o_7_end],
-                        [left_val, right_val],
-                    )
+            blend_window = 200.0
+            left_idx = np.argmin(np.abs(ext_wvl - native_max))
+            native_endpoint = row_ext[left_idx]
+            gap_region = (ext_wvl > native_max) & (ext_wvl <= native_max + blend_window)
+            _gap_wvls = [1996.2, 1997.0, 2000.0, 2050.0, 2100.0, 2196.0, 2197.0, 2200.0]
             if irow in _debug_rows:
-                _gap_wvls = [1996.2, 1997.0, 2000.0, 2025.0, 2050.0]
-                print(f'[DEBUG per-row irow={irow} AFTER gap blend (native_max={native_max:.2f})]')
+                print(f'[DEBUG per-row irow={irow} BEFORE cosine blend] '
+                      f'native_max={native_max:.2f}  native_endpoint={native_endpoint:.6f}  '
+                      f'blend_end={native_max + blend_window:.2f}  gap_pts={np.sum(gap_region)}')
+                for tw in _gap_wvls:
+                    tj = np.argmin(np.abs(ext_wvl - tw))
+                    in_gap = gap_region[tj] if tj < len(gap_region) else False
+                    raw_alpha = np.clip((ext_wvl[tj] - native_max) / blend_window, 0.0, 1.0)
+                    cos_alpha = (1.0 - np.cos(np.pi * raw_alpha)) / 2.0
+                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}  in_gap={in_gap}  alpha={cos_alpha:.4f}')
+            if np.any(gap_region) and np.isfinite(native_endpoint):
+                alpha = np.clip((ext_wvl[gap_region] - native_max) / blend_window, 0.0, 1.0)
+                alpha = (1.0 - np.cos(np.pi * alpha)) / 2.0
+                row_ext[gap_region] = (1.0 - alpha) * native_endpoint + alpha * row_ext[gap_region]
+            if irow in _debug_rows:
+                print(f'[DEBUG per-row irow={irow} AFTER cosine blend]')
                 for tw in _gap_wvls:
                     tj = np.argmin(np.abs(ext_wvl - tw))
                     print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
