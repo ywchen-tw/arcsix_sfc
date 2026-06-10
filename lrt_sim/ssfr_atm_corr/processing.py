@@ -554,7 +554,7 @@ def extend_final_albedo_1s(
 
     extended = np.full((final_1s.shape[0], extension_wvl.size), np.nan, dtype=float)
     native_range = (extension_wvl >= np.nanmin(native_wvl)) & (extension_wvl <= np.nanmax(native_wvl))
-    native_trust_range = native_range & (extension_wvl < h2o_7_start)
+    native_trust_range = native_range
     ratio_anchor = (
         (native_wvl >= h2o_7_start - 50.0)
         & (native_wvl < h2o_7_start)
