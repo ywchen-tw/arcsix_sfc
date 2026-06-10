@@ -531,6 +531,9 @@ def _snowice_alb_fitting_from_best(
                 cap_mask = (alb_wvl >= 1450) & (alb_wvl <= 1550) & np.isfinite(alb_corr_fit)
                 if np.count_nonzero(cap_mask) >= 1:
                     cap_val = float(np.nanmin(alb_corr_fit[cap_mask]))
+                    h2o7_native = (alb_wvl >= 1748) & (alb_wvl <= 2050) & np.isfinite(alb_corr)
+                    if np.any(h2o7_native):
+                        cap_val = max(cap_val, float(np.nanmin(alb_corr[h2o7_native])))
                     fill_min = float(np.nanmin(replace_array))
                     if (
                         np.isfinite(cap_val)
