@@ -407,13 +407,26 @@ def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit
     if np.count_nonzero(anchors) >= 2:
         model = best_fit_spectrum[anchors]
         obs = alb_corr_fit[anchors]
-        model_var = np.sum((model - np.mean(model)) ** 2)
+        anchor_wvl = alb_wvl[anchors]
+        # Proximity weights: anchors nearest the gap edges (1290 / h2o_6_end)
+        # dominate, so the fill honors continuity at both boundaries instead of
+        # free-floating on a fit dominated by the far low-albedo IR anchors.
+        d_edge = np.where(
+            anchor_wvl < h2o_6_start,
+            h2o_6_start - anchor_wvl,
+            anchor_wvl - h2o_6_end,
+        )
+        w = np.exp(-d_edge / 20.0)
+        wsum = w.sum()
+        wm = np.sum(w * model) / wsum
+        wo = np.sum(w * obs) / wsum
+        model_var = np.sum(w * (model - wm) ** 2)
         if model_var > 1e-12:
-            scale = np.sum((model - np.mean(model)) * (obs - np.mean(obs))) / model_var
-            offset = np.mean(obs) - scale * np.mean(model)
+            scale = np.sum(w * (model - wm) * (obs - wo)) / model_var
+            offset = wo - scale * wm
         else:
             scale = 1.0
-            offset = np.mean(obs - model)
+            offset = wo - wm
     elif np.count_nonzero(anchors) == 1:
         anchor = np.flatnonzero(anchors)[0]
         scale = 1.0
