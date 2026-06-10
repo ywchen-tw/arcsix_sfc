@@ -408,15 +408,16 @@ def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit
         model = best_fit_spectrum[anchors]
         obs = alb_corr_fit[anchors]
         anchor_wvl = alb_wvl[anchors]
-        # Proximity weights: anchors nearest the gap edges (1290 / h2o_6_end)
-        # dominate, so the fill honors continuity at both boundaries instead of
-        # free-floating on a fit dominated by the far low-albedo IR anchors.
-        d_edge = np.where(
+        # Weight only the LEFT anchors by proximity to 1290 nm so the fill meets
+        # the unmasked observation at the band's left edge (fixes the boundary
+        # step seen in clear cases, e.g. 0605). Right anchors keep uniform weight
+        # so the steep IR descent stays observation-driven -- weighting the right
+        # edge over-lifts low-albedo cloudy cases (e.g. 0603, alt ~0.3 km).
+        w = np.where(
             anchor_wvl < h2o_6_start,
-            h2o_6_start - anchor_wvl,
-            anchor_wvl - h2o_6_end,
+            np.exp(-(h2o_6_start - anchor_wvl) / 20.0),
+            1.0,
         )
-        w = np.exp(-d_edge / 20.0)
         wsum = w.sum()
         wm = np.sum(w * model) / wsum
         wo = np.sum(w * obs) / wsum
