@@ -349,7 +349,7 @@ def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
     return np.clip(smoothed, 0, 1)
 
 
-def _smooth_h2o5_h2o6_transition(alb_wvl, alb, boundary=1286.0, half_width=40.0, kernel=11):
+def _smooth_h2o5_h2o6_transition(alb_wvl, alb, boundary=1286.0, half_width=10.0, kernel=5):
     """Broadly smooth the fitted h2o5/h2o6 fill transition, pinning the anchor.
 
     The h2o_5 and h2o_6 gaps are filled independently; the h2o_5 fill can
