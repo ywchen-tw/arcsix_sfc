@@ -535,20 +535,46 @@ def extend_final_albedo_1s(
     if force_row_extension:
         use_template = False
 
+    _debug_rows = {37}
+    _debug_wvls = [1748.0, 1799.5, 1899.0, 1903.7, 1908.4, 1991.7, 1996.2]
+
     if not use_template:
         ext_wvl = None
+        _row_ntr = None  # native_trust_range on ext_wvl; computed once after first row
         extended_rows = []
-        for row in final_1s:
+        for irow, row in enumerate(final_1s):
             if np.all(~np.isfinite(row)):
                 if ext_wvl is None:
                     ext_wvl, _ = alb_extention(native_wvl, np.zeros_like(native_wvl), clear_sky=clear_sky)
+                    _row_ntr = (ext_wvl >= np.nanmin(native_wvl)) & (ext_wvl <= np.nanmax(native_wvl))
                 extended_rows.append(np.full(ext_wvl.shape, np.nan, dtype=float))
                 continue
             row_ext_wvl, row_ext = alb_extention(native_wvl, row, clear_sky=clear_sky)
             if ext_wvl is None:
                 ext_wvl = row_ext_wvl
+                _row_ntr = (ext_wvl >= np.nanmin(native_wvl)) & (ext_wvl <= np.nanmax(native_wvl))
             row_ext = np.interp(ext_wvl, row_ext_wvl, row_ext, left=np.nan, right=np.nan)
             row_ext = cap_longwave_extension(ext_wvl, row_ext, row)
+            if irow in _debug_rows:
+                print(f'[DEBUG per-row irow={irow} BEFORE patch]')
+                for tw in _debug_wvls:
+                    ti = np.argmin(np.abs(native_wvl - tw))
+                    tj = np.argmin(np.abs(ext_wvl - tw))
+                    print(f'  native[{native_wvl[ti]:.2f}]={row[ti]}  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
+            finite_row = np.isfinite(row)
+            if _row_ntr is not None and np.any(_row_ntr) and np.count_nonzero(finite_row) >= 2:
+                row_ext[_row_ntr] = np.interp(
+                    ext_wvl[_row_ntr],
+                    native_wvl[finite_row],
+                    row[finite_row],
+                    left=np.nan,
+                    right=np.nan,
+                )
+            if irow in _debug_rows:
+                print(f'[DEBUG per-row irow={irow} AFTER patch]')
+                for tw in _debug_wvls:
+                    tj = np.argmin(np.abs(ext_wvl - tw))
+                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             extended_rows.append(row_ext)
         return ext_wvl if ext_wvl is not None else np.array([]), np.vstack(extended_rows) if extended_rows else np.empty((0, 0))
 
@@ -561,8 +587,6 @@ def extend_final_albedo_1s(
         & np.isfinite(leg_native_final)
         & (np.abs(leg_native_final) > 1e-6)
     )
-    _debug_rows = {37}
-    _debug_wvls = [1748.0, 1799.5, 1899.0, 1903.7, 1908.4, 1991.7, 1996.2]
     if any(irow in _debug_rows for irow in range(len(final_1s))):
         print(f'[DEBUG extend INPUTS] '
               f'native_wvl=[{np.nanmin(native_wvl):.2f}, {np.nanmax(native_wvl):.2f}]  '
