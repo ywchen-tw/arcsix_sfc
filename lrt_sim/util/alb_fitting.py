@@ -779,7 +779,8 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     else:
         obs_anchor = np.nan
     model_anchor = np.interp(long_anchor_wvl, ori_spec_wvl, ori_spec_alb)
-    right_edge_mask = finite_alb & (alb_wvl < long_blend_start)
+    obs_right_edge = obs_anchor  # default; overwritten below if native obs reach near long_replace_start
+    right_edge_mask = finite_alb & (alb_wvl < long_replace_start)
     if np.any(right_edge_mask):
         right_edge_wvl   = float(alb_wvl[right_edge_mask][-1])
         obs_right_edge   = float(alb_corr_fitted[right_edge_mask][-1])
@@ -794,8 +795,8 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     # Linearly rescale the post-blend/replace region (≥1900 nm) so that:
     #   ceiling: inter-band peak (≥2000 nm) is anchored via the SNICAR 1750-window ratio
     #            ceiling = obs_1750_max × (model_lm_post2000 / model_lm_1750)
-    #   floor:   absorption trough is anchored to the observed minimum near 1495 nm
-    #            floor = obs_anchor (observed albedo at 1495 nm)
+    #   floor:   absorption trough anchored to the native observation at the right edge
+    #            (last native point before long_replace_start), ensuring continuity at 2000 nm.
     # The linear map raw_lo→floor, raw_hi→ceiling preserves spectral shape while
     # simultaneously respecting both observation-derived constraints. The same
     # transform is applied to the full ≥1900 nm region (blend + replace) to avoid
@@ -808,14 +809,14 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
         np.any(snicar_1750_mask)
         and np.any(snicar_post2000_mask)
         and np.count_nonzero(obs_1750_win) >= 1
-        and np.isfinite(obs_anchor)
+        and np.isfinite(obs_right_edge)
     ):
         model_lm_1750     = float(np.nanmax(interp_snicar_unscaled[snicar_1750_mask]))
         model_lm_post2000 = float(np.nanmax(interp_snicar_unscaled[snicar_post2000_mask]))
         obs_1750_max      = float(np.nanmax(alb_corr_fitted[obs_1750_win]))
         if model_lm_1750 > 1e-6 and np.isfinite(model_lm_post2000) and np.isfinite(obs_1750_max):
             ceiling   = obs_1750_max * model_lm_post2000 / model_lm_1750
-            floor_val = obs_anchor
+            floor_val = obs_right_edge
             raw_lo = float(np.nanmin(interp_ori_spec_alb[blend_and_replace_mask]))
             raw_hi = float(np.nanmax(interp_ori_spec_alb[blend_and_replace_mask]))
             if raw_hi > raw_lo and ceiling > floor_val > 0:
