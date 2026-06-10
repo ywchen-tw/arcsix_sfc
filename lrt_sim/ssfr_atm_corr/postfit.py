@@ -117,8 +117,9 @@ def _postfit_h2o6_h2o7_window(native_wvl, fitted_row):
         elif diff_std > 0.02:
             values[start_ind:end_ind + 1] = (compare_alb + baseline) / 2.0
 
-    smoothed = uniform_filter1d(values[start_ind:].copy(), size=5, mode='reflect')
-    values[start_ind:] = np.clip(smoothed, 0.0, 1.0)
+    smooth_start = max(0, start_ind - 5)
+    smoothed = uniform_filter1d(values[smooth_start:].copy(), size=5, mode='reflect')
+    values[smooth_start:] = np.clip(smoothed, 0.0, 1.0)
     return np.clip(values, 0.0, 1.0)
 
 
