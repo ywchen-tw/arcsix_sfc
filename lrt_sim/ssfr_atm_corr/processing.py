@@ -535,14 +535,11 @@ def extend_final_albedo_1s(
     if force_row_extension:
         use_template = False
 
-    _debug_rows = {0}
-    _debug_wvls = [1748.0, 1799.5, 1899.0, 1903.7, 1908.4, 1991.7, 1996.2]
-
     if not use_template:
         ext_wvl = None
         _row_ntr = None  # native_trust_range on ext_wvl; computed once after first row
         extended_rows = []
-        for irow, row in enumerate(final_1s):
+        for row in final_1s:
             if np.all(~np.isfinite(row)):
                 if ext_wvl is None:
                     ext_wvl, _ = alb_extention(native_wvl, np.zeros_like(native_wvl), clear_sky=clear_sky)
@@ -555,12 +552,6 @@ def extend_final_albedo_1s(
                 _row_ntr = (ext_wvl >= np.nanmin(native_wvl)) & (ext_wvl <= np.nanmax(native_wvl))
             row_ext = np.interp(ext_wvl, row_ext_wvl, row_ext, left=np.nan, right=np.nan)
             row_ext = cap_longwave_extension(ext_wvl, row_ext, row)
-            if irow in _debug_rows:
-                print(f'[DEBUG per-row irow={irow} BEFORE patch]')
-                for tw in _debug_wvls:
-                    ti = np.argmin(np.abs(native_wvl - tw))
-                    tj = np.argmin(np.abs(ext_wvl - tw))
-                    print(f'  native[{native_wvl[ti]:.2f}]={row[ti]}  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             finite_row = np.isfinite(row)
             if _row_ntr is not None and np.any(_row_ntr) and np.count_nonzero(finite_row) >= 2:
                 row_ext[_row_ntr] = np.interp(
@@ -570,11 +561,6 @@ def extend_final_albedo_1s(
                     left=np.nan,
                     right=np.nan,
                 )
-            if irow in _debug_rows:
-                print(f'[DEBUG per-row irow={irow} AFTER native patch]')
-                for tw in _debug_wvls:
-                    tj = np.argmin(np.abs(ext_wvl - tw))
-                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             # Cosine-taper blend from native endpoint into alb_extention values over
             # a 200 nm window.  Because the blend at the right end equals
             # row_ext[gap_region] exactly (alpha=1), the slope matches alb_extention
@@ -584,26 +570,10 @@ def extend_final_albedo_1s(
             left_idx = np.argmin(np.abs(ext_wvl - native_max))
             native_endpoint = row_ext[left_idx]
             gap_region = (ext_wvl > native_max) & (ext_wvl <= native_max + blend_window)
-            _gap_wvls = [1996.2, 1997.0, 2000.0, 2050.0, 2100.0, 2196.0, 2197.0, 2200.0]
-            if irow in _debug_rows:
-                print(f'[DEBUG per-row irow={irow} BEFORE cosine blend] '
-                      f'native_max={native_max:.2f}  native_endpoint={native_endpoint:.6f}  '
-                      f'blend_end={native_max + blend_window:.2f}  gap_pts={np.sum(gap_region)}')
-                for tw in _gap_wvls:
-                    tj = np.argmin(np.abs(ext_wvl - tw))
-                    in_gap = gap_region[tj] if tj < len(gap_region) else False
-                    raw_alpha = np.clip((ext_wvl[tj] - native_max) / blend_window, 0.0, 1.0)
-                    cos_alpha = (1.0 - np.cos(np.pi * raw_alpha)) / 2.0
-                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}  in_gap={in_gap}  alpha={cos_alpha:.4f}')
             if np.any(gap_region) and np.isfinite(native_endpoint):
                 alpha = np.clip((ext_wvl[gap_region] - native_max) / blend_window, 0.0, 1.0)
                 alpha = (1.0 - np.cos(np.pi * alpha)) / 2.0
                 row_ext[gap_region] = (1.0 - alpha) * native_endpoint + alpha * row_ext[gap_region]
-            if irow in _debug_rows:
-                print(f'[DEBUG per-row irow={irow} AFTER cosine blend]')
-                for tw in _gap_wvls:
-                    tj = np.argmin(np.abs(ext_wvl - tw))
-                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             extended_rows.append(row_ext)
         return ext_wvl if ext_wvl is not None else np.array([]), np.vstack(extended_rows) if extended_rows else np.empty((0, 0))
 
@@ -616,20 +586,6 @@ def extend_final_albedo_1s(
         & np.isfinite(leg_native_final)
         & (np.abs(leg_native_final) > 1e-6)
     )
-    if any(irow in _debug_rows for irow in range(len(final_1s))):
-        print(f'[DEBUG extend INPUTS] '
-              f'native_wvl=[{np.nanmin(native_wvl):.2f}, {np.nanmax(native_wvl):.2f}]  '
-              f'n_native={native_wvl.size}  '
-              f'final_1s.shape={final_1s.shape}  '
-              f'native_trust_range pts={np.sum(native_trust_range)}  '
-              f'native_range=[{extension_wvl[native_trust_range][0]:.2f}, {extension_wvl[native_trust_range][-1]:.2f}]')
-        print(f'  leg_native_final finite={np.count_nonzero(np.isfinite(leg_native_final))}/{leg_native_final.size}  '
-              f'leg_extension finite={np.count_nonzero(np.isfinite(leg_extension))}/{leg_extension.size}')
-        for tw in _debug_wvls:
-            ti = np.argmin(np.abs(native_wvl - tw))
-            tj = np.argmin(np.abs(extension_wvl - tw))
-            print(f'  leg_native[{native_wvl[ti]:.2f}]={leg_native_final[ti]:.6f}  '
-                  f'leg_ext[{extension_wvl[tj]:.2f}]={leg_extension[tj]:.6f}')
     for irow, row in enumerate(final_1s):
         valid_ratio = (
             np.isfinite(row)
@@ -639,13 +595,6 @@ def extend_final_albedo_1s(
         if np.count_nonzero(valid_ratio) < 2:
             row_ext = leg_extension.copy()
             finite_row = np.isfinite(row)
-            if irow in _debug_rows:
-                last_fin = native_wvl[finite_row][-1] if np.any(finite_row) else np.nan
-                print(f'[DEBUG extend irow={irow} FALLBACK (valid_ratio={np.count_nonzero(valid_ratio)} < 2)]  '
-                      f'finite_count={np.count_nonzero(finite_row)}  last_finite_native={last_fin:.4f}')
-                for tw in _debug_wvls:
-                    ti = np.argmin(np.abs(native_wvl - tw))
-                    print(f'  row[{native_wvl[ti]:.2f}]={row[ti]}')
             if np.any(native_trust_range) and np.count_nonzero(finite_row) >= 2:
                 row_ext[native_trust_range] = np.interp(
                     extension_wvl[native_trust_range],
@@ -654,10 +603,6 @@ def extend_final_albedo_1s(
                     left=np.nan,
                     right=np.nan,
                 )
-            if irow in _debug_rows:
-                for tw in _debug_wvls:
-                    tj = np.argmin(np.abs(extension_wvl - tw))
-                    print(f'  [FALLBACK after patch] ext[{extension_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             row_ext = cap_longwave_extension(extension_wvl, row_ext, row)
             extended[irow] = np.clip(row_ext, 0.0, 1.0)
             continue
@@ -672,16 +617,6 @@ def extend_final_albedo_1s(
             right_ratio = np.nanmedian(row[row_ratio_anchor] / leg_native_final[row_ratio_anchor])
         if not np.isfinite(right_ratio):
             right_ratio = ratio_native[-1]
-        if irow in _debug_rows:
-            ratio_valid_restricted = valid_ratio & (native_wvl < h2o_7_start)
-            restricted_used = np.count_nonzero(ratio_valid_restricted) >= 2
-            print(f'[DEBUG extend irow={irow} STEP1] '
-                  f'valid_ratio_count={np.count_nonzero(valid_ratio)}  '
-                  f'ratio_valid_restricted={np.count_nonzero(ratio_valid_restricted)}  '
-                  f'restricted_used={restricted_used}  '
-                  f'ratio_valid_last_wvl={native_wvl[ratio_valid][-1]:.4f}  '
-                  f'row_ratio_anchor_count={np.count_nonzero(row_ratio_anchor)}  '
-                  f'right_ratio={right_ratio:.6f}')
         ratio_ext = np.interp(
             extension_wvl,
             native_wvl[ratio_valid],
@@ -690,23 +625,7 @@ def extend_final_albedo_1s(
             right=right_ratio,
         )
         row_ext = leg_extension * ratio_ext
-        if irow in _debug_rows:
-            print(f'[DEBUG extend irow={irow} STEP2 template=leg_ext*ratio_ext]')
-            for tw in _debug_wvls:
-                tj = np.argmin(np.abs(extension_wvl - tw))
-                print(f'  ext[{extension_wvl[tj]:.2f}]:  ratio_ext={ratio_ext[tj]:.6f}  '
-                      f'leg_ext={leg_extension[tj]:.6f}  template={row_ext[tj]:.6f}')
         finite_row = np.isfinite(row)
-        if irow in _debug_rows:
-            h2o7_nat = (native_wvl >= 1748) & (native_wvl <= 2050)
-            last_fin = native_wvl[finite_row][-1] if np.any(finite_row) else np.nan
-            print(f'[DEBUG extend irow={irow} STEP3 finite_row]  '
-                  f'total_finite={np.count_nonzero(finite_row)}  '
-                  f'finite_in_H2O7={np.count_nonzero(finite_row & h2o7_nat)}  '
-                  f'last_finite_native={last_fin:.4f}')
-            for tw in _debug_wvls:
-                ti = np.argmin(np.abs(native_wvl - tw))
-                print(f'  row[{native_wvl[ti]:.2f}]={row[ti]}  finite={np.isfinite(row[ti])}')
         if np.any(native_trust_range) and np.count_nonzero(finite_row) >= 2:
             row_ext[native_trust_range] = np.interp(
                 extension_wvl[native_trust_range],
@@ -715,20 +634,8 @@ def extend_final_albedo_1s(
                 left=np.nan,
                 right=np.nan,
             )
-        if irow in _debug_rows:
-            print(f'[DEBUG extend irow={irow} STEP4 after native_trust_range patch]')
-            for tw in _debug_wvls:
-                tj = np.argmin(np.abs(extension_wvl - tw))
-                print(f'  ext[{extension_wvl[tj]:.2f}]={row_ext[tj]:.6f}  in_trust={native_trust_range[tj]}')
         row_ext = cap_longwave_extension(extension_wvl, row_ext, row)
         extended[irow] = np.clip(row_ext, 0.0, 1.0)
-        if irow in _debug_rows:
-            print(f'[DEBUG extend irow={irow} STEP5 final clipped]')
-            for tw in _debug_wvls:
-                tj = np.argmin(np.abs(extension_wvl - tw))
-                ti = np.argmin(np.abs(native_wvl - tw))
-                print(f'  ext[{extension_wvl[tj]:.2f}]={extended[irow, tj]:.6f}  '
-                      f'native={row[ti] if abs(native_wvl[ti]-tw)<5 else float("nan"):.6f}')
     return extension_wvl, extended
 
 
