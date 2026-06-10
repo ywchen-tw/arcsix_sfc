@@ -741,7 +741,6 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     long_wvl_start, long_wvl_end = 1450, 1740
     long_anchor_wvl = 1495.0
     long_blend_start = 1900.0
-    long_scale_wvl = 2000.0
     long_replace_start = 2000.0
     
     # fit on long wavelength side
@@ -780,9 +779,15 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     else:
         obs_anchor = np.nan
     model_anchor = np.interp(long_anchor_wvl, ori_spec_wvl, ori_spec_alb)
-    model_scale_anchor = np.interp(long_scale_wvl, ori_spec_wvl, ori_spec_alb)
-    if np.isfinite(obs_anchor) and np.isfinite(model_scale_anchor) and model_scale_anchor > 1e-6:
-        interp_ori_spec_alb = interp_ori_spec_alb * (obs_anchor / model_scale_anchor)
+    right_edge_mask = finite_alb & (alb_wvl < long_blend_start)
+    if np.any(right_edge_mask):
+        right_edge_wvl   = float(alb_wvl[right_edge_mask][-1])
+        obs_right_edge   = float(alb_corr_fitted[right_edge_mask][-1])
+        model_right_edge = float(np.interp(right_edge_wvl, ori_spec_wvl, ori_spec_alb))
+        if model_right_edge > 1e-6:
+            interp_ori_spec_alb = interp_ori_spec_alb * (obs_right_edge / model_right_edge)
+        elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
+            interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
     elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
         interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
 
