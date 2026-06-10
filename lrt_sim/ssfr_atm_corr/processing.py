@@ -37,11 +37,11 @@ POSTFIT_DIAGNOSTIC_STRIDE = 100
 try:
     from .helpers import gas_abs_masking, write_2col_file
     from .postfit import apply_postfit_correction, postfit_h2o_6_fit_end
-    from .settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start, h2o_7_start
+    from .settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start, h2o_7_end, h2o_7_start
 except ImportError:
     from helpers import gas_abs_masking, write_2col_file
     from postfit import apply_postfit_correction, postfit_h2o_6_fit_end
-    from settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start, h2o_7_start
+    from settings import _fdir_data_, _fdir_general_, gas_bands, h2o_6_end, h2o_6_start, h2o_7_end, h2o_7_start
 
 
 @dataclass(frozen=True)
@@ -535,7 +535,7 @@ def extend_final_albedo_1s(
     if force_row_extension:
         use_template = False
 
-    _debug_rows = {37}
+    _debug_rows = {0}
     _debug_wvls = [1748.0, 1799.5, 1899.0, 1903.7, 1908.4, 1991.7, 1996.2]
 
     if not use_template:
@@ -571,8 +571,29 @@ def extend_final_albedo_1s(
                     right=np.nan,
                 )
             if irow in _debug_rows:
-                print(f'[DEBUG per-row irow={irow} AFTER patch]')
+                print(f'[DEBUG per-row irow={irow} AFTER native patch]')
                 for tw in _debug_wvls:
+                    tj = np.argmin(np.abs(ext_wvl - tw))
+                    print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
+            # Bridge the native-endpoint → h2o_7_end gap with a linear blend so there
+            # is no discontinuity at the native grid edge (~1996 nm → 1997 nm).
+            native_max = np.nanmax(native_wvl)
+            gap_region = (ext_wvl > native_max) & (ext_wvl <= h2o_7_end)
+            if np.any(gap_region):
+                left_idx = np.argmin(np.abs(ext_wvl - native_max))
+                right_idx = np.argmin(np.abs(ext_wvl - h2o_7_end))
+                left_val = row_ext[left_idx]
+                right_val = row_ext[right_idx]
+                if np.isfinite(left_val) and np.isfinite(right_val):
+                    row_ext[gap_region] = np.interp(
+                        ext_wvl[gap_region],
+                        [native_max, h2o_7_end],
+                        [left_val, right_val],
+                    )
+            if irow in _debug_rows:
+                _gap_wvls = [1996.2, 1997.0, 2000.0, 2025.0, 2050.0]
+                print(f'[DEBUG per-row irow={irow} AFTER gap blend (native_max={native_max:.2f})]')
+                for tw in _gap_wvls:
                     tj = np.argmin(np.abs(ext_wvl - tw))
                     print(f'  ext[{ext_wvl[tj]:.2f}]={row_ext[tj]:.6f}')
             extended_rows.append(row_ext)
