@@ -691,7 +691,7 @@ def _snowice_alb_fitting_from_best(
     # H2O5/H2O6 transition smoother: made redundant by the proximity-weighted
     # H2O-6 fill (changes output <0.001, adds no smoothness). Disabled but kept
     # available; re-enable if a residual boundary kink reappears.
-    # alb_corr_fit_smooth = _smooth_h2o5_h2o6_transition(alb_wvl, alb_corr_fit_smooth)
+    alb_corr_fit_smooth = _smooth_h2o5_h2o6_transition(alb_wvl, alb_corr_fit_smooth)
 
     # print("alb_wvl shape:", alb_wvl.shape)
     # print("alb_corr shape:", alb_corr.shape)
