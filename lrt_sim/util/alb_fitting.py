@@ -769,7 +769,7 @@ def _snowice_alb_fitting_from_best(
     
     # smooth with window size of 5
     alb_corr_fit_smooth = alb_corr_fit.copy()
-    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=10, mode='reflect')
+    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5, mode='reflect')
     alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
     # H2O5/H2O6 transition smoother: made redundant by the proximity-weighted
     # H2O-6 fill (changes output <0.001, adds no smoothness). Disabled but kept

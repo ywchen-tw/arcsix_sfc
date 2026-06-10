@@ -275,25 +275,6 @@ ALL_CASE_CATALOG = [
   },               
  
  
- {'id': 'case_003',
-  'date': '2024-06-03',
-  'case_tag': 'cloudy_atm_corr_1',
-  'tmhr_ranges_select': [[13.62, 13.75],  # 300m, cloudy, camera icing
-                                            ],
-  'simulation_interval': 0.5,
-  'clear_sky': False,
-  'manual_cloud': True,
-  'levels': np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
-                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
-                            np.arange(5.0, 10.1, 2.5),
-                            np.array([15, 20, 30., 40., 45.]))),
-  'manual_cloud_cer': 13.0,
-  'manual_cloud_cwp': 0.07782,
-  'manual_cloud_cwp_expr': '77.82 / 1000',
-  'manual_cloud_cth': 1.93,
-  'manual_cloud_cbh': 1.41,
-  'manual_cloud_cot': 21.27,},
- 
  {'id': 'case_004',
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_2',
@@ -985,6 +966,25 @@ BAD_CASE_CATALOG = [
   },
  
  {'id': 'bad_case_003',
+  'date': '2024-06-03',
+  'case_tag': 'cloudy_atm_corr_1',
+  'tmhr_ranges_select': [[13.62, 13.75],  # 300m, cloudy, camera icing
+                                            ],
+  'simulation_interval': 0.5,
+  'clear_sky': False,
+  'manual_cloud': True,
+  'levels': np.concatenate((np.array([0.0, 0.2, 0.3, 0.4, 0.7, 1.0,]),
+                            np.array([1.41, 1.5, 1.93, 2.0, 2.5, 3.0, 4.0]), 
+                            np.arange(5.0, 10.1, 2.5),
+                            np.array([15, 20, 30., 40., 45.]))),
+  'manual_cloud_cer': 13.0,
+  'manual_cloud_cwp': 0.07782,
+  'manual_cloud_cwp_expr': '77.82 / 1000',
+  'manual_cloud_cth': 1.93,
+  'manual_cloud_cbh': 1.41,
+  'manual_cloud_cot': 21.27,},
+ 
+ {'id': 'bad_case_004',
   'legacy_id': 'case_061',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_1',
@@ -997,7 +997,7 @@ BAD_CASE_CATALOG = [
   'note': 'Bad case; excluded from active catalog.',
   },
  
- {'id': 'bad_case_004',
+ {'id': 'bad_case_005',
   'legacy_id': 'case_062',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_2',
@@ -1010,7 +1010,7 @@ BAD_CASE_CATALOG = [
   'note': 'Bad case; excluded from active catalog.',
   },
  
- {'id': 'bad_case_005',
+ {'id': 'bad_case_006',
   'legacy_id': 'case_063',
   'date': '2024-08-08',
   'case_tag': 'clear_atm_corr_3',
@@ -1023,7 +1023,7 @@ BAD_CASE_CATALOG = [
   'note': 'Bad case; excluded from active catalog.',
   },
  
- {'id': 'bad_case_006',
+ {'id': 'bad_case_007',
   'legacy_id': 'case_067',
   'date': '2024-08-09',
   'case_tag': 'clear_atm_corr',
