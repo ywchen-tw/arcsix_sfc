@@ -786,13 +786,15 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
     elif np.isfinite(obs_anchor) and np.isfinite(model_anchor):
         interp_ori_spec_alb = interp_ori_spec_alb + (obs_anchor - model_anchor)
 
-    # Cap the post-blend/replace region (≥1900 nm) using the SNICAR model's own
-    # spectral ratio anchored to the observed 1650-1900 nm window maximum.
-    # Anchoring to the 1750 nm window (not the 1495 nm absorption trough) gives a
-    # tighter, more reliable ceiling because the 1750 nm window is well-measured.
-    # Applying the same factor to both blend (1900-2000 nm) and replace (≥2000 nm)
-    # regions avoids the step discontinuity at 2000 nm, and preserves the internal
-    # SNICAR spectral ratios (peak/trough shape) within the extended region.
+    # Linearly rescale the post-blend/replace region (≥1900 nm) so that:
+    #   ceiling: inter-band peak (≥2000 nm) is anchored via the SNICAR 1750-window ratio
+    #            ceiling = obs_1750_max × (model_lm_post2000 / model_lm_1750)
+    #   floor:   absorption trough is anchored to the observed minimum near 1495 nm
+    #            floor = obs_anchor (observed albedo at 1495 nm)
+    # The linear map raw_lo→floor, raw_hi→ceiling preserves spectral shape while
+    # simultaneously respecting both observation-derived constraints. The same
+    # transform is applied to the full ≥1900 nm region (blend + replace) to avoid
+    # a step discontinuity at 2000 nm.
     snicar_1750_mask     = (alb_wvl_ext >= 1650) & (alb_wvl_ext <= 1900)
     snicar_post2000_mask = alb_wvl_ext >= long_replace_start
     blend_and_replace_mask = alb_wvl_ext >= long_blend_start
@@ -801,15 +803,25 @@ def alb_extention(alb_wvl, alb_corr_fitted, clear_sky=False):
         np.any(snicar_1750_mask)
         and np.any(snicar_post2000_mask)
         and np.count_nonzero(obs_1750_win) >= 1
+        and np.isfinite(obs_anchor)
     ):
         model_lm_1750     = float(np.nanmax(interp_snicar_unscaled[snicar_1750_mask]))
         model_lm_post2000 = float(np.nanmax(interp_snicar_unscaled[snicar_post2000_mask]))
         obs_1750_max      = float(np.nanmax(alb_corr_fitted[obs_1750_win]))
         if model_lm_1750 > 1e-6 and np.isfinite(model_lm_post2000) and np.isfinite(obs_1750_max):
-            ceiling = obs_1750_max * model_lm_post2000 / model_lm_1750
-            lm_actual = float(np.nanmax(interp_ori_spec_alb[blend_and_replace_mask]))
-            if lm_actual > ceiling > 1e-6:
-                interp_ori_spec_alb[blend_and_replace_mask] *= ceiling / lm_actual
+            ceiling   = obs_1750_max * model_lm_post2000 / model_lm_1750
+            floor_val = obs_anchor
+            raw_lo = float(np.nanmin(interp_ori_spec_alb[blend_and_replace_mask]))
+            raw_hi = float(np.nanmax(interp_ori_spec_alb[blend_and_replace_mask]))
+            if raw_hi > raw_lo and ceiling > floor_val > 0:
+                scale  = (ceiling - floor_val) / (raw_hi - raw_lo)
+                offset = floor_val - scale * raw_lo
+                interp_ori_spec_alb[blend_and_replace_mask] = np.clip(
+                    scale * interp_ori_spec_alb[blend_and_replace_mask] + offset,
+                    0.0, 1.0,
+                )
+            elif raw_hi > ceiling > 1e-6:
+                interp_ori_spec_alb[blend_and_replace_mask] *= ceiling / raw_hi
 
     # plt.close('all')
     # plt.figure(figsize=(8, 5))
