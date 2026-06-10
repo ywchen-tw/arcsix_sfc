@@ -349,6 +349,35 @@ def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
     return np.clip(smoothed, 0, 1)
 
 
+def _smooth_h2o5_h2o6_transition(alb_wvl, alb, boundary=1286.0, half_width=40.0, kernel=11):
+    """Broadly smooth the fitted h2o5/h2o6 fill transition, pinning the anchor.
+
+    The h2o_5 and h2o_6 gaps are filled independently; the h2o_5 fill can
+    overshoot into a hump above the right-hand shelf, leaving the +/-30-50 nm
+    region around 1286 nm visibly asymmetric. Apply a wide moving average
+    across that window (using full-array context so the window edges are not
+    biased) and re-pin the grid sample nearest 1286 nm to its pre-smoothing
+    value so this step leaves that point unchanged.
+    """
+    alb_wvl = np.asarray(alb_wvl, dtype=float)
+    out = np.asarray(alb, dtype=float).copy()
+    anchor = int(np.argmin(np.abs(alb_wvl - boundary)))
+    anchor_val = out[anchor]
+    window = (alb_wvl >= boundary - half_width) & (alb_wvl <= boundary + half_width)
+    if np.count_nonzero(window) < 3:
+        return out
+    work = out.copy()
+    finite = np.isfinite(work)
+    if not finite.all():
+        if not finite.any():
+            return out
+        work[~finite] = np.interp(alb_wvl[~finite], alb_wvl[finite], out[finite])
+    smoothed = uniform_filter1d(work, size=int(kernel), mode='nearest')
+    out[window] = smoothed[window]
+    out[anchor] = anchor_val
+    return np.clip(out, 0.0, 1.0)
+
+
 def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit_spectrum, h2o_6_end):
     """Fill H2O-6 with the best-fit SNICAR shape before generic gap bridging."""
     h2o_6_start = 1290
@@ -645,6 +674,7 @@ def _snowice_alb_fitting_from_best(
     alb_corr_fit_smooth = alb_corr_fit.copy()
     alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5, mode='reflect')
     alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
+    alb_corr_fit_smooth = _smooth_h2o5_h2o6_transition(alb_wvl, alb_corr_fit_smooth)
 
     # print("alb_wvl shape:", alb_wvl.shape)
     # print("alb_corr shape:", alb_corr.shape)
