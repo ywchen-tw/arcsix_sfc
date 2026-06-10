@@ -523,26 +523,41 @@ def _snowice_alb_fitting_from_best(
                 replace_array = anchor_obs + slope * (best_fit_spectrum[bands_fit][bandfit_nan] - anchor_snicar)
             else:
                 replace_array = np.full(np.sum(bandfit_nan), anchor_obs)
-            # For H2O-7 gap only: rescale fill amplitude so its minimum reaches the
-            # local minimum near 1495 nm.  The anchor value at 1748 nm is preserved
-            # exactly; only the depth of the trough is adjusted.
+            # For H2O-7 gap: use native endpoint (capped at local min near 1495 nm) as
+            # right anchor so fill@end <= local_min@1495. Fall back to cap_val rescaling
+            # when no native data exists in the gap or SNICAR is flat.
             gap_wvl = alb_wvl[bands_fit][bandfit_nan]
             if np.any((gap_wvl >= 1748) & (gap_wvl <= 2050)):
-                cap_mask = (alb_wvl >= 1450) & (alb_wvl <= 1550) & np.isfinite(alb_corr_fit)
-                if np.count_nonzero(cap_mask) >= 1:
-                    cap_val = float(np.nanmin(alb_corr_fit[cap_mask]))
-                    h2o7_native = (alb_wvl >= 1748) & (alb_wvl <= 2050) & np.isfinite(alb_corr)
-                    if np.any(h2o7_native):
-                        cap_val = max(cap_val, float(np.nanmin(alb_corr[h2o7_native])))
+                h2o7_native_mask = (
+                    (alb_wvl >= 1748) & (alb_wvl <= 2050)
+                    & np.isfinite(alb_corr) & np.isfinite(best_fit_spectrum)
+                )
+                cap_mask_1495 = (alb_wvl >= 1450) & (alb_wvl <= 1550) & np.isfinite(alb_corr_fit)
+                cap_val_1495 = (
+                    float(np.nanmin(alb_corr_fit[cap_mask_1495]))
+                    if np.count_nonzero(cap_mask_1495) >= 1 else np.inf
+                )
+                two_anchor_applied = False
+                if np.any(h2o7_native_mask) and np.isfinite(cap_val_1495):
+                    r_idx     = int(np.where(h2o7_native_mask)[0][-1])
+                    xr_obs    = min(float(alb_corr[r_idx]), cap_val_1495)
+                    xr_snicar = float(best_fit_spectrum[r_idx])
+                    denom_r   = xr_snicar - anchor_snicar
+                    if xr_obs < anchor_obs and abs(denom_r) > 1e-6:
+                        a_r = (xr_obs - anchor_obs) / denom_r
+                        b_r = anchor_obs - a_r * anchor_snicar
+                        replace_array = np.clip(
+                            a_r * best_fit_spectrum[bands_fit][bandfit_nan] + b_r, 0.0, 1.0
+                        )
+                        two_anchor_applied = True
+                if not two_anchor_applied and np.isfinite(cap_val_1495):
                     fill_min = float(np.nanmin(replace_array))
                     if (
-                        np.isfinite(cap_val)
-                        and np.isfinite(fill_min)
-                        and fill_min > cap_val
-                        and anchor_obs > fill_min
-                        and anchor_obs > cap_val
+                        np.isfinite(fill_min)
+                        and fill_min > cap_val_1495
+                        and anchor_obs > fill_min and anchor_obs > cap_val_1495
                     ):
-                        scale = (cap_val - anchor_obs) / (fill_min - anchor_obs)
+                        scale = (cap_val_1495 - anchor_obs) / (fill_min - anchor_obs)
                         replace_array = np.clip(
                             anchor_obs + scale * (replace_array - anchor_obs), 0.0, 1.0
                         )
