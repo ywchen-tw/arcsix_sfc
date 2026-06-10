@@ -321,7 +321,7 @@ def find_best_fit(model_library, obs_wvl, obs_albedo):
 
 def _smooth_h2o6_h2o7_continuum(alb_wvl, alb, h2o_6_end, h2o_7_start=1748):
     """Remove narrow spikes and smooth the clean continuum before H2O-7."""
-    window_start = h2o_6_end + 5
+    window_start = h2o_6_end - 5
     window = (alb_wvl >= window_start) & (alb_wvl < h2o_7_start)
     if np.count_nonzero(window) < 5:
         return alb
@@ -523,6 +523,26 @@ def _snowice_alb_fitting_from_best(
                 replace_array = anchor_obs + slope * (best_fit_spectrum[bands_fit][bandfit_nan] - anchor_snicar)
             else:
                 replace_array = np.full(np.sum(bandfit_nan), anchor_obs)
+            # For H2O-7 gap only: rescale fill amplitude so its minimum reaches the
+            # local minimum near 1495 nm.  The anchor value at 1748 nm is preserved
+            # exactly; only the depth of the trough is adjusted.
+            gap_wvl = alb_wvl[bands_fit][bandfit_nan]
+            if np.any((gap_wvl >= 1748) & (gap_wvl <= 2050)):
+                cap_mask = (alb_wvl >= 1450) & (alb_wvl <= 1550) & np.isfinite(alb_corr_fit)
+                if np.count_nonzero(cap_mask) >= 1:
+                    cap_val = float(np.nanmin(alb_corr_fit[cap_mask]))
+                    fill_min = float(np.nanmin(replace_array))
+                    if (
+                        np.isfinite(cap_val)
+                        and np.isfinite(fill_min)
+                        and fill_min > cap_val
+                        and anchor_obs > fill_min
+                        and anchor_obs > cap_val
+                    ):
+                        scale = (cap_val - anchor_obs) / (fill_min - anchor_obs)
+                        replace_array = np.clip(
+                            anchor_obs + scale * (replace_array - anchor_obs), 0.0, 1.0
+                        )
         else:  # has_right only
             anchor_ind = bandfit_nan_ind[-1] + 1
             anchor_obs = alb_corr_fit[bands_fit][anchor_ind]
