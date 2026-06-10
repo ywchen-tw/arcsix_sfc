@@ -444,6 +444,82 @@ def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit
     return alb_corr_fit, alb_corr_mask
 
 
+def _fill_h2o5_with_scaled_snicar(
+    alb_wvl, alb_corr_fit, alb_corr_mask, best_fit_spectrum,
+    h2o_5_start=1230, h2o_5_end=1286, h2o_4_end=1175,
+):
+    """Fill H2O-5 with the best-fit SNICAR shape before generic gap bridging.
+
+    Mirrors _fill_h2o6_with_scaled_snicar but uses an expanded, proximity-weighted
+    LEFT anchor band [h2o_4_end, h2o_5_start) (decay-weighted toward the gap edge so
+    the fill meets the unmasked observation at 1230 nm) and a single RIGHT anchor
+    point (first finite observation just past the gap, uniform weight).
+    """
+    h2o5_gap = (
+        (alb_wvl >= h2o_5_start)
+        & (alb_wvl <= h2o_5_end)
+        & np.isnan(alb_corr_mask)
+        & np.isfinite(best_fit_spectrum)
+    )
+    if not np.any(h2o5_gap):
+        return alb_corr_fit, alb_corr_mask
+
+    left_anchor = (
+        (alb_wvl >= h2o_4_end)
+        & (alb_wvl < h2o_5_start)
+        & np.isfinite(alb_corr_fit)
+        & np.isfinite(best_fit_spectrum)
+    )
+    # Single right anchor: first finite observation just past the gap, keeping the
+    # IR-side fill observation-driven at one boundary point.
+    right_candidates = (
+        (alb_wvl > h2o_5_end)
+        & np.isfinite(alb_corr_fit)
+        & np.isfinite(best_fit_spectrum)
+    )
+    right_anchor = np.zeros_like(left_anchor)
+    if np.any(right_candidates):
+        right_anchor[np.flatnonzero(right_candidates)[0]] = True
+    anchors = left_anchor | right_anchor
+
+    if np.count_nonzero(anchors) >= 2:
+        model = best_fit_spectrum[anchors]
+        obs = alb_corr_fit[anchors]
+        anchor_wvl = alb_wvl[anchors]
+        # Weight only the LEFT anchors by proximity to the gap edge (1230 nm) so the
+        # fill meets the unmasked observation at the band's left edge. The single
+        # right anchor keeps uniform weight.
+        w = np.where(
+            anchor_wvl < h2o_5_start,
+            np.exp(-(h2o_5_start - anchor_wvl) / 20.0),
+            1.0,
+        )
+        wsum = w.sum()
+        wm = np.sum(w * model) / wsum
+        wo = np.sum(w * obs) / wsum
+        model_var = np.sum(w * (model - wm) ** 2)
+        if model_var > 1e-12:
+            scale = np.sum(w * (model - wm) * (obs - wo)) / model_var
+            offset = wo - scale * wm
+        else:
+            scale = 1.0
+            offset = wo - wm
+    elif np.count_nonzero(anchors) == 1:
+        anchor = np.flatnonzero(anchors)[0]
+        scale = 1.0
+        offset = alb_corr_fit[anchor] - best_fit_spectrum[anchor]
+    else:
+        scale = 1.0
+        offset = 0.0
+
+    replacement = scale * best_fit_spectrum[h2o5_gap] + offset
+    alb_corr_fit = alb_corr_fit.copy()
+    alb_corr_mask = alb_corr_mask.copy()
+    alb_corr_fit[h2o5_gap] = np.clip(replacement, 0, 1)
+    alb_corr_mask[h2o5_gap] = alb_corr_fit[h2o5_gap]
+    return alb_corr_fit, alb_corr_mask
+
+
 def _snowice_alb_fitting_from_best(
     alb_wvl,
     alb_corr,
@@ -491,7 +567,14 @@ def _snowice_alb_fitting_from_best(
         best_fit_spectrum,
         h2o_6_end,
     )
-    
+    # Fill H2O-5 after H2O-6 so the H2O-6 anchors stay observation-only.
+    alb_corr_fit, alb_corr_mask = _fill_h2o5_with_scaled_snicar(
+        alb_wvl,
+        alb_corr_fit,
+        alb_corr_mask,
+        best_fit_spectrum,
+    )
+
     # --- backup: polynomial fit for band_1 anchored at 550 nm (caused unnatural std dev gap at 550 nm) ---
     # for bands_fit in [band_1_fit]:
     #     bandfit_nan = np.isnan(alb_corr_mask[bands_fit])
@@ -686,7 +769,7 @@ def _snowice_alb_fitting_from_best(
     
     # smooth with window size of 5
     alb_corr_fit_smooth = alb_corr_fit.copy()
-    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=5, mode='reflect')
+    alb_corr_fit_smooth = uniform_filter1d(alb_corr_fit_smooth, size=10, mode='reflect')
     alb_corr_fit_smooth = np.clip(alb_corr_fit_smooth, 0, 1)
     # H2O5/H2O6 transition smoother: made redundant by the proximity-weighted
     # H2O-6 fill (changes output <0.001, adds no smoothness). Disabled but kept
