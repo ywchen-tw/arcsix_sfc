@@ -29,14 +29,14 @@ import os
 import sys
 import platform
 
-if platform.system() == 'Linux':
-    # Define the path to your module directory
-    # Use os.path.abspath and os.path.join for platform independence
-    # module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'util'))
+# Anchor everything to the lrt_sim/ project dir (parent of this analysis/ folder),
+# so the script runs the same regardless of the current working directory.
+_BASE_DIR_ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../lrt_sim
+sys.path.insert(0, _BASE_DIR_)   # make `from util import *` resolvable
+os.chdir(_BASE_DIR_)             # keep relative paths (../data, ./fig, ./tmp, *.dat) valid
 
-    # Add the directory to the Python search path
-    # sys.path.insert(0, module_path)
-    sys.path.append("/projects/yuch8913/arcsix_sfc/lrt_sim/")  
+if platform.system() == 'Linux':
+    sys.path.append("/projects/yuch8913/arcsix_sfc/lrt_sim/")
 
 import glob
 import copy
