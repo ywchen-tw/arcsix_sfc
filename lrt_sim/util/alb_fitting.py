@@ -413,11 +413,25 @@ def _fill_h2o6_with_scaled_snicar(alb_wvl, alb_corr_fit, alb_corr_mask, best_fit
         # step seen in clear cases, e.g. 0605). Right anchors keep uniform weight
         # so the steep IR descent stays observation-driven -- weighting the right
         # edge over-lifts low-albedo cloudy cases (e.g. 0603, alt ~0.3 km).
+        left_sel = anchor_wvl < h2o_6_start
         w = np.where(
-            anchor_wvl < h2o_6_start,
+            left_sel,
             np.exp(-(h2o_6_start - anchor_wvl) / 20.0),
             1.0,
         )
+        # Balance the two anchor groups so the sparse, distant left edge is not
+        # drowned out by the many right anchors. H2O-5 masking (1230-1286) pushes
+        # the nearest left anchor ~60 nm from the gap edge, shrinking its raw
+        # exp-weight to a tiny fraction of the 30-40 uniform right anchors; the
+        # plateau then floats to the SNICAR shape instead of meeting the observed
+        # left edge. Rescaling the left group to the same total weight as the
+        # right group restores the left edge's say while preserving the
+        # within-left proximity weighting.
+        right_sel = ~left_sel
+        left_w_sum = w[left_sel].sum()
+        right_w_sum = w[right_sel].sum()
+        if left_w_sum > 0 and right_w_sum > 0:
+            w = np.where(left_sel, w * (right_w_sum / left_w_sum), w)
         wsum = w.sum()
         wm = np.sum(w * model) / wsum
         wo = np.sum(w * obs) / wsum
@@ -489,11 +503,22 @@ def _fill_h2o5_with_scaled_snicar(
         # Weight only the LEFT anchors by proximity to the gap edge (1230 nm) so the
         # fill meets the unmasked observation at the band's left edge. The single
         # right anchor keeps uniform weight.
+        left_sel = anchor_wvl < h2o_5_start
         w = np.where(
-            anchor_wvl < h2o_5_start,
+            left_sel,
             np.exp(-(h2o_5_start - anchor_wvl) / 20.0),
             1.0,
         )
+        # Balance the two anchor groups (mirrors the H2O-6 fill). Here the left band
+        # is adjacent and densely weighted while the right is a single point, so the
+        # raw weights let the left edge dominate and the fill can drift from the IR
+        # boundary; rescaling the left group to the right group's total weight gives
+        # both edges equal say while preserving within-left proximity weighting.
+        right_sel = ~left_sel
+        left_w_sum = w[left_sel].sum()
+        right_w_sum = w[right_sel].sum()
+        if left_w_sum > 0 and right_w_sum > 0:
+            w = np.where(left_sel, w * (right_w_sum / left_w_sum), w)
         wsum = w.sum()
         wm = np.sum(w * model) / wsum
         wo = np.sum(w * obs) / wsum
