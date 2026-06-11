@@ -1277,6 +1277,7 @@ def run_catalog_case(
     run_final_sim=True,
     run_final_extension_rt=False,
     skip_missing_cloud_observations=True,
+    workers=1,
 ):
     """Run one atmospheric-correction catalog case."""
     iterations = tuple(iterations)
@@ -1339,6 +1340,7 @@ def run_catalog_case(
             final_sim=True,
             final_status=final_status,
             final_extension_rt=run_final_extension_rt,
+            workers=workers,
         )
 
     def run_track_iteration(iter):
@@ -1358,6 +1360,7 @@ def run_catalog_case(
             manual_cloud_cbh=manual_cloud_cbh,
             manual_cloud_cot=manual_cloud_cot,
             iter=iter,
+            workers=workers,
         )
 
     native_final_files, missing_native_final_patterns = final_native_output_files(case, date_s)

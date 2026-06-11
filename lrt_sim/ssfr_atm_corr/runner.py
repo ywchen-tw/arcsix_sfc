@@ -40,7 +40,7 @@ CLEAR_SKY_CASE_ID_LIST = [
 ]
 
 CLOUDY_CASE_ID_LIST = [
-    # 'case_003', 
+    # git 'case_003', 
     'case_004',
     'case_014',
     'case_019', 'case_020', 'case_021',
@@ -83,6 +83,7 @@ def run_cases(
     run_final_sim=True,
     run_final_extension_rt=False,
     skip_missing_cloud_observations=True,
+    workers=1,
 ):
     """Run one or more surface-albedo atmospheric-correction catalog cases."""
     os.makedirs('./fig', exist_ok=True)
@@ -108,6 +109,7 @@ def run_cases(
             run_final_sim=run_final_sim,
             run_final_extension_rt=run_final_extension_rt,
             skip_missing_cloud_observations=skip_missing_cloud_observations,
+            workers=workers,
         )
 
 
@@ -151,6 +153,16 @@ def parse_args():
         type=int,
         default=8,
         help='Number of track-workflow iterations to allow. Default: 8.',
+    )
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=1,
+        help=(
+            'Number of parallel worker processes for independent sub-legs within a case. '
+            'Default: 1 (serial). Peak memory scales ~linearly with this count, so size it '
+            'to the per-job memory allocation.'
+        ),
     )
     parser.add_argument(
         '--no-overwrite-lrt',
@@ -239,6 +251,7 @@ def main():
             rerun_simulation=args.rerun_simulation,
             iterations=range(args.iterations),
             run_final_extension_rt=args.final_extension_rt,
+            workers=args.workers,
         )
 
 if __name__ == '__main__':
