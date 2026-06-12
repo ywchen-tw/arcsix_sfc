@@ -18,15 +18,15 @@ from scipy.interpolate import interp1d
 from util import closest_indices, dropsonde_time_loc_list, gaussian, read_ict_dropsonde, ssfr_slit_convolve
 
 try:
-    from .helpers import write_2col_file
+    from .helpers import atomic_write, write_2col_file
 except ImportError:
-    from helpers import write_2col_file
+    from helpers import atomic_write, write_2col_file
 
 
 def write_1col_file(filename, values, header):
     """Write one-column numeric data with a header."""
     values = np.asarray(values, dtype=float)
-    with open(filename, 'w') as f:
+    with atomic_write(filename) as f:
         f.write(header)
         for value in values:
             f.write(f'{value:11.3f}\n')

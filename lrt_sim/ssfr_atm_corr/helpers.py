@@ -1,5 +1,8 @@
 """Small helpers for SSFR atmospheric correction."""
 
+import os
+import uuid
+from contextlib import contextmanager
 from enum import IntFlag, auto
 
 import numpy as np
@@ -80,9 +83,35 @@ class ssfr_flags(IntFlag):
     alp_ang_pit_rol_issue = auto()
 
 
+@contextmanager
+def atomic_write(filename, mode='w', **open_kwargs):
+    """Write to a temp file in the same directory, then atomically replace `filename`.
+
+    Guards against torn/interleaved output when more than one process targets the
+    same path (e.g. a parallel run overlapping a serial one): each writer commits a
+    complete file via os.replace, so a race can only ever clobber the target with
+    another *complete* file, never corrupt it mid-write.
+    """
+    directory = os.path.dirname(filename) or '.'
+    os.makedirs(directory, exist_ok=True)
+    tmp = os.path.join(
+        directory,
+        f'.{os.path.basename(filename)}.{os.getpid()}.{uuid.uuid4().hex}.tmp',
+    )
+    try:
+        with open(tmp, mode, **open_kwargs) as f:
+            yield f
+        os.replace(tmp, filename)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def write_2col_file(filename, wvl, val, header):
     """Write wavelength/value arrays as a two-column text file."""
-    with open(filename, 'w') as f:
+    with atomic_write(filename) as f:
         f.write(header)
         for i in range(len(val)):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')

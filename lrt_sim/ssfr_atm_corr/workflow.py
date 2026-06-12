@@ -69,7 +69,7 @@ MIN_FINAL_ITERATION = 2
 
 try:
     from .settings import *
-    from .helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
+    from .helpers import atomic_write, find_h2o_6_end, gas_abs_masking, write_2col_file
     from .postfit import (
         apply_postfit_correction,
         postfit_h2o_6_fit_end,
@@ -87,7 +87,7 @@ try:
     )
 except ImportError:
     from settings import *
-    from helpers import find_h2o_6_end, gas_abs_masking, write_2col_file
+    from helpers import atomic_write, find_h2o_6_end, gas_abs_masking, write_2col_file
     from postfit import (
         apply_postfit_correction,
         postfit_h2o_6_fit_end,
@@ -190,7 +190,7 @@ def write_column_csv(filename, columns):
     if mismatched:
         raise ValueError(f'CSV columns have mismatched lengths: {", ".join(mismatched)}')
 
-    with open(filename, 'w', newline='') as f:
+    with atomic_write(filename, newline='') as f:
         writer = csv.writer(f)
         writer.writerow(headers)
         writer.writerows(zip(*arrays))
