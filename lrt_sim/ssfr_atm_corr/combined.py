@@ -81,6 +81,7 @@ try:
             _tmhr_range_,
             _wavelength_,
             gas_bands,
+            ice_frac_time_offset,
         )
     else:
         from helpers import gas_abs_masking
@@ -107,6 +108,7 @@ try:
             _tmhr_range_,
             _wavelength_,
             gas_bands,
+            ice_frac_time_offset,
         )
 except ImportError:
     from lrt_sim.ssfr_atm_corr.helpers import gas_abs_masking
@@ -133,6 +135,7 @@ except ImportError:
         _tmhr_range_,
         _wavelength_,
         gas_bands,
+        ice_frac_time_offset,
     )
 
 
@@ -1720,28 +1723,8 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
         with open(file, 'rb') as f:
             ice_frac_data = pickle.load(f)
 
-        ice_frac_time_offset = {
-            '20240528': 0,
-            '20240530': 0,
-            '20240531': 0,
-            '20240603': -0.50/3600,
-            '20240605': -0.80/3600,
-            '20240606': -0.75/3600,
-            '20240607':  0.35/3600,
-            '20240610': 0,
-            '20240611': -0.15/3600,
-            '20240613':  0.55/3600,
-            '20240725':  0.30/3600,
-            '20240729': -0.95/3600,
-            '20240730':  1.0/3600,
-            '20240801': -0.50/3600,
-            '20240802': -0.15/3600,
-            '20240807': -0.70/3600,
-            '20240808': -0.25/3600,
-            '20240809': -0.05/3600,
-            '20240815': -0.85/3600,
-        }
-
+        # ice_frac_time_offset is the single source of truth in settings.py,
+        # shared with the ice-fraction albedo analysis.
         collocate_ice_frac(spring, ice_frac_data, ice_frac_time_offset)
         collocate_ice_frac(summer, ice_frac_data, ice_frac_time_offset)
 

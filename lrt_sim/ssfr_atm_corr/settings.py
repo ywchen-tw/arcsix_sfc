@@ -99,6 +99,32 @@ gas_bands = [
 # Future experiment switch. Keep False to mask every configured gas band at all altitudes.
 ALTITUDE_DEPENDENT_GAS_MASKING = False
 
+# Per-date timing offset (decimal hours) applied to the camera ice-fraction time
+# axis to align it with the SSFR/flight time axis. Single source of truth shared by
+# combined.py (collocation) and the ice-fraction albedo analysis. Values are stored
+# as <seconds>/3600 so the intended shift in seconds is readable inline.
+ice_frac_time_offset = {
+    '20240528': 0,
+    '20240530': 0,
+    '20240531': 0,
+    '20240603': -0.50 / 3600,
+    '20240605': -0.80 / 3600,
+    '20240606': -0.75 / 3600,
+    '20240607': 0.35 / 3600,
+    '20240610': 0,
+    '20240611': -0.15 / 3600,
+    '20240613': 0.55 / 3600,
+    '20240725': 0.30 / 3600,
+    '20240729': -0.95 / 3600,
+    '20240730': 1.0 / 3600,
+    '20240801': -0.50 / 3600,
+    '20240802': -0.15 / 3600,
+    '20240807': -0.70 / 3600,
+    '20240808': -0.25 / 3600,
+    '20240809': -0.05 / 3600,
+    '20240815': -0.85 / 3600,
+}
+
 __all__ = [
     name
     for name in globals()

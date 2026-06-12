@@ -849,7 +849,15 @@ def plot_gas_absorption_bands(ax, wvl=None, alt=None):
         )
         return
 
-    for band_start, band_end in gas_bands:
+    # Merge overlapping/adjacent bands so each shaded region is drawn once
+    # (overlapping axvspans would otherwise stack into darker areas).
+    merged = []
+    for band_start, band_end in sorted(gas_bands):
+        if merged and band_start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], band_end)
+        else:
+            merged.append([band_start, band_end])
+    for band_start, band_end in merged:
         ax.axvspan(band_start, band_end, color='gray', alpha=0.3)
 
 
@@ -1068,7 +1076,7 @@ def _plot_mean_albedo_spectrum(
     ax.set_xlim(*xlim)
     ax.set_title(title, fontsize=13)
     if overlay_wvl is not None and overlay_albedo is not None:
-        ax.legend(fontsize=10, loc='center left', bbox_to_anchor=(1.02, 0.5))
+        ax.legend(fontsize=10, loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=2)
     fig.tight_layout()
     fig.savefig(filename, bbox_inches='tight', dpi=150)
     plt.close(fig)
