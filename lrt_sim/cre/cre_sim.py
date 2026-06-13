@@ -278,6 +278,26 @@ def write_2col_file(filename, wvl, val, header):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')
 
 
+def extend_albedo_edge(wvl, alb, wvl_max=4100.0, step=1.0):
+    """Extend an albedo spectrum past its last wavelength by repeating the edge value.
+
+    uvspec's reptran SW grid evaluates band points slightly beyond the nominal
+    4000 nm edge (e.g. 4000.77 nm); if the surface-albedo file stops at 4000 nm,
+    uvspec aborts with ``Error -7 ... setup_albedo``. Padding the SWIR tail with
+    the (essentially flat) edge albedo out to ``wvl_max`` avoids that without
+    changing the physically meaningful spectrum.
+    """
+    wvl = np.asarray(wvl, dtype=float)
+    alb = np.asarray(alb, dtype=float)
+    if wvl.size == 0 or wvl[-1] >= wvl_max:
+        return wvl, alb
+    pad_wvl = np.arange(wvl[-1] + step, wvl_max + step / 2.0, step)
+    if pad_wvl.size == 0:
+        return wvl, alb
+    pad_alb = np.full(pad_wvl.shape, alb[-1])
+    return np.concatenate([wvl, pad_wvl]), np.concatenate([alb, pad_alb])
+
+
 def combined_product_file():
     """Return the path to the combined atmospheric-correction product."""
     return f'{_fdir_general_}/sfc_alb_combined/sfc_alb_combined_spring_summer.pkl'
@@ -758,21 +778,27 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         alb_fname = f'{sfc_alb_dir}/sfc_alb_{date_s}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.dat'
         if (combined_case is not None) and (combined_case.get('alb_ext') is not None):
             # Canonical extended albedo from the combined product (300-4000 nm).
-            ext_wvl = combined_case['ext_wvl']
+            ext_wvl = np.asarray(combined_case['ext_wvl'], dtype=float)
             ext_alb = np.clip(np.nanmean(combined_case['alb_ext'], axis=0), 0.0, 1.0)
         else:
             # Fallback: extend the native albedo here.
             ext_wvl, ext_alb = alb_extention(alb_wvl, alb_corr_fit_avg, clear_sky=clear_sky)
             ext_alb = np.clip(ext_alb, 0.0, 1.0)
-        write_2col_file(alb_fname, ext_wvl, ext_alb,
-                        header=('# SSFR derived sfc albedo\n'
-                                '# wavelength (nm)      albedo (unitless)\n'))
     else:
-        alb_fname = f'{sfc_alb_dir}/{manual_alb}'
-        if not os.path.exists(alb_fname):
-            raise FileNotFoundError(f"Manual albedo file {alb_fname} not found.")
-        ext_alb = pd.read_csv(alb_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 1].values
-        ext_wvl = pd.read_csv(alb_fname, delim_whitespace=True, comment='#', header=None).iloc[:, 0].values
+        manual_alb_path = f'{sfc_alb_dir}/{manual_alb}'
+        if not os.path.exists(manual_alb_path):
+            raise FileNotFoundError(f"Manual albedo file {manual_alb_path} not found.")
+        ext_alb = pd.read_csv(manual_alb_path, delim_whitespace=True, comment='#', header=None).iloc[:, 1].values
+        ext_wvl = pd.read_csv(manual_alb_path, delim_whitespace=True, comment='#', header=None).iloc[:, 0].values
+        # uvspec reads an edge-extended copy; the original sweep .dat is left intact.
+        alb_fname = f'{sfc_alb_dir}/{manual_alb.replace(".dat", "")}_ext4100.dat'
+
+    # Pad the SWIR tail past 4000 nm (flat edge value) so uvspec's reptran band
+    # points just beyond 4000 nm don't trip "Error -7 ... setup_albedo".
+    ext_wvl, ext_alb = extend_albedo_edge(ext_wvl, ext_alb, wvl_max=4100.0)
+    write_2col_file(alb_fname, ext_wvl, ext_alb,
+                    header=('# SSFR derived sfc albedo (edge-extended to 4100 nm)\n'
+                            '# wavelength (nm)      albedo (unitless)\n'))
 
     alb_mean = np.round(np.nanmean(ext_alb[(ext_wvl >= 400) & (ext_wvl <= 2500)]), 5)
     plt.close('all')
