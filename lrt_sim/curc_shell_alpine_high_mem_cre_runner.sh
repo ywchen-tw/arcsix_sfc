@@ -49,10 +49,16 @@ MANUAL_ALB="$(python -c "from cre.cre_cases import MANUAL_ALB_SWEEP as a; print(
 }
 echo "Array task ${SLURM_ARRAY_TASK_ID}: albedo ${MANUAL_ALB}"
 
+# Resumable by default: already-written (albedo, SZA) CSVs are skipped and any
+# uvspec outputs already on disk are reused, so an interrupted/requeued job
+# continues instead of restarting. Set OVERWRITE=1 to force a full recompute.
+OVERWRITE_FLAG=""
+[ "${OVERWRITE:-0}" = "1" ] && OVERWRITE_FLAG="--overwrite-lrt"
+
 python -m cre.cre_runner \
     --case-id "$CASE_ID" \
     --mode "$MODE" \
     --atm-file "$ATM_FILE" \
     --manual-alb "$MANUAL_ALB" \
     --workers "$WORKERS" \
-    --overwrite-lrt
+    $OVERWRITE_FLAG

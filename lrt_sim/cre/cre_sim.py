@@ -714,7 +714,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # sza_arr = np.array([70, 71.5,], dtype=np.float32)
     # sza_arr = np.array([72.5, 73], dtype=np.float32)
     # sza_arr = np.array([73.5, 75, sza_avg], dtype=np.float32)
-    sza_arr = np.array([50, 52.5,], dtype=np.float32)
+    sza_arr = np.array([50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87, sza_avg], dtype=np.float32)
     if sza_list is not None:
         # explicit solar-zenith-angle list (e.g. a single angle for a quick test)
         sza_arr = np.atleast_1d(np.array(sza_list, dtype=np.float32))
@@ -948,6 +948,10 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             'cer': [manual_cloud_cer]*len(cot_list),
             'cth': [manual_cloud_cth]*len(cot_list),
             'cbh': [manual_cloud_cbh]*len(cot_list),
+            # Record which surface albedo produced these fluxes so the CSV is
+            # self-describing (independent of the filename).
+            'alb_file': [manual_alb if manual_alb is not None else 'case_own']*len(cot_list),
+            'alb_mean': [alb_mean]*len(cot_list),
             'Fup_sfc': Fup_sfc,
             'Fdn_sfc': Fdn_sfc,
         }
