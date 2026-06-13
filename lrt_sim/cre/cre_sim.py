@@ -413,6 +413,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                      sza_list=None,
                      manual_atm_file=None,
                      manual_ch4_file=None,
+                     cwp_list_g=None,  # explicit CWP list [g/m^2] for a quick test; None = built-in platform sweep
                     ):
 
     log = logging.getLogger("lrt")
@@ -789,12 +790,15 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             z_list = atm_z_grid
             atm_z_grid_str = ' '.join(['%.3f' % z for z in atm_z_grid])
 
-            if platform.system() == 'Darwin':
+            if cwp_list_g is not None:
+                cwp_list = list(np.atleast_1d(cwp_list_g))  # explicit test sweep, g/m^2 (used verbatim)
+            elif platform.system() == 'Darwin':
                 cwp_list = [0, 5, 10, 30, 50, 100, 200]  # g/m^2
+                cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
             elif platform.system() == 'Linux':
                 cwp_list = [0, 1, 2, 3, 5, 7.5, 10, 15, 20, 35, 50, 75, 100, 150, 200, 300, 400, 500, 600]  # g/m^2
-            
-            cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
+                cwp_list.append(manual_cloud_cwp*1000)  # convert kg/m^2 to g/m^2
+
             cwp_list = np.array(cwp_list)/1000  # convert to kg/m^2
             rho_liquid_water = 1000  # kg/m^3
             cot_list = 3/(2 * manual_cloud_cer * 1e-6 * rho_liquid_water) * cwp_list  # from cwp to cot
