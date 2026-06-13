@@ -58,15 +58,21 @@ CRE_CWP_LIST_LINUX = [
 # ---------------------------------------------------------------------------
 # Cross-case manual albedo spectra (filenames under data/sfc_alb_cre/).
 # Used by cre_plot to compare CRE under a range of measured surface albedos.
+#
+# Selected from data/sfc_alb_cre/ext_alb_broadband.csv to span the broadband
+# albedo range (~0.29-0.80) with minimal redundancy: near-identical broadband
+# values (gap < ~0.02) were dropped, keeping one representative each. The inline
+# value is the solar-flux-weighted broadband albedo.
 # ---------------------------------------------------------------------------
 MANUAL_ALB_SWEEP = [
-    'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-    'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
-    'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
-    'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
-    'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
-    'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
-    'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
-    'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
-    'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
+    'sfc_alb_20240801_13.843_14.351_0.11km_cre_alb.dat',             # 0.294
+    'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',             # 0.543
+    'sfc_alb_20240808_13.212_13.345_0.12km_cre_alb.dat',             # 0.564
+    'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',  # 0.608
+    'sfc_alb_20240809_16.029_16.224_0.11km_cre_alb.dat',             # 0.638
+    'sfc_alb_20240611_14.968_15.347_0.41km_cre_alb.dat',             # 0.672
+    'sfc_alb_20240528_15.610_17.404_0.18km_cre_alb.dat',             # 0.699
+    'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',             # 0.752
+    'sfc_alb_20240606_16.250_16.950_0.11km_cre_alb.dat',             # 0.776
+    'sfc_alb_20240606_16.250_16.950_1.18km_cre_alb.dat',             # 0.797
 ]

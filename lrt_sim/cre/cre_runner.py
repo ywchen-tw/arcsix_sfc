@@ -37,6 +37,7 @@ def run_cre_cases(
     sza_list=None,
     manual_atm_file=None,
     manual_ch4_file=None,
+    workers=None,
 ):
     """Run CRE simulations for one or more catalog cases in SW and/or LW."""
     if __package__:
@@ -61,6 +62,7 @@ def run_cre_cases(
                 sza_list=sza_list,
                 manual_atm_file=manual_atm_file,
                 manual_ch4_file=manual_ch4_file,
+                workers=workers,
             )
 
 
@@ -105,13 +107,24 @@ def main():
         '--manual-alb-sweep', action='store_true',
         help='Use the cross-case manual albedo spectra sweep from cre_cases.',
     )
+    parser.add_argument(
+        '--manual-alb', default=None,
+        help='Run a single surface-albedo .dat (filename under data/sfc_alb_cre/) '
+             'for the case. One albedo per invocation; pairs with the SLURM job '
+             'array. Ignored if --manual-alb-sweep is given.',
+    )
+    parser.add_argument(
+        '--workers', type=int, default=None,
+        help='libRadtran process-pool size for the SZA x CWP sweep. '
+             'Default: cpu-2 on Mac, full cpu count on Linux.',
+    )
     args = parser.parse_args()
 
     case_ids = args.case_ids
     if args.all:
         case_ids = list(CRE_CASE_IDS)
 
-    manual_alb = MANUAL_ALB_SWEEP if args.manual_alb_sweep else None
+    manual_alb = MANUAL_ALB_SWEEP if args.manual_alb_sweep else args.manual_alb
 
     run_cre_cases(
         case_id=args.case_id,
@@ -122,6 +135,7 @@ def main():
         sza_list=args.sza,
         manual_atm_file=args.atm_file,
         manual_ch4_file=args.ch4_file,
+        workers=args.workers,
     )
 
 

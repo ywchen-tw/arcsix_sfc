@@ -40,6 +40,8 @@ def main():
                          'CH4 profile derived automatically unless --ch4-file given.')
     ap.add_argument('--ch4-file', default=None,
                     help='Matching CH4 profile (overrides the auto-derived name).')
+    ap.add_argument('--workers', type=int, default=None,
+                    help='libRadtran pool size. Default: cpu-2 on Mac, full cpu on Linux.')
     args = ap.parse_args()
 
     # Deferred so ``--help`` works without the full er3t/libRadtran stack
@@ -76,6 +78,7 @@ def main():
             cwp_list_g=[args.lwp],
             manual_atm_file=args.atm_file,
             manual_ch4_file=args.ch4_file,
+            workers=args.workers,
             **cloud_kwargs,
         )
     print("Test finished.")

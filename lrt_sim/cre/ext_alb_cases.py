@@ -2,10 +2,11 @@
 
 Each entry describes how to build one libRadtran surface-albedo ``.dat`` from the
 combined atmospheric-correction product (``sfc_alb_combined_spring_summer.pkl``):
-a date, a flight time window, the altitude used in the filename, and an optional
-scale factor. The generator selects the matching rows, averages the **already
+a date, a flight time window, an optional altitude band, and an optional scale
+factor. The generator selects the matching rows, averages the **already
 extended** (300-4000 nm) atmospheric-corrected albedo (no re-extension), and
-writes the file to ``data/sfc_alb_cre/``.
+writes the file to ``data/sfc_alb_cre/``. The altitude in the filename is the
+mean altitude of the selected rows (after any ``alt_range`` filtering).
 
 To add an albedo file, append an entry to ``EXT_ALB_CASES`` and run::
 
@@ -18,13 +19,16 @@ Case fields
 date        : str   'YYYYMMDD'
 time_range  : tuple (t_start, t_end) decimal-hour UTC — selection window and the
                     t0/t1 used in the output filename
-alt         : float altitude in km, used only for the filename
+alt_range   : tuple (a_lo, a_hi) optional altitude band in km (both bounds
+                    inclusive) to further filter rows; if it empties the
+                    time-window selection it is ignored. Omit for time-only.
 scale       : float optional multiplier applied to the albedo (default 1.0)
 case_tag    : str   optional extra filter (exact combined-product case tag)
 
 Output filename
 ---------------
 ``sfc_alb_{date}_{t0:.3f}_{t1:.3f}_{alt:.2f}km_cre_alb[_scale_{scale}X].dat``
+where ``alt`` is the mean altitude (km) of the selected rows.
 """
 
 import argparse
@@ -96,42 +100,50 @@ def solar_weighted_broadband(ext_wvl, alb, solar_wvl=None, solar_flux=None,
 # Case catalog — add entries here to generate more albedo files.
 # ---------------------------------------------------------------------------
 EXT_ALB_CASES = [
-    {'date': '20240528', 'time_range': (15.610, 17.404), 'alt': 0.22},
-    {'date': '20240603', 'time_range': (14.711, 14.868), 'alt': 0.34},
-    {'date': '20240605', 'time_range': (12.422, 13.812), 'alt': 5.80},
-    {'date': '20240605', 'time_range': (14.258, 15.036), 'alt': 0.11},
-    {'date': '20240605', 'time_range': (15.535, 15.918), 'alt': 0.44},
-    {'date': '20240606', 'time_range': (16.250, 16.950), 'alt': 0.50},
-    {'date': '20240607', 'time_range': (15.336, 15.761), 'alt': 0.12},
-    {'date': '20240611', 'time_range': (14.968, 15.347), 'alt': 0.16},
-    {'date': '20240611', 'time_range': (15.347, 16.113), 'alt': 0.17},
-    {'date': '20240613', 'time_range': (13.704, 13.812), 'alt': 0.21},
-    {'date': '20240613', 'time_range': (14.109, 14.140), 'alt': 0.11},
-    {'date': '20240613', 'time_range': (15.834, 15.883), 'alt': 0.12},
-    {'date': '20240613', 'time_range': (16.043, 16.067), 'alt': 0.16},
-    {'date': '20240613', 'time_range': (16.550, 17.581), 'alt': 0.22},
-    {'date': '20240725', 'time_range': (15.094, 15.300), 'alt': 0.11},
-    {'date': '20240725', 'time_range': (15.881, 15.903), 'alt': 0.33},
-    {'date': '20240801', 'time_range': (13.843, 14.351), 'alt': 0.11},
-    {'date': '20240807', 'time_range': (13.344, 13.761), 'alt': 0.13},
-    {'date': '20240807', 'time_range': (15.472, 15.921), 'alt': 0.11},
-    {'date': '20240808', 'time_range': (13.212, 13.345), 'alt': 0.12},
-    {'date': '20240809', 'time_range': (13.376, 13.600), 'alt': 0.12},
-    {'date': '20240809', 'time_range': (16.029, 16.224), 'alt': 0.11},
+    {'date': '20240528', 'time_range': (15.610, 17.404), 'alt_range': (0.1, 0.24)},
+    {'date': '20240528', 'time_range': (15.610, 17.404), 'alt_range': (0.25, 0.40)},
+    {'date': '20240603', 'time_range': (14.711, 14.868)},
+    {'date': '20240605', 'time_range': (12.422, 13.812)},
+    {'date': '20240605', 'time_range': (14.258, 15.036)},
+    {'date': '20240605', 'time_range': (15.535, 15.918)},
+    {'date': '20240606', 'time_range': (16.250, 16.950), 'alt_range': (0.1, 0.3)},
+    {'date': '20240606', 'time_range': (16.250, 16.950), 'alt_range': (0.4, 0.8)},
+    {'date': '20240606', 'time_range': (16.250, 16.950), 'alt_range': (0.9, 1.5)},
+    {'date': '20240607', 'time_range': (15.336, 15.761)},
+    {'date': '20240611', 'time_range': (14.968, 15.347), 'alt_range': (0.1, 0.25)},
+    {'date': '20240611', 'time_range': (14.968, 15.347), 'alt_range': (0.26, 0.5)},
+    {'date': '20240611', 'time_range': (15.347, 16.113)},
+    {'date': '20240613', 'time_range': (13.704, 13.812)},
+    {'date': '20240613', 'time_range': (14.109, 14.140)},
+    {'date': '20240613', 'time_range': (15.834, 15.883)},
+    {'date': '20240613', 'time_range': (16.043, 16.067)},
+    {'date': '20240613', 'time_range': (16.550, 17.581)},
+    {'date': '20240725', 'time_range': (15.094, 15.300)},
+    {'date': '20240725', 'time_range': (15.881, 15.903)},
+    {'date': '20240801', 'time_range': (13.843, 14.351)},
+    {'date': '20240807', 'time_range': (13.344, 13.761)},
+    {'date': '20240807', 'time_range': (15.472, 15.921)},
+    {'date': '20240808', 'time_range': (13.212, 13.345)},
+    {'date': '20240809', 'time_range': (13.376, 13.600)},
+    {'date': '20240809', 'time_range': (16.029, 16.224)},
     # scaled variants (sensitivity tests)
-    {'date': '20240528', 'time_range': (15.610, 17.404), 'alt': 0.22, 'scale': 0.99},
-    {'date': '20240808', 'time_range': (15.314, 15.497), 'alt': 0.12, 'scale': 0.97},
-    {'date': '20240808', 'time_range': (15.314, 15.497), 'alt': 0.12, 'scale': 1.012},
+    {'date': '20240528', 'time_range': (15.610, 17.404), 'scale': 0.99},
+    {'date': '20240808', 'time_range': (15.314, 15.497), 'scale': 0.97},
+    {'date': '20240808', 'time_range': (15.314, 15.497), 'scale': 1.012},
     # Not in the current combined product (generator will skip with a warning):
-    # {'date': '20240531', 'time_range': (13.839, 15.180), 'alt': 5.61},
-    # {'date': '20240603', 'time_range': (13.620, 13.750), 'alt': 0.32},  # cloudy_atm_corr_1
+    # {'date': '20240531', 'time_range': (13.839, 15.180)},
+    # {'date': '20240603', 'time_range': (13.620, 13.750), 'case_tag': 'cloudy_atm_corr_1'},
 ]
 
 
-def case_output_name(case):
-    """Return the .dat filename for one case, matching the legacy convention."""
+def case_output_name(case, alt_avg):
+    """Return the .dat filename for one case, matching the legacy convention.
+
+    ``alt_avg`` is the mean altitude (km) of the selected rows, computed after
+    any ``alt_range`` filtering.
+    """
     t0, t1 = case['time_range']
-    base = f"sfc_alb_{case['date']}_{t0:.3f}_{t1:.3f}_{case['alt']:.2f}km_cre_alb"
+    base = f"sfc_alb_{case['date']}_{t0:.3f}_{t1:.3f}_{alt_avg:.2f}km_cre_alb"
     scale = case.get('scale', 1.0)
     if scale != 1.0:
         base += f"_scale_{scale}X"
@@ -175,24 +187,28 @@ def generate_ext_alb_files(cases=EXT_ALB_CASES, out_dir=None, time_pad=0.001,
 
     written, skipped, summary = [], [], []
     for case in cases:
-        name = case_output_name(case)
-        out_path = os.path.join(out_dir, name)
         t0, t1 = case['time_range']
         time_range = (t0 - time_pad, t1 + time_pad)
         scale = case.get('scale', 1.0)
 
+        alt_range = case.get('alt_range')
         sel = select_combined_rows(
-            case['date'], time_range=time_range,
+            case['date'], time_range=time_range, alt_range=alt_range,
             case_tag=case.get('case_tag'), combined_data=combined_data,
         )
-        n_rows = 0 if sel is None else len(sel['time'])
         ext_wvl, mean_alb = mean_extended_albedo(
-            case['date'], time_range=time_range,
+            case['date'], time_range=time_range, alt_range=alt_range,
             case_tag=case.get('case_tag'), combined_data=combined_data,
         )
-        if ext_wvl is None:
-            skipped.append(f"{name}  (no combined rows for {case['date']} {time_range})")
+        if sel is None or ext_wvl is None:
+            skipped.append(f"sfc_alb_{case['date']}_{t0:.3f}_{t1:.3f}  "
+                           f"(no combined rows for {case['date']} {time_range})")
             continue
+
+        n_rows = len(sel['time'])
+        alt_avg = float(np.nanmean(sel['alt']))
+        name = case_output_name(case, alt_avg)
+        out_path = os.path.join(out_dir, name)
 
         out_alb = np.clip(mean_alb * scale, 0.0, 1.0)
         broadband = solar_weighted_broadband(ext_wvl, out_alb, solar_wvl, solar_flux)
@@ -215,7 +231,7 @@ def generate_ext_alb_files(cases=EXT_ALB_CASES, out_dir=None, time_pad=0.001,
             'date': case['date'],
             't0': t0,
             't1': t1,
-            'alt_km': case['alt'],
+            'alt_km': alt_avg,
             'scale': scale,
             'n_rows': n_rows,
             'broadband_albedo': broadband,
