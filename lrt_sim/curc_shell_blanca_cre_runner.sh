@@ -1,8 +1,8 @@
 #!/bin/env bash
 
 #SBATCH --nodes=1
-#SBATCH --ntasks=32
-#SBATCH --ntasks-per-node=32
+#SBATCH --ntasks=64
+#SBATCH --ntasks-per-node=64
 #SBATCH --time=24:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=Yu-Wen.Chen@colorado.edu
@@ -70,7 +70,10 @@ WORKERS=$(( USABLE_MEM_GB / MEM_PER_RUN_GB ))
 [ "$WORKERS" -lt 1 ] && WORKERS=1
 # Never exceed the cores we hold.
 [ "$WORKERS" -gt "$SLURM_NTASKS" ] && WORKERS="$SLURM_NTASKS"
-echo "Alloc ${SLURM_NTASKS} cores (~${TOTAL_MEM_GB} GB, usable ${USABLE_MEM_GB}); ${MEM_PER_RUN_GB} GB/run -> ${WORKERS} workers"
+# Blanca: hard cap on concurrent uvspec workers (override with MAX_WORKERS).
+MAX_WORKERS="${MAX_WORKERS:-2}"
+[ "$WORKERS" -gt "$MAX_WORKERS" ] && WORKERS="$MAX_WORKERS"
+echo "Alloc ${SLURM_NTASKS} cores (~${TOTAL_MEM_GB} GB, usable ${USABLE_MEM_GB}); ${MEM_PER_RUN_GB} GB/run, cap ${MAX_WORKERS} -> ${WORKERS} workers"
 
 # This job's surface albedo, pulled by index from the single source of truth
 # (cre_cases.MANUAL_ALB_SWEEP) so the bash side never drifts from Python.

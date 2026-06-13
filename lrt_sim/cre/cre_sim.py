@@ -814,6 +814,14 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         fig.savefig(f'fig/{date_s}/{date_s}_{case_tag}_manual_{manual_alb.replace(".dat", "")}_{time_all[0]:.3f}_{time_all[-1]:.3f}_{alt_avg:.2f}km_cre_alb.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
 
+    # Free the large / now-unneeded inputs before the parallel RT phase so the
+    # parent process stays lean while many uvspec workers run concurrently
+    # (matters most on memory-tight nodes). These are only used up to the albedo
+    # and atmosphere preparation above.
+    del ext_wvl, ext_alb, alb_corr_fit_avg, alb_iter2_all
+    del combined_case, data_dropsonde, cld_marli
+    gc.collect()
+
     atm_z_grid = levels
     z_list = atm_z_grid
     atm_z_grid_str = ' '.join(['%.3f' % z for z in atm_z_grid])
@@ -918,6 +926,8 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         er3t.rtm.lrt.lrt_run_mp(all_inits_to_run, Ncpu=n_workers)
     else:
         print("All libRadtran outputs already present; reading existing results.")
+    all_inits_to_run = None  # drop duplicate refs; inits stay alive via sza_jobs until read
+    gc.collect()
 
     # ---- read + write one CSV per SZA ---------------------------------------
     for job in sza_jobs:
@@ -958,11 +968,10 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         pd.DataFrame(output_dict).to_csv(job['csv'], index=False)
 
         del output_dict, Fup_sfc, Fdn_sfc, flux_down_results, flux_up_results
+        job['inits'] = None  # free this SZA's init objects progressively
         gc.collect()
 
-    del ext_alb, ext_wvl
-    gc.collect()
-    print("Finished libratran calculations.")  
+    print("Finished libratran calculations.")
     #\----------------------------------------------------------------------------/#
 
     return
