@@ -25,7 +25,7 @@ from alb_fitting import alb_extention
 
 PKL = (
     '/Users/yuch8913/programming/arcsix_sfc/data/'
-    'sfc_alb_combined_smooth_450nm/'
+    'sfc_alb_combined/'
     'sfc_alb_update_20240725_cloudy_atm_corr_time_15.094_15.300.pkl'
 )
 FIG_DIR = '/Users/yuch8913/programming/arcsix_sfc/lrt_sim'

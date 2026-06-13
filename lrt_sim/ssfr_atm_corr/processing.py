@@ -1310,7 +1310,7 @@ def process_atm_corr_case(
     if config is None:
         config = make_default_config()
     if output_dir is None:
-        output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
+        output_dir = f'{_fdir_general_}/sfc_alb_combined'
 
     date_s = date.strftime("%Y%m%d")
     tmhr_ranges_select = split_tmhr_ranges(tmhr_ranges_select, simulation_interval)

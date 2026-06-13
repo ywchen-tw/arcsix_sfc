@@ -139,17 +139,43 @@ def linear_regression_with_confidence(x, y, confidence=0.95):
     
     return x_sorted, y_pred, lower_bound, upper_bound, res
 
-def analyze_ice_frac_alb():
+def analyze_ice_frac_alb(alb_product='native'):
     log = logging.getLogger("atm corr combined")
 
-    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
+    # Select the atmospheric-corrected albedo product. Both products live in the
+    # same combined pickle; only the wavelength grid and the spectral/broadband
+    # keys differ ('native' = raw SSFR 352-1996 nm grid, 'extended' = modeled
+    # 300-4000 nm grid). The spectra are already atm-corrected + fit, so the
+    # gas-band-filtered broadband is not needed here -> use the unfiltered
+    # broadband for both products to keep them methodologically matched.
+    if alb_product not in ('native', 'extended'):
+        raise ValueError(f"alb_product must be 'native' or 'extended', got {alb_product!r}")
+    alb_keys = {
+        'native': {
+            'wvl':       'wvl_{sfx}',
+            'spectral':  'alb_final_all_{sfx}',
+            'broadband': 'broadband_alb_final_all_1s_{sfx}',
+        },
+        'extended': {
+            'wvl':       'ext_wvl_{sfx}',
+            'spectral':  'alb_final_ext_all_{sfx}',
+            'broadband': 'broadband_alb_atm_corrected_ext_{sfx}_all',
+        },
+    }[alb_product]
+
+    output_dir = f'{_fdir_general_}/sfc_alb_combined'
 
     combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
     with open(combined_output_file, 'rb') as r:
         combined_data = pickle.load(r)
 
-    fig_dir = f'fig/sfc_alb_corr_analysis'
+    # product-tagged output dirs so native/extended runs don't overwrite
+    fig_dir = f'fig/sfc_alb_corr_analysis/{alb_product}'
     os.makedirs(fig_dir, exist_ok=True)
+
+    # per-leg spectral fit output (intercept = SIF=0, extrapolated = SIF=1) as CSV
+    wvl_fit_dir = f'{_fdir_general_}/sfc_alb_ice_frac/{alb_product}'
+    os.makedirs(wvl_fit_dir, exist_ok=True)
 
     # ice_frac_time_offset is imported from settings (single source of truth shared
     # with combined.py); see top-of-module import.
@@ -258,6 +284,69 @@ def analyze_ice_frac_alb():
         lst_lo.append(np.percentile(v, lo) if len(v) > 0 else np.nan)
         lst_hi.append(np.percentile(v, hi) if len(v) > 0 else np.nan)
 
+    def _fit_wvl_icefraction(alb_wvl, cam_ice_frac, alb_cam, prefix, date_label):
+        """Per-wavelength linear fit of albedo vs camera ice fraction.
+
+        Writes ``{prefix}_wvl_icefraction_fit.csv`` (wvl, slope, intercept=SIF=0,
+        r2, alb_sif1=extrapolated to SIF=1) and the companion intercept/SIF=1
+        spectra figure. Returns (slope, intercept, r2, alb_sif1) arrays for reuse.
+        """
+        wvl_slope     = np.full_like(alb_wvl, np.nan, dtype=float)
+        wvl_intercept = np.full_like(alb_wvl, np.nan, dtype=float)   # albedo at SIF=0
+        wvl_r2        = np.full_like(alb_wvl, np.nan, dtype=float)
+        wvl_pval      = np.full_like(alb_wvl, np.nan, dtype=float)
+        for i in range(len(alb_wvl)):
+            mask = np.isfinite(alb_cam[:, i]) & np.isfinite(cam_ice_frac)
+            if mask.sum() > 2:
+                res_i            = linregress(cam_ice_frac[mask], alb_cam[:, i][mask])
+                wvl_slope[i]     = res_i.slope
+                wvl_intercept[i] = res_i.intercept
+                wvl_r2[i]        = res_i.rvalue ** 2
+                wvl_pval[i]      = res_i.pvalue
+        wvl_alb_sif1 = wvl_intercept + wvl_slope   # extrapolated to SIF=1
+        pd.DataFrame({
+            'wvl_nm':    alb_wvl,
+            'slope':     wvl_slope,
+            'intercept': wvl_intercept,   # albedo at SIF=0
+            'r2':        wvl_r2,
+            'pval':      wvl_pval,
+            'alb_sif1':  wvl_alb_sif1,     # albedo extrapolated to SIF=1
+        }).to_csv(f'{wvl_fit_dir}/{prefix}_wvl_icefraction_fit.csv', index=False)
+
+        # spectrum-average R2 and p value over non-gas-band wavelengths
+        # (gas-absorption bands carry noisy fits and would skew the average)
+        in_gas = np.zeros(len(alb_wvl), dtype=bool)
+        for band in gas_bands:
+            in_gas |= (alb_wvl >= band[0]) & (alb_wvl <= band[1])
+        avg_mask = ~in_gas & np.isfinite(wvl_r2)
+        if not np.any(avg_mask):                     # fallback: all finite wavelengths
+            avg_mask = np.isfinite(wvl_r2)
+        mean_r2 = np.nanmean(wvl_r2[avg_mask])  if np.any(avg_mask) else np.nan
+        mean_p  = np.nanmean(wvl_pval[avg_mask]) if np.any(avg_mask) else np.nan
+
+        # intercept (SIF=0) and extrapolated (SIF=1) albedo spectra in one figure
+        plt.close('all')
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.plot(alb_wvl, wvl_intercept, color='b', label='Intercept (sea ice fraction = 0)')
+        ax.plot(alb_wvl, wvl_alb_sif1,  color='r', label='Extrapolated (sea ice fraction = 1)')
+        for band in gas_bands:
+            ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
+        ax.set_xlabel('Wavelength (nm)', fontsize=14)
+        ax.set_ylabel('Surface Albedo', fontsize=14)
+        ax.legend(fontsize=10)
+        ax.tick_params(labelsize=12)
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_xlim(np.nanmin(alb_wvl), np.nanmax(alb_wvl))
+        ax.text(0.02, 0.04,
+                'mean $\\mathrm{R^2}$ = %.3f\nmean p = %.2e\n(excl. gas bands)' % (mean_r2, mean_p),
+                transform=ax.transAxes, fontsize=11, va='bottom', ha='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+        ax.set_title(f'Intercept & Sea-Ice-Fraction=1 Albedo Spectra, {date_label}', fontsize=13)
+        fig.tight_layout()
+        fig.savefig(f'{fig_dir}/{prefix}_intercept_sif1_spectra.png', bbox_inches='tight', dpi=150)
+        plt.close(fig)
+        return wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1
+
     # best time-shift results: {(date_key, case_tag): {'shift_s': int, 'r': float}}
     kt19_hdrf_best_shift = {}
 
@@ -275,13 +364,13 @@ def analyze_ice_frac_alb():
             if not np.any(final_mask):
                 print(f"No data for date {date_key} and case tag {case_tag}. Skipping.")
                 continue
-            alb_wvl              = combined_data[f'wvl_{sfx}']
+            alb_wvl              = combined_data[alb_keys['wvl'].format(sfx=sfx)]
             lon_selected_all     = combined_data[f'lon_all_{sfx}'][final_mask]
             lat_selected_all     = combined_data[f'lat_all_{sfx}'][final_mask]
             alt_selected_all     = combined_data[f'alt_all_{sfx}'][final_mask]
             time_selected_all    = combined_data[f'time_{sfx}_all'][final_mask]
-            alb_selected_all     = combined_data[f'alb_iter2_all_{sfx}'][final_mask, :]
-            broadband_alb_selected_all = combined_data[f'broadband_alb_iter2_all_filter_{sfx}'][final_mask]
+            alb_selected_all     = combined_data[alb_keys['spectral'].format(sfx=sfx)][final_mask, :]
+            broadband_alb_selected_all = combined_data[alb_keys['broadband'].format(sfx=sfx)][final_mask]
             myi_selected_all_ori = combined_data[f'myi_ratio_{sfx}_all'][final_mask]
             fyi_selected_all_ori = combined_data[f'fyi_ratio_{sfx}_all'][final_mask]
             yi_selected_all_ori  = combined_data[f'yi_ratio_{sfx}_all'][final_mask]
@@ -397,8 +486,10 @@ def analyze_ice_frac_alb():
             alb_1020_cam_time = np.where(m, alb_1020_selected_all[closest_idx], np.nan)
             alb_865_cam_time  = np.where(m, alb_865_selected_all[closest_idx],  np.nan)
             alb_1650_cam_time = np.where(m, alb_1650_selected_all[closest_idx], np.nan)
-                    
-            
+            # full spectral albedo matched to camera time (for per-wavelength fit)
+            alb_cam_time = np.where(m[:, np.newaxis], alb_selected_all[closest_idx], np.nan)
+
+
             fig, (ax, axr) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.3})
             ax2 = ax.twinx()
             l1 = ax.plot(time_selected_all, broadband_alb_selected_all, c='skyblue', label='Broadband Albedo', alpha=0.75, linewidth=2)
@@ -420,6 +511,9 @@ def analyze_ice_frac_alb():
             # calculate slope and correlation coefficient
             valid_mask = ~np.isnan(cam_ice_fraction) & ~np.isnan(broadband_alb_cam_time)
             if np.sum(valid_mask) > 2:
+                # per-wavelength fit + CSV + intercept/SIF=1 spectra figure for this case
+                _fit_wvl_icefraction(alb_wvl, cam_ice_fraction, alb_cam_time,
+                                     f'arcsix_albedo_{date_key}_{case_tag}', f'{date_key} {case_tag}')
                 x_sorted, y_pred, lower_bound, upper_bound, res = linear_regression_with_confidence(
                     cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], confidence=0.95)
                 axr.plot(x_sorted, y_pred, color='orange', linestyle='--', label=r'Fit: y=%.2fx+%.2f\n$\mathrm{R^2}$=%.2f' %(res.slope, res.intercept, res.rvalue**2))
@@ -1329,13 +1423,13 @@ def analyze_ice_frac_alb():
             case_mask |= np.array([ct in tag for tag in combined_data[f'case_tags_{sfx}_all']])
         m = date_mask & case_mask
         return (
-            combined_data[f'wvl_{sfx}'],
+            combined_data[alb_keys['wvl'].format(sfx=sfx)],
             combined_data[f'lon_all_{sfx}'][m],
             combined_data[f'lat_all_{sfx}'][m],
             combined_data[f'alt_all_{sfx}'][m],
             combined_data[f'time_{sfx}_all'][m],
-            combined_data[f'alb_iter2_all_{sfx}'][m, :],
-            combined_data[f'broadband_alb_iter2_all_filter_{sfx}'][m],
+            combined_data[alb_keys['spectral'].format(sfx=sfx)][m, :],
+            combined_data[alb_keys['broadband'].format(sfx=sfx)][m],
         )
 
     def _match_cam_to_ssfr(cam_time, time_ssfr, broadband_alb, alb_spectral, threshold=1/3600):
@@ -1464,15 +1558,11 @@ def analyze_ice_frac_alb():
         fig.savefig(f'{fig_dir}/{prefix}_wvl_icefraction.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
 
-        # 8. Slope and R² vs wavelength
-        wvl_slope = np.full_like(alb_wvl, np.nan)
-        wvl_r2    = np.full_like(alb_wvl, np.nan)
-        for i in range(len(alb_wvl)):
-            mask = np.isfinite(alb_cam[:, i]) & np.isfinite(cam_ice_frac)
-            if mask.sum() > 2:
-                res_i        = linregress(cam_ice_frac[mask], alb_cam[:, i][mask])
-                wvl_slope[i] = res_i.slope
-                wvl_r2[i]    = res_i.rvalue ** 2
+        # 8. Per-wavelength fit -> CSV + intercept/SIF=1 spectra figure (shared helper)
+        wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1 = _fit_wvl_icefraction(
+            alb_wvl, cam_ice_frac, alb_cam, prefix, date_label)
+
+        # Slope and R² vs wavelength
         fig, ax = plt.subplots(figsize=(8, 6))
         ax2 = ax.twinx()
         ax.scatter(alb_wvl, wvl_slope, c=wvl_r2, s=10, cmap='jet', vmin=0, vmax=1)
@@ -1656,5 +1746,8 @@ if __name__ == '__main__':
     os.makedirs(dir_fig, exist_ok=True)
 
     # surface albedo vs camera ice-fraction analysis
+    # run for both the native and the extended atmospheric-corrected albedo
     # ------------------------------------------
-    analyze_ice_frac_alb()
+    for _alb_product in ['native', 'extended']:
+        print(f"\n===== analyzing alb_product = {_alb_product} =====")
+        analyze_ice_frac_alb(alb_product=_alb_product)

@@ -438,6 +438,13 @@ def season_from_combined_cache(mapping, name):
             fallback_base_name='broadband_alb_iter2_all',
         ),
         bb_alb_iter2_690_1190=mapping[f'broadband_alb_690_1190_{suffix}_all'],
+        ext_wvl=mapping.get(f'ext_wvl_{suffix}', np.array([])),
+        alb_atm_corrected_ext=mapping.get(
+            f'alb_atm_corrected_ext_{suffix}_all', np.empty((n_pts, 0))
+        ),
+        broadband_alb_atm_corrected_ext=mapping.get(
+            f'broadband_alb_atm_corrected_ext_{suffix}_all', np.full(n_pts, np.nan)
+        ),
         kt19_sfc_T=mapping.get(f'kt19_sfc_T_{suffix}_all', np.full(n_pts, np.nan)),
         sza=mapping.get(f'sza_{suffix}_all', np.full(n_pts, np.nan)),
         ice_frac=mapping[f'ice_frac_all_{suffix}'],
@@ -1671,7 +1678,7 @@ def compute_grain_size_ratio(season):
 def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True):
     log = logging.getLogger("atm corr combined")
 
-    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
+    output_dir = f'{_fdir_general_}/sfc_alb_combined'
     sfc_alb_files = sorted(glob.glob(f'{output_dir}/sfc_alb_update_*.pkl'))
     print(f"Found {len(sfc_alb_files)} surface albedo files for combination.")
     
@@ -1797,6 +1804,15 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
             'alb_iter1_all_1s_spring': spring.alb_iter1,
             'alb_iter2_all_1s_spring': spring.alb_iter2,
             'alb_final_all_1s_spring': spring.alb_iter2,
+            # extended (300-4000 nm) atmospheric-corrected albedo
+            'ext_wvl_spring': spring.ext_wvl,
+            'extension_wvl_spring': spring.ext_wvl,
+            'alb_atm_corrected_ext_spring_all': spring.alb_atm_corrected_ext,
+            'alb_final_ext_all_spring': spring.alb_atm_corrected_ext,
+            'alb_iter2_ext_all_spring': spring.alb_atm_corrected_ext,
+            'broadband_alb_atm_corrected_ext_spring_all': spring.broadband_alb_atm_corrected_ext,
+            'broadband_alb_final_ext_spring_all': spring.broadband_alb_atm_corrected_ext,
+            'broadband_alb_iter2_ext_spring_all': spring.broadband_alb_atm_corrected_ext,
             'broadband_alb_iter1_all_spring': spring._bb_alb_iter1,
             'broadband_alb_iter2_all_spring': spring._bb_alb_iter2_file,
             'broadband_alb_iter1_all_1s_spring': spring._bb_alb_iter1,
@@ -1856,6 +1872,15 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
             'alb_iter1_all_1s_summer': summer.alb_iter1,
             'alb_iter2_all_1s_summer': summer.alb_iter2,
             'alb_final_all_1s_summer': summer.alb_iter2,
+            # extended (300-4000 nm) atmospheric-corrected albedo
+            'ext_wvl_summer': summer.ext_wvl,
+            'extension_wvl_summer': summer.ext_wvl,
+            'alb_atm_corrected_ext_summer_all': summer.alb_atm_corrected_ext,
+            'alb_final_ext_all_summer': summer.alb_atm_corrected_ext,
+            'alb_iter2_ext_all_summer': summer.alb_atm_corrected_ext,
+            'broadband_alb_atm_corrected_ext_summer_all': summer.broadband_alb_atm_corrected_ext,
+            'broadband_alb_final_ext_summer_all': summer.broadband_alb_atm_corrected_ext,
+            'broadband_alb_iter2_ext_summer_all': summer.broadband_alb_atm_corrected_ext,
             'broadband_alb_iter1_all_summer': summer._bb_alb_iter1,
             'broadband_alb_iter2_all_summer': summer._bb_alb_iter2_file,
             'broadband_alb_iter1_all_1s_summer': summer._bb_alb_iter1,

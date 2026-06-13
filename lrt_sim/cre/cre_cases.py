@@ -1,0 +1,72 @@
+"""CRE-specific case configuration.
+
+Base case parameters (date, time ranges, atmospheric levels, cloud
+microphysics, clear/cloudy flag) live in the shared
+``lrt_sim.ssfr_atm_corr.case_catalog`` so there is a single source of truth.
+This module only adds the extras that are specific to the cloud-radiative-effect
+sweeps and have no home in that catalog: the solar-zenith-angle grid, the cloud
+water-path sweep, and the cross-case ``manual_alb`` spectra used to compare CRE
+under different surface albedos.
+"""
+
+import numpy as np
+
+# ---------------------------------------------------------------------------
+# Catalog case ids to run CRE simulations / plots for.
+# These are ids in ssfr_atm_corr.case_catalog (good + bad lists). They are the
+# cloudy atmospheric-correction cases the legacy ssfr_cre script ran.
+# ---------------------------------------------------------------------------
+CRE_CASE_IDS = [
+    'case_004',       # 2024-06-03 cloudy_atm_corr_2 (present in combined product)
+    'bad_case_003',   # 2024-06-03 cloudy_atm_corr_1 (300 m, camera icing; not in
+                      # the combined product -> cre_sim falls back to per-leg pickles)
+]
+
+DEFAULT_CRE_CASE_ID = CRE_CASE_IDS[0]
+
+
+# ---------------------------------------------------------------------------
+# Solar-zenith-angle sweep (degrees).
+# The legacy code ran this in small chunks on the cluster; the full grid is
+# kept here. ``cre_sza_array`` optionally appends the case-mean SZA.
+# ---------------------------------------------------------------------------
+CRE_SZA_GRID = np.array(
+    [50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75],
+    dtype=np.float32,
+)
+
+
+def cre_sza_array(sza_avg=None):
+    """Return the SZA sweep, optionally including the case-mean SZA."""
+    if sza_avg is None:
+        return CRE_SZA_GRID.copy()
+    return np.unique(
+        np.concatenate((CRE_SZA_GRID, np.array([np.round(sza_avg, 2)], dtype=np.float32)))
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cloud water-path sweep (g/m^2) used to build the COT grid. The per-case cloud
+# water path from the catalog is appended at run time inside cre_sim.
+# ---------------------------------------------------------------------------
+CRE_CWP_LIST_MAC = [0, 5, 10, 30, 50, 100, 200]
+CRE_CWP_LIST_LINUX = [
+    0, 1, 2, 3, 5, 7.5, 10, 15, 20, 35, 50, 75, 100, 150, 200, 300, 400, 500, 600,
+]
+
+
+# ---------------------------------------------------------------------------
+# Cross-case manual albedo spectra (filenames under data/sfc_alb_cre/).
+# Used by cre_plot to compare CRE under a range of measured surface albedos.
+# ---------------------------------------------------------------------------
+MANUAL_ALB_SWEEP = [
+    'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
+    'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
+    'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
+    'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
+    'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+    'sfc_alb_20240807_13.344_13.761_0.13km_cre_alb.dat',
+    'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',
+    'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',
+    'sfc_alb_20240605_12.422_13.812_5.80km_cre_alb.dat',
+]

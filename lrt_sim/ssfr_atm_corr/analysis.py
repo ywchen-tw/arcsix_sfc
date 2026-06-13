@@ -225,7 +225,7 @@ def one_second_albedo_arrays(combined_data, date_select, final_mask):
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
 
-    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
+    output_dir = f'{_fdir_general_}/sfc_alb_combined'
     
     combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
     with open(combined_output_file, 'rb') as r:
@@ -380,14 +380,11 @@ def combined_atm_corr():
     
     #"""
     
-    # 6/5 clear_atm_corr_2, 3
+    # 6/5 clear_atm_corr_2, 3 (old 0605_clear_2 -> new clear_2..4, old 0605_clear_3 -> new clear_5..7)
     date_select = '20240605'
     date_summer_mask = combined_data['dates_spring_all'] == int(date_select)
-    case_tag_select_1 = 'clear_atm_corr_2'
-    case_tag_mask_1 = np.array([case_tag_select_1 in ct for ct in combined_data['case_tags_spring_all']])
-    case_tag_select_2 = 'clear_atm_corr_3'
-    case_tag_mask_2 = np.array([case_tag_select_2 in ct for ct in combined_data['case_tags_spring_all']])
-    case_tag_mask = case_tag_mask_1 | case_tag_mask_2
+    case_tags_select = [f'clear_atm_corr_{n}' for n in range(2, 8)]
+    case_tag_mask = np.array([ct in case_tags_select for ct in combined_data['case_tags_spring_all']])
     final_mask = date_summer_mask & case_tag_mask
     alb_wvl = combined_data['wvl_summer'] if date_select > '20240630' else combined_data['wvl_spring']
     lon_selected_all = combined_data['lon_all_summer'][final_mask] if date_select > '20240630' else combined_data['lon_all_spring'][final_mask]
