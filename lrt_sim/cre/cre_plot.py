@@ -106,6 +106,34 @@ except ImportError:
         _fdir_data_, _fdir_general_, _fdir_tmp_, _fdir_tmp_graph_, _title_extra_,
     )
 
+# Solar-TOA-weighted broadband albedo: use the same slit-convolved solar flux and
+# weighting that ext_alb_cases uses to build the manual_alb .dat files, so the
+# broadband axis here matches ext_alb_broadband.csv / cre_cases comments. Defined
+# locally (rather than imported from ext_alb_cases) to avoid pulling cre_sim in.
+_SOLAR_FLUX_FILE = os.path.join(_LRT_SIM_ROOT, 'arcsix_ssfr_solar_flux_slit.dat')
+
+
+def load_solar_flux(solar_file=_SOLAR_FLUX_FILE):
+    """Return (wavelength_nm, flux) from a two-column solar-flux .dat file."""
+    data = np.loadtxt(solar_file, comments='#')
+    return data[:, 0], data[:, 1]
+
+
+def solar_weighted_broadband(ext_wvl, alb, solar_wvl=None, solar_flux=None,
+                             solar_file=_SOLAR_FLUX_FILE):
+    """Solar-flux-weighted broadband albedo: integral(alb*F dlambda) / integral(F dlambda).
+
+    The solar flux is interpolated onto ``ext_wvl`` (zero outside its range), so
+    the integral is effectively over the shortwave band the solar file covers.
+    """
+    if solar_wvl is None:
+        solar_wvl, solar_flux = load_solar_flux(solar_file)
+    flux = np.interp(ext_wvl, solar_wvl, solar_flux, left=0.0, right=0.0)
+    denom = np.trapz(flux, ext_wvl)
+    if denom <= 0:
+        return np.nan
+    return float(np.trapz(np.asarray(alb) * flux, ext_wvl) / denom)
+
 o2a_1_start, o2a_1_end = 748, 780
 h2o_1_start, h2o_1_end = 672, 706
 h2o_2_start, h2o_2_end = 705, 746
@@ -155,10 +183,15 @@ def load_case_from_combined(date_s, case_tag, combined_file=None):
     broadband = (
         np.asarray(d[bb_key])[mask] if bb_key in d else np.full(n_pts, np.nan)
     )
+    ext_key = f'alb_atm_corrected_ext_{sfx}_all'
+    era5_key = f'era5_alb_{sfx}_all'
     return {
         'alb_wvl':       np.asarray(d[f'wvl_{sfx}']),
         'alb':           np.asarray(d[f'alb_iter2_all_{sfx}'])[mask, :],
         'broadband_alb': broadband,
+        'ext_wvl':       np.asarray(d.get(f'ext_wvl_{sfx}', np.array([]))),
+        'alb_ext':       (np.asarray(d[ext_key])[mask, :] if ext_key in d else None),
+        'era5_alb':      (np.asarray(d[era5_key])[mask] if era5_key in d else np.full(n_pts, np.nan)),
         'time':          np.asarray(d[f'time_{sfx}_all'])[mask],
         'lon':           np.asarray(d[f'lon_all_{sfx}'])[mask],
         'lat':           np.asarray(d[f'lat_all_{sfx}'])[mask],
@@ -227,6 +260,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # that file naming (time window + alt) matches what cre_sim wrote.
     combined_case = load_case_from_combined(date_s, case_tag)
 
+    ext_wvl_combined  = None
+    alb_ext_combined  = None
+    era5_alb_combined = None
     if combined_case is not None:
         alb_wvl           = combined_case['alb_wvl']
         alb_iter2_all     = combined_case['alb']
@@ -236,6 +272,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         lat_all           = combined_case['lat']
         alt_all           = combined_case['alt']
         sza_all           = combined_case['sza']
+        ext_wvl_combined  = combined_case['ext_wvl']
+        alb_ext_combined  = combined_case['alb_ext']
+        era5_alb_combined = combined_case['era5_alb']
     else:
         for i in range(len(tmhr_ranges_select)):
             time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
@@ -282,56 +321,27 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
     
     alb_iter2_all_avg = np.nanmean(alb_iter2_all, axis=0)
-    
-    # iceage_nh_12.5km_20240101_20250923_ql.nc
-    with Dataset(f'{_fdir_general_}/era5/forecast_albedo_0_daily-mean.nc', 'r') as nc:
-        era5_lon = nc.variables['longitude'][:]
-        era5_lat = nc.variables['latitude'][:]
-        era5_time = nc.variables['valid_time'][:] # days since 2024-05-01
-        era5_alb = nc.variables['fal'][:]  # time, lat, lon
-    era5_time_dates = np.array([datetime.datetime(2024,5,1) + datetime.timedelta(days=int(t)) for t in era5_time])
-    era5_time_dates_str = np.array([t.strftime('%Y%m%d') for t in era5_time_dates])
-    era5_alb = np.array(era5_alb, dtype=np.float32)
-    era5_lat_mesh, era5_lon_mesh = np.meshgrid(era5_lat, era5_lon, indexing='ij')
-    
-    era5_alb_date = era5_alb[era5_time_dates_str == str(date_s)]
-    era5_alb_interp = griddata(
-                (era5_lon_mesh.flatten(), era5_lat_mesh.flatten()), era5_alb_date[0].flatten(),
-                (lon_all, lat_all),
-                method='nearest'
-            )
-    
-    # df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
-    # wvl_solar = np.array(df_solor.iloc[:, 0])
-    # flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
-    # # interpolate to 1 nm grid
-    # f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
-    # ext_broadband_alb_all = np.zeros_like(era5_alb_interp)
-    # ext_wvl, _ = alb_extention(alb_wvl, alb_iter2_all_avg, clear_sky=clear_sky)
-    # flux_solar_interp = f_interp(ext_wvl)
-    # for i in range(len(broadband_alb_all)):
-    #     alb_i = np.clip(alb_iter2_all[i, :], 0.0, 1.0)
-    #     if np.all(np.isnan(alb_i)):
-    #         ext_broadband_alb_all[i] = np.nan
-    #         continue
-    #     ext_wvl_i, ext_alb_i = alb_extention(alb_wvl, alb_i, clear_sky=clear_sky)
-    #     ext_broadband_alb_all[i] = np.trapz(ext_alb_i * flux_solar_interp, ext_wvl_i) / np.trapz(flux_solar_interp, ext_wvl_i)
 
-    # plt.close('all')
-    # fig, ax = plt.subplots(figsize=(8, 6))
-    # ax.scatter(ext_broadband_alb_all, era5_alb_interp, c='blue', s=10, alpha=0.5)
-    # ax.scatter(np.nanmean(ext_broadband_alb_all), np.nanmean(era5_alb_interp), c='red', s=100, label='Mean value')
-    # ax.plot([0, 1], [0, 1], 'k--')
-    # ax.set_xlim(0.2, 0.9)
-    # ax.set_ylim(0.2, 0.9)
-    # ax.set_xlabel('Surface Broadband Albedo from SSFR', fontsize=14)
-    # ax.set_ylabel('Surface Broadband Albedo from ERA5', fontsize=14)
-    # fig.savefig(f'fig/{date_s}/{date_s}_{case_tag}_sfc_alb_ssfr_vs_era5.png', dpi=300)
-    
-    # print("Average surface broadband albedo from SSFR:", np.nanmean(ext_broadband_alb_all)) # 0.7040066
-    # print("Average surface broadband albedo from ERA5:", np.nanmean(era5_alb_interp)) # 0.6548484
-    
-    
+    # Solar-TOA-weighted broadband albedo for this CRE case, computed the same way
+    # ext_alb_cases builds the manual_alb files: average the already-extended
+    # (300-4000 nm) atmospheric-corrected albedo over the case, then weight by the
+    # slit-convolved solar flux. ERA5 albedo is the case mean of the collocated
+    # forecast albedo (fal) stored in the combined product.
+    solar_wvl, solar_flux = load_solar_flux()
+
+    era5_broadband_alb = np.nan
+    ssfr_ext_broadband_alb = np.nan
+    if combined_case is not None:
+        era5_broadband_alb = np.round(np.nanmean(era5_alb_combined), 3)
+        if alb_ext_combined is not None and alb_ext_combined.size:
+            mean_alb_case = np.clip(np.nanmean(alb_ext_combined, axis=0), 0.0, 1.0)
+            ssfr_ext_broadband_alb = np.round(
+                solar_weighted_broadband(ext_wvl_combined, mean_alb_case, solar_wvl, solar_flux), 3
+            )
+    print(f"{date_s} {case_tag}: SSFR extended broadband albedo = {ssfr_ext_broadband_alb}, "
+          f"ERA5 broadband albedo = {era5_broadband_alb}")
+
+
         
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
 
@@ -392,13 +402,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         broadband_alb_ori_all = []
         
         
-        # use CU solar spectrum
-        df_solor = pd.read_csv('CU_composite_solar_processed.dat', sep='\s+', header=None)
-        wvl_solar = np.array(df_solor.iloc[:, 0])
-        flux_solar = np.array(df_solor.iloc[:, 1])#/1000 # convert mW/m^2/nm to W/m^2/nm
-        
-        # interpolate to 1 nm grid
-        f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
+        # Solar-TOA weighting (slit-convolved SSFR solar flux), matching how
+        # ext_alb_cases computes the broadband albedo of each manual_alb file.
+        f_interp = interp1d(solar_wvl, solar_flux, kind='linear', bounds_error=False, fill_value=0.0)
         
         
         
@@ -784,7 +790,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # sza_select = 61.46
     sza_select = 61.93
     sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
-    broadband_alb_select = 0.704
+    broadband_alb_select = ssfr_ext_broadband_alb
     broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
     df_alb_sel = df_all.loc[(df_all['broadband_alb'].values==broadband_alb_all_unique[broadband_alb_delect_ind]), :]
 
@@ -918,7 +924,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
     cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
-    ax3.scatter(cos_sza_real, 0.704, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
+    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
     ax3.set_ylim(np.nanmin(broadband_alb_mesh), np.nanmax(broadband_alb_mesh))
@@ -974,7 +980,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
             
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
             # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
             # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
@@ -982,8 +988,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
             end_cwp = sza_real_df_real_all_i['cwp'].values[0]
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
-            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
-            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            print(f"real net CRE for ERA5 albedo {era5_broadband_alb}:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for ERA5 albedo {era5_broadband_alb}:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
             ax1.arrow(start_cwp, start_Fnet, 
                       end_cwp - start_cwp, end_Fnet - start_Fnet,
                       head_width=2, head_length=2, 
@@ -1038,7 +1044,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
             
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
             # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
             # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
@@ -1046,8 +1052,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
             end_cwp = sza_real_df_real_all_i['cwp'].values[0]
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
-            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
-            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            print(f"real net CRE for ERA5 albedo {era5_broadband_alb}:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for ERA5 albedo {era5_broadband_alb}:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
             ax1.arrow(start_cwp, start_Fnet, 
                       end_cwp - start_cwp, end_Fnet - start_Fnet,
                       head_width=2, head_length=2, 
@@ -1094,7 +1100,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
             
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
             # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
             # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
@@ -1102,8 +1108,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
             end_cwp = sza_real_df_real_all_i['cwp'].values[0]
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4 -4 +2
-            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
-            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            print(f"real net CRE for ERA5 albedo {era5_broadband_alb}:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for ERA5 albedo {era5_broadband_alb}:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
             # ax1.arrow(start_cwp, start_Fnet, 
             #           end_cwp - start_cwp, end_Fnet - start_Fnet,
             #           head_width=2, head_length=2, 
@@ -1155,7 +1161,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
             
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
             # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
             # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
             # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
@@ -1163,8 +1169,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
             end_cwp = sza_real_df_real_all_i['cwp'].values[0]
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
-            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
-            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            print(f"real net CRE for ERA5 albedo {era5_broadband_alb}:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for ERA5 albedo {era5_broadband_alb}:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
             # ax1.arrow(start_cwp, start_Fnet, 
             #           end_cwp - start_cwp, end_Fnet - start_Fnet,
             #           head_width=2, head_length=2, 
@@ -1210,7 +1216,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
             
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - 0.655))
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
             # sza_real_df_all_i_real_finterp = interp1d(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, kind='linear', fill_value='extrapolate')
             # F_sfc_net_cre_real_at_cwp_zero_0655 = sza_real_df_all_i_real_finterp(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind
             # ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_all[i]:.3f}')
@@ -1218,8 +1224,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
             end_cwp = sza_real_df_real_all_i['cwp'].values[0]
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0]+4
-            print(f"real net CRE for albedo 0.655:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
-            print(f"zero crossing cwp for albedo 0.655:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
+            print(f"real net CRE for ERA5 albedo {era5_broadband_alb}:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
+            print(f"zero crossing cwp for ERA5 albedo {era5_broadband_alb}:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655])
             # ax1.arrow(start_cwp, start_Fnet, 
             #           end_cwp - start_cwp, end_Fnet - start_Fnet,
             #           head_width=2, head_length=2, 
@@ -1282,12 +1288,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
     cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
-    ax3.scatter(cos_sza_real, 0.7040066, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
-    ax3.scatter(cos_sza_real, 0.6548484, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
-    ax3.text(cos_sza_real+0.01, 0.7040066-0.002, 'ARCSIX', color='orange', fontsize=12)
-    ax3.text(cos_sza_real+0.01, 0.6548484-0.002, 'ERA5', color='orange', fontsize=12)
+    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
+    ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
+    ax3.text(cos_sza_real+0.01, ssfr_ext_broadband_alb-0.002, 'ARCSIX', color='orange', fontsize=12)
+    ax3.text(cos_sza_real+0.01, era5_broadband_alb-0.002, 'ERA5', color='orange', fontsize=12)
     # plot arrow from SSFR Albedo to ERA5 Albedo
-    ax3.annotate('', xy=(cos_sza_real, 0.701), xytext=(cos_sza_real, 0.657),
+    ax3.annotate('', xy=(cos_sza_real, ssfr_ext_broadband_alb), xytext=(cos_sza_real, era5_broadband_alb),
                  arrowprops=dict(facecolor='purple', arrowstyle='->', 
                                  edgecolor='purple',
                                  lw=2.5),
@@ -1508,17 +1514,21 @@ if __name__ == '__main__':
     os.makedirs('./fig', exist_ok=True)
     config = make_default_config()
 
-    # Example: post-process / plot the 2024-06-03 cloudy_atm_corr_2 case
-    # (case_004), sweeping a set of manual albedo spectra.
+    # Post-process / plot the 2024-06-03 cloudy_atm_corr_2 case (case_004) with
+    # exactly 5 albedo spectra. The plot treats index 2 as the SSFR/flight-case
+    # condition and index 3 as the ERA5 condition, so:
+    #   index 2 = case_004's own albedo            (broadband ~0.748)
+    #   index 3 = sweep albedo closest to ERA5      (broadband ~0.638, ERA5 ~0.651)
+    # indices 0, 1, 4 are context spectra spanning low -> high albedo.
     plot_cre_case(
         config,
         'case_004',
         manual_alb=[
-            'sfc_alb_20240606_16.250_16.950_0.50km_cre_alb.dat',
-            'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',
-            'sfc_alb_20240603_13.620_13.750_0.32km_cre_alb.dat',
-            'sfc_alb_20240613_16.550_17.581_0.22km_cre_alb.dat',
-            'sfc_alb_20240725_15.094_15.300_0.11km_cre_alb.dat',
+            'sfc_alb_20240801_13.843_14.351_0.11km_cre_alb.dat',   # 0.294  context (low)
+            'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',   # 0.543  context (mid)
+            'sfc_alb_20240603_14.711_14.868_0.34km_cre_alb.dat',   # 0.748  case_004 (SSFR)  -> i==2
+            'sfc_alb_20240809_16.029_16.224_0.11km_cre_alb.dat',   # 0.638  closest to ERA5  -> i==3
+            'sfc_alb_20240606_16.250_16.950_1.18km_cre_alb.dat',   # 0.797  context (high)
         ],
         overwrite_lrt=True,
     )
