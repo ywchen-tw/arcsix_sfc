@@ -55,10 +55,14 @@ echo "Array task ${SLURM_ARRAY_TASK_ID}: albedo ${MANUAL_ALB}"
 OVERWRITE_FLAG=""
 [ "${OVERWRITE:-0}" = "1" ] && OVERWRITE_FLAG="--overwrite-lrt"
 
-python -m cre.cre_runner \
-    --case-id "$CASE_ID" \
-    --mode "$MODE" \
-    --atm-file "$ATM_FILE" \
-    --manual-alb "$MANUAL_ALB" \
-    --workers "$WORKERS" \
-    $OVERWRITE_FLAG
+# python -m cre.cre_runner \
+#     --case-id "$CASE_ID" \
+#     --mode "$MODE" \
+#     --atm-file "$ATM_FILE" \
+#     --manual-alb "$MANUAL_ALB" \
+#     --workers "$WORKERS" \
+#     $OVERWRITE_FLAG
+
+
+python -m cre.cre_runner --case-id case_004 --mode 'lw' \
+    --manual-alb sfc_alb_20240603_14.711_14.868_0.34km_cre_alb.dat
