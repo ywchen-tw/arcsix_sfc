@@ -30,7 +30,7 @@ MODE="${2:-both}"
 
 # Reuse the prebuilt atmospheric profile (skips the MODIS-based rebuild); the
 # matching ch4_profiles_* is derived automatically. Resolved under data/zpt/<date>/.
-ATM_FILE="atm_profiles_20240603_cloudy_atm_corr_2_14.711_14.868_0.34km.dat"
+ATM_FILE="atm_profiles_20240613_cloudy_atm_corr_1_14.109_14.140_0.11km.dat"
 
 # Each uvspec CRE run peaks near ~64 GB; amem gives ~15.5 GB/core. Size the pool
 # by available RAM (not core count) so the flattened SZA x CWP sweep never OOMs.
@@ -65,4 +65,8 @@ OVERWRITE_FLAG=""
 
 
 python -m cre.cre_runner --case-id case_004 --mode 'lw' \
-    --manual-alb sfc_alb_20240603_14.711_14.868_0.34km_cre_alb.dat
+    --manual-alb sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat
+
+# python -m cre.cre_runner --case-id case_019 --mode 'lw' \
+#     --atm-file "$ATM_FILE" \
+#     --manual-alb sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat

@@ -18,6 +18,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 CRE_CASE_IDS = [
     'case_004',       # 2024-06-03 cloudy_atm_corr_2 (present in combined product)
+    'case_019',       # 2024-06-13 cloudy_atm_corr_1 (100 m, cloudy)
     'bad_case_003',   # 2024-06-03 cloudy_atm_corr_1 (300 m, camera icing; not in
                       # the combined product -> cre_sim falls back to per-leg pickles)
 ]
@@ -71,9 +72,11 @@ MANUAL_ALB_SWEEP = [
     'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',  # 0.608
     'sfc_alb_20240809_16.029_16.224_0.11km_cre_alb.dat',             # 0.638
     'sfc_alb_20240611_14.968_15.347_0.41km_cre_alb.dat',             # 0.672
+    'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',             # 0.676  (case_019 own albedo)
     'sfc_alb_20240528_15.610_17.404_0.18km_cre_alb.dat',             # 0.699
     'sfc_alb_20240603_14.711_14.868_0.34km_cre_alb.dat',             # 0.748  (case_004 own albedo)
     'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',             # 0.752
+    'sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 1-min albedo)
     'sfc_alb_20240606_16.250_16.950_0.11km_cre_alb.dat',             # 0.776
     'sfc_alb_20240606_16.250_16.950_1.18km_cre_alb.dat',             # 0.797
 ]
