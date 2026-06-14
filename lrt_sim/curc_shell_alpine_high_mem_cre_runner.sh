@@ -67,11 +67,11 @@ OVERWRITE_FLAG=""
 # python -m cre.cre_runner --case-id case_004 --mode 'lw' \
 #     --manual-alb sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat
 
-python -m cre.cre_runner --case-id case_004 --mode 'both' \
-    --manual-alb sfc_alb_20240613_15.834_15.883_0.12km_cre_alb_scale_0.987X.dat
-
 # python -m cre.cre_runner --case-id case_004 --mode 'both' \
-#     --manual-alb sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat
+#     --manual-alb sfc_alb_20240613_15.834_15.883_0.12km_cre_alb_scale_0.987X.dat
+
+python -m cre.cre_runner --case-id case_004 --mode 'both' \
+    --manual-alb sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat
 
 # python -m cre.cre_runner --case-id case_019 --mode 'lw' \
 #     --atm-file "$ATM_FILE" \
