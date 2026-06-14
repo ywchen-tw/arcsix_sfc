@@ -210,6 +210,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                      overwrite_lrt=True,
                      manual_cloud=False,
                      manual_alb=None,
+                     force_rebuild=False,
                     ):
     
     log = logging.getLogger("lrt")
@@ -359,7 +360,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
-    if not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
+    if force_rebuild or not os.path.exists(f'{fdir}/{date_s}_{case_tag}_cre_simulations_all_alb.csv'):
 
         if manual_alb is None:
             manual_alb = [None]
@@ -937,7 +938,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     
-    level_labels = [20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 300,  ]
+    level_labels = [20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250,  ]
     
     # cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
@@ -969,7 +970,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
-    ax3.set_ylim(0.45, 0.80)
+    ax3.set_ylim(0.55, 0.775)
     
     # print("cos_sza_real:", cos_sza_real)
     
@@ -1342,7 +1343,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                  )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
-    ax3.set_ylim(0.45, 0.80)
+    ax3.set_ylim(0.55, 0.775)
     
     # print("cos_sza_real:", cos_sza_real)
     
@@ -1415,7 +1416,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     #              )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
-    ax3.set_ylim(0.45, 0.80)
+    ax3.set_ylim(0.55, 0.775)
     
     # print("cos_sza_real:", cos_sza_real)
     
@@ -1528,8 +1529,13 @@ def find_catalog_case(case_id):
     raise KeyError(f'Unknown CRE case id: {case_id}')
 
 
-def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False):
-    """Plot the CRE simulation results for one atmospheric-correction catalog case."""
+def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False, force_rebuild=False):
+    """Plot the CRE simulation results for one atmospheric-correction catalog case.
+
+    ``force_rebuild=True`` re-reads the per-SZA CSVs and rewrites the aggregate
+    cache / per-albedo figures even when the cached ``..._all_alb.csv`` exists
+    (use after changing the albedo sweep or the figure code).
+    """
     case = find_catalog_case(case_id)
     year, month, day = [int(part) for part in case['date'].split('-')]
 
@@ -1547,6 +1553,7 @@ def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False):
         clear_sky=case.get('clear_sky', True),
         overwrite_lrt=overwrite_lrt,
         manual_alb=manual_alb,
+        force_rebuild=force_rebuild,
         **cloud_kwargs,
     )
 
@@ -1566,9 +1573,13 @@ if __name__ == '__main__':
     # contour has a dense albedo axis; the CRE-vs-LWP / spectrum panels internally
     # pick 5 representative albedos (case_004 at i==2, ERA5-closest at i==3) via
     # broadband_alb_curve.
+    # force_rebuild=True ignores the cached aggregate CSV and rebuilds from the
+    # per-SZA CSVs (also regenerates the per-albedo figures). Set False to reuse
+    # the cache for fast styling-only iterations.
     plot_cre_case(
         config,
         'case_004',
         manual_alb=MANUAL_ALB_SWEEP,
         overwrite_lrt=True,
+        force_rebuild=True,
     )
