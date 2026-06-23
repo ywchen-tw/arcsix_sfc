@@ -74,11 +74,14 @@ MANUAL_ALB_SWEEP = [
     'sfc_alb_20240611_14.968_15.347_0.41km_cre_alb.dat',             # 0.672
     'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',             # 0.676  (case_019 own albedo)
     'sfc_alb_20240528_15.610_17.404_0.18km_cre_alb.dat',             # 0.699
-    'sfc_alb_20240613_15.834_15.883_0.12km_cre_alb_scale_0.987X.dat',  # 0.709  
+    # 0.709 (sfc_alb_20240613_15.834_..._scale_0.987X) dropped: thinned the tight
+    # 0.699/0.709/0.721 cluster near 0.7 that kinked the critical-LWP contour.
     'sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat',             # 0.721
-    'sfc_alb_20240603_14.711_14.868_0.34km_cre_alb.dat',             # 0.748  (case_004 own albedo)
-    'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',             # 0.752
-    'sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 1-min albedo)
+    # 0.748 (case_004 full-window) and 0.752 dropped: redundant with the 0.758
+    # observation below; their tight clustering kinked the critical-LWP contour.
+    'sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 1-min albedo, observation)
+    'sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 2-min albedo, observation)
+    'sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat',             # 0.751  (case_004 peak 3-min albedo, observation)
     'sfc_alb_20240606_16.250_16.950_0.11km_cre_alb.dat',             # 0.776
     'sfc_alb_20240606_16.250_16.950_1.18km_cre_alb.dat',             # 0.797
 ]

@@ -134,6 +134,43 @@ def solar_weighted_broadband(ext_wvl, alb, solar_wvl=None, solar_flux=None,
         return np.nan
     return float(np.trapz(np.asarray(alb) * flux, ext_wvl) / denom)
 
+
+def refine_contour_grid(cos_sza_arr, alb_arr, z, n_sza=160, n_alb=160, sigma=4.0):
+    """Interpolate the coarse, unevenly-spaced critical-LWP grid onto a fine,
+    regular (cos-SZA, albedo) grid and lightly smooth it, so the rendered contours
+    are smooth without the overshoot a cubic interpolant produces on this sparse,
+    uneven grid.
+
+    ``z`` is shaped ``(len(cos_sza_arr), len(alb_arr))``. Uses **linear**
+    interpolation onto the fine grid (no overshoot), then a NaN-aware Gaussian
+    smoothing (normalized convolution) confined to the data hull. ``sigma`` is in
+    fine-grid cells; set it to 0 to interpolate without smoothing. Returns
+    ``(cos_sza_fine_mesh, alb_fine_mesh, z_fine)`` each shaped ``(n_sza, n_alb)``.
+    """
+    cos_sza_arr = np.asarray(cos_sza_arr, dtype=float)
+    alb_arr = np.asarray(alb_arr, dtype=float)
+    cs_mesh, alb_mesh = np.meshgrid(cos_sza_arr, alb_arr, indexing='ij')
+    pts = np.column_stack([cs_mesh.ravel(), alb_mesh.ravel()])
+    vals = np.asarray(z, dtype=float).ravel()
+    ok = np.isfinite(vals)
+    if ok.sum() < 4:
+        return cs_mesh, alb_mesh, np.asarray(z, dtype=float)
+    cs_fine = np.linspace(cos_sza_arr.min(), cos_sza_arr.max(), n_sza)
+    alb_fine = np.linspace(alb_arr.min(), alb_arr.max(), n_alb)
+    CS, AL = np.meshgrid(cs_fine, alb_fine, indexing='ij')
+    z_lin = griddata(pts[ok], vals[ok], (CS, AL), method='linear')
+    mask = np.isfinite(z_lin)
+    if sigma and sigma > 0:
+        # NaN-aware Gaussian: smooth value*mask and mask, then divide, so edges of
+        # the data hull are not pulled toward zero.
+        num = ndimage.gaussian_filter(np.where(mask, z_lin, 0.0), sigma, mode='nearest')
+        den = ndimage.gaussian_filter(mask.astype(float), sigma, mode='nearest')
+        with np.errstate(invalid='ignore', divide='ignore'):
+            z_fine = np.where(mask, num / den, np.nan)
+    else:
+        z_fine = z_lin
+    return CS, AL, z_fine
+
 o2a_1_start, o2a_1_end = 748, 780
 h2o_1_start, h2o_1_end = 672, 706
 h2o_2_start, h2o_2_end = 705, 746
@@ -157,8 +194,15 @@ def combined_product_file():
 
 
 def load_case_from_combined(date_s, case_tag, combined_file=None):
-    """Select one case's albedo, broadband albedo, sza and coordinates from the
-    combined atmospheric-correction product, matching :func:`cre.cre_sim`.
+    """Select one case (date + exact ``case_tag``) from the combined
+    atmospheric-correction product, matching :func:`cre.cre_sim`.
+
+    Returns a dict of per-point arrays for the matching rows:
+    ``alb_wvl`` / ``alb`` (native SSFR albedo spectra), ``broadband_alb``,
+    ``ext_wvl`` / ``alb_ext`` (the already-extended 300-4000 nm albedo used for
+    solar-weighted broadband), ``era5_alb`` (collocated ERA5 ``fal``), plus
+    ``time``, ``lon``, ``lat``, ``alt`` and ``sza``. ``alb_ext`` is ``None`` and
+    ``era5_alb`` is NaN-filled if those columns are absent in the product.
 
     Returns ``None`` when the combined file is missing or has no rows for the
     requested case so the caller can fall back to the per-leg processed pickles.
@@ -211,8 +255,59 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                      manual_cloud=False,
                      manual_alb=None,
                      force_rebuild=False,
+                     obs_alb_file=None,
                     ):
-    
+    """Post-process and plot the surface cloud-radiative-effect (CRE) sweep for one case.
+
+    This is the plotting counterpart to ``cre.cre_sim``: that module runs
+    libRadtran over a grid of solar-zenith angles (SZA) x cloud water paths (CWP)
+    x surface albedos and writes one ``ssfr_simu_flux_..._cre_{sw,lw}_sza_*.csv``
+    per (albedo, SZA). Here we read those fluxes back and build the paper figures.
+
+    Pipeline
+    --------
+    1. Pull the case geometry/albedo from the combined atmospheric-correction
+       product (:func:`load_case_from_combined`): SSFR albedo spectra, the already
+       extended (300-4000 nm) albedo, ERA5 forecast albedo, SZA and coordinates.
+    2. Compute the two reference broadband albedos for the case, both solar-TOA
+       (slit-flux) weighted to match ``ext_alb_cases``:
+         * ``ssfr_ext_broadband_alb`` - the flight-case ("observation") albedo,
+           from the combined case mean or, if ``obs_alb_file`` is given, from that
+           specific albedo .dat (e.g. the peak 1-min albedo).
+         * ``era5_broadband_alb`` - case mean of the collocated ERA5 ``fal``.
+    3. For every albedo in ``manual_alb`` x every SZA, read the SW/LW surface
+       fluxes, form SW/LW/net CRE vs CWP (clear-sky subtracted), and aggregate
+       into ``df_all`` (full CWP sweep) and ``df_real_all`` (the flight cloud's
+       observed CWP). Cached to ``{case}_cre_simulations_*`` for fast re-plots;
+       albedos with missing CSVs are skipped.
+    4. Find the critical LWP (net-CRE zero crossing) for each (SZA, albedo) ->
+       ``cwp_zero_arr``, and plot it as a cos(SZA) x broadband-albedo contour
+       (optionally smoothed by :func:`refine_contour_grid`), plus CRE-vs-LWP and
+       albedo-spectrum panels for 5 representative albedos (``broadband_alb_curve``;
+       index 2 = observation, index 3 = ERA5-closest).
+
+    Parameters
+    ----------
+    date, tmhr_ranges_select, case_tag, config, levels, simulation_interval,
+    clear_sky, manual_cloud
+        Case identity / geometry, matching ``cre.cre_sim`` (``clear_sky`` selects
+        the ``clear`` vs ``sat_cloud`` output folder).
+    overwrite_lrt
+        Unused here (kept for signature parity with ``cre_sim``); plotting never
+        re-runs libRadtran.
+    manual_alb
+        List of surface-albedo ``.dat`` filenames (under ``data/sfc_alb_cre``) to
+        read and plot; typically ``cre_cases.MANUAL_ALB_SWEEP``.
+    force_rebuild
+        If True, rebuild the aggregate cache / per-albedo figures even when the
+        cached ``..._all_alb.csv`` exists (use after changing the sweep or figures).
+    obs_alb_file
+        Optional albedo ``.dat`` used as the flight-case observation albedo,
+        overriding the combined case mean.
+
+    Outputs are PNGs under ``fig/<date>/`` and the cached aggregate CSV/pkl under
+    the case CRE folder.
+    """
     log = logging.getLogger("lrt")
     log.info("Starting processing for %s", date.strftime("%Y%m%d"))
 
@@ -339,6 +434,16 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             ssfr_ext_broadband_alb = np.round(
                 solar_weighted_broadband(ext_wvl_combined, mean_alb_case, solar_wvl, solar_flux), 3
             )
+    # Optionally use a specific albedo .dat as the flight-case ("observation")
+    # albedo (e.g. the case_004 peak 1-min albedo) instead of the combined case
+    # mean. The SSFR marker and the i==2 curve then track this observation.
+    if obs_alb_file is not None:
+        _obs = np.loadtxt(f'{_fdir_general_}/sfc_alb_cre/{obs_alb_file}')
+        ssfr_ext_broadband_alb = np.round(
+            solar_weighted_broadband(_obs[:, 0], _obs[:, 1], solar_wvl, solar_flux), 3
+        )
+        print(f"{date_s} {case_tag}: observation albedo = {obs_alb_file} "
+              f"-> broadband {ssfr_ext_broadband_alb}")
     print(f"{date_s} {case_tag}: SSFR extended broadband albedo = {ssfr_ext_broadband_alb}, "
           f"ERA5 broadband albedo = {era5_broadband_alb}")
 
@@ -424,6 +529,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             # Skip albedos not yet simulated for this case, so a partially-simulated
             # sweep still plots the albedos that are available (instead of crashing).
             def _csv_name(mode, sza_sim, _alb=manual_alb_i):
+                """Path of the cre_sim flux CSV for this (mode sw/lw, SZA, albedo)."""
                 base = (f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}'
                         f'_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}')
                 if _alb is None:
@@ -747,11 +853,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # snapped to the nearest actually-simulated broadband albedo.
     _alb_unique_arr = np.array(broadband_alb_all_unique)
     def _nearest_curve_alb(target):
+        """Snap a target broadband albedo to the nearest actually-simulated one."""
         return float(_alb_unique_arr[np.argmin(np.abs(_alb_unique_arr - target))])
     broadband_alb_curve = [
-        _nearest_curve_alb(0.294),
+        _nearest_curve_alb(0.70),                      # context (~0.699)
         _nearest_curve_alb(0.543),
-        _nearest_curve_alb(ssfr_ext_broadband_alb),   # case_004 (~0.748)
+        _nearest_curve_alb(ssfr_ext_broadband_alb),   # observation (~0.758)
         _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.638)
         _nearest_curve_alb(0.797),
     ]
@@ -828,7 +935,18 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             #     fig.tight_layout()
             #     plt.show()
             #     plt.close(fig)
-    
+
+    # Smooth contour rendering: interpolate the sparse, unevenly-spaced critical-LWP
+    # grid onto a fine regular grid (cubic). Set smooth_contour=False to plot the
+    # raw grid (kinked at the simulated albedo/SZA nodes).
+    smooth_contour = True
+    if smooth_contour:
+        cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont = refine_contour_grid(
+            cos_sza_arr, broadband_alb_all_unique, cwp_zero_arr)
+    else:
+        cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont = (
+            cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr)
+
     plt.close('all')
     # sza_select = 61.46
     sza_select = 61.93
@@ -910,7 +1028,10 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             print(f"real net CRE:", sza_real_df_real_all_i['F_sfc_net_cre'].values)
             print(f"zero crossing cwp:", cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind])
                 
-        # ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_i:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
+    # Panel (b): albedo spectra ordered high -> low broadband albedo (color stays
+    # tied to each albedo's index so it matches panel (a)).
+    for i in sorted(range(5), key=lambda k: broadband_alb_curve[k], reverse=True):
+        broadband_alb_i = broadband_alb_curve[i]
         broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
         ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_i:.3f}')
 
@@ -938,14 +1059,14 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     
-    level_labels = [20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250,  ]
+    level_labels = [20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250, 300,  ]
     
     # cc1 = ax3.scatter(cos_sza_mesh.flatten(), broadband_alb_mesh.flatten(), c=cwp_zero_arr, s=50, alpha=0.5, cmap='jet', vmin=20, vmax=300, zorder=3)
     
     
     print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
 
-    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
     ax3.clabel(cc, level_labels, fontsize=12, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
@@ -1045,11 +1166,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                    fontsize=14)
     ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
     ax1.set_xlim(0, 200)
-    ax1.set_ylim(-65, 30)
+    ax1.set_ylim(-65, 40)
     ax1.legend(fontsize=12, loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax1.tick_params(axis='both', which='major', labelsize=12)
     
-    for i in range(5):
+    # Panel (b): list the albedo spectra high -> low broadband albedo (color stays
+    # tied to each albedo's index so it matches panel (a)).
+    for i in sorted(range(5), key=lambda k: broadband_alb_curve[k], reverse=True):
         broadband_alb_i = broadband_alb_curve[i]
         broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
         ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_i:.3f}')
@@ -1309,7 +1432,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_real_df_all length:", len(sza_real_df_all))
     print("sza_real_df_real_all length:", len(sza_real_df_real_all))
     
-    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
     ax3.clabel(cc, level_labels, fontsize=12, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
@@ -1386,7 +1509,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_real_df_all length:", len(sza_real_df_all))
     print("sza_real_df_real_all length:", len(sza_real_df_real_all))
     
-    cc = ax3.contour(cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
     ax3.clabel(cc, level_labels, fontsize=12, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
@@ -1442,7 +1565,101 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
 
     fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_combined_contour_only_no_symbol.png', dpi=300, bbox_inches='tight')
-    
+
+    # ------------------------------------------------------------------
+    # Combined left/right figure: surface_net_cre_vs_lwp_5_alb_*_combined content
+    # (net CRE vs LWP = panel a, albedo spectra = panel b) stacked on the LEFT, and
+    # the surface_*_contour_only content (critical-LWP contour = panel c) on the
+    # RIGHT. Reuses the same data/markers as those two standalone figures.
+    # ------------------------------------------------------------------
+    plt.close('all')
+    fig = plt.figure(figsize=(15, 9))
+    gs = gridspec.GridSpec(11, 11, figure=fig, hspace=0.5, wspace=0.4)
+    ax1 = fig.add_subplot(gs[:5, :6])
+    ax2 = fig.add_subplot(gs[6:, :6])
+    ax3 = fig.add_subplot(gs[2:10, 7:])
+
+    # Flight-case geometry (mean SZA) used for panel (a) and the contour markers.
+    sza_select = 61.93
+    sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values))))
+    cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
+    sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
+    sza_real_df_all = df_all.loc[df_all['sza'] == sza_unique_sorted[sza_select_ind], :]
+    sza_real_df_real_all = df_real_all.loc[df_real_all['sza'] == sza_unique_sorted[sza_select_ind], :]
+    cos_sza_real = cos_sza_unique_sorted[sza_select_ind]
+
+    # (a) Surface net CRE vs LWP for the 5 selected albedos, with the observation
+    #     (i==2) and ERA5 (i==3) real-case markers, zero crossings and arrow.
+    for i in range(5):
+        broadband_alb_i = broadband_alb_curve[i]
+        sza_real_df_all_i = sza_real_df_all.loc[sza_real_df_all['broadband_alb'].values == broadband_alb_i, :]
+        sza_real_df_real_all_i = sza_real_df_real_all.loc[sza_real_df_real_all['broadband_alb'].values == broadband_alb_i, :]
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i])
+        if i == 2:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR albedo={broadband_alb_i:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR albedo={broadband_alb_i:.3f}')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] - 3
+        if i == 3:
+            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_i:.3f}')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_i:.3f}')
+            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] + 4
+            ax1.arrow(start_cwp, start_Fnet, end_cwp - start_cwp, end_Fnet - start_Fnet,
+                      head_width=2, head_length=2, lw=1.5, fc='k', ec='k', linestyle='-')
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$', fontsize=14)
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', fontsize=14)
+    ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
+    ax1.set_xlim(0, 200)
+    ax1.set_ylim(-65, 40)
+    ax1.legend(fontsize=8, loc='lower left')
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+
+    # (b) Albedo spectra, ordered high -> low broadband albedo.
+    for i in sorted(range(5), key=lambda k: broadband_alb_curve[k], reverse=True):
+        broadband_alb_i = broadband_alb_curve[i]
+        broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
+        ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Broadband Albedo: {broadband_alb_i:.3f}')
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
+    ax2.set_xlim(300, 4000)
+    ax2.set_ylim(-0.05, 1.05)
+    ax2.legend(fontsize=9, loc='upper right')
+    ax2.tick_params(axis='both', which='major', labelsize=12)
+
+    # (c) Critical-LWP contour (cos SZA vs broadband albedo) with the Shupe (2003)
+    #     LWP=30 line and the SSFR/ERA5 albedo markers + arrow.
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350, zorder=2)
+    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
+    shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
+    ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15))
+    ax3.text(0.28, 0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
+    ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
+    ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='orange', fontsize=12)
+    ax3.text(cos_sza_real + 0.01, era5_broadband_alb - 0.002, 'ERA5', color='orange', fontsize=12)
+    ax3.annotate('', xy=(cos_sza_real, ssfr_ext_broadband_alb), xytext=(cos_sza_real, era5_broadband_alb),
+                 arrowprops=dict(facecolor='purple', arrowstyle='->', edgecolor='purple', lw=2.5))
+    ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
+    ax3.set_ylim(0.55, 0.775)
+    ax3.tick_params(axis='x', bottom=True, top=False, labelbottom=True, labeltop=False)
+    ax3_top = ax3.secondary_xaxis('top')
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=15)
+    ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
+    ax3_top.tick_params(axis='x', labelsize=12)
+
+    for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
+        ypos = 1.08 if ax is ax3 else 1.03
+        ax.text(0.0, ypos, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+
+    fig.savefig(f'fig/{date_s}/surface_net_cre_lwp_and_contour_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
+
     sys.exit()
     
     
@@ -1480,8 +1697,14 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     return
 
 def albedo_plot(albedo_file_list, date_s):
-    
-    
+    """Quick-look overlay of several surface-albedo spectra.
+
+    Loads each two-column ``.dat`` in ``albedo_file_list`` from
+    ``data/sfc_alb_cre`` and plots albedo vs wavelength on one axis, saving
+    ``fig/<date_s>/surface_alb_test.png``. Utility/QC helper, independent of the
+    CRE sweep.
+    """
+
     fdir_alb = f'{_fdir_general_}/sfc_alb_cre'
     
     fig, ax1 = plt.subplots(1, 1, figsize=(10, 5), gridspec_kw={'hspace': 0.3})
@@ -1529,7 +1752,8 @@ def find_catalog_case(case_id):
     raise KeyError(f'Unknown CRE case id: {case_id}')
 
 
-def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False, force_rebuild=False):
+def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False, force_rebuild=False,
+                  obs_alb_file=None):
     """Plot the CRE simulation results for one atmospheric-correction catalog case.
 
     ``force_rebuild=True`` re-reads the per-SZA CSVs and rewrites the aggregate
@@ -1554,6 +1778,7 @@ def plot_cre_case(config, case_id, manual_alb=None, overwrite_lrt=False, force_r
         overwrite_lrt=overwrite_lrt,
         manual_alb=manual_alb,
         force_rebuild=force_rebuild,
+        obs_alb_file=obs_alb_file,
         **cloud_kwargs,
     )
 
@@ -1582,4 +1807,6 @@ if __name__ == '__main__':
         manual_alb=MANUAL_ALB_SWEEP,
         overwrite_lrt=True,
         force_rebuild=True,
+        # Observation = case_004 peak 1-min albedo (broadband ~0.758).
+        obs_alb_file='sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',
     )

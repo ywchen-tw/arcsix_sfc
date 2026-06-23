@@ -104,6 +104,8 @@ EXT_ALB_CASES = [
     {'date': '20240528', 'time_range': (15.610, 17.404), 'alt_range': (0.25, 0.40)},
     {'date': '20240603', 'time_range': (14.711, 14.868)},
     {'date': '20240603', 'time_range': (14.735, 14.752)},  # peak 1-min broadband ~0.758
+    {'date': '20240603', 'time_range': (14.716, 14.749)},  # peak 2-min broadband ~0.758
+    {'date': '20240603', 'time_range': (14.711, 14.761)},  # peak 3-min broadband ~0.751
     {'date': '20240605', 'time_range': (12.422, 13.812)},
     {'date': '20240605', 'time_range': (14.258, 15.036)},
     {'date': '20240605', 'time_range': (15.535, 15.918)},
