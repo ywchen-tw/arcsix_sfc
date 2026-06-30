@@ -592,7 +592,6 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     lat_all = np.array([])
     alt_all = np.array([])
     sza_all = np.array([])
-    saa_all = np.array([])
     sfc_T = np.array([])
 
     time_all = np.array([])
@@ -601,12 +600,14 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
 
     # Surface albedo, sza, kt19 and coordinates come from the combined
     # atmospheric-correction product (single source of truth). The MARLI water
-    # vapor profile and saa are not in the combined product, so they are still
-    # read from the per-leg cloud-observation pickles in the loop below.
+    # vapor profile is not in the combined product, so it is still read from the
+    # per-leg cloud-observation pickles in the loop below (only needed when
+    # building the atmospheric profile from scratch).
     combined_case = load_case_from_combined(date_s, case_tag)
 
     init = True
     alb_iter2_all = None
+    skip_ranges = []  # time windows of legs flagged bad in preprocessing
 
     for i in range(len(tmhr_ranges_select)):
         time_start, time_end = tmhr_ranges_select[i][0], tmhr_ranges_select[i][-1]
@@ -620,10 +621,15 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
             print(f"Processed file {processed_file} not found. Skipping leg {i}.")
             continue
 
-        # MARLI water-vapor profile and saa only exist in the per-leg cloud-obs pickle
+        # MARLI water-vapor profile only exists in the per-leg cloud-obs pickle.
+        # Legs flagged bad during preprocessing are saved as a minimal
+        # skip-sentinel (no marli/sza/flux); record the leg's time window and skip
+        # it so it's excluded from the combined-product averages below.
         with open(fname_cld_obs_info, 'rb') as f:
             cld_leg = pickle.load(f)
-        saa_all = np.concatenate((saa_all, cld_leg['saa']))
+        if cld_leg.get('skip'):
+            skip_ranges.append((time_start, time_end))
+            continue
         if cld_leg['marli_h'] is not None:
             marli_all_h = np.concatenate((marli_all_h, cld_leg['marli_h']))
             marli_all_wvmr = np.concatenate((marli_all_wvmr, cld_leg['marli_wvmr']))
@@ -657,6 +663,20 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
         sza_all       = combined_case['sza']
         sfc_T         = combined_case['kt19_sfc_T']
 
+        # Exclude samples inside a skip-sentinel leg's time window so the
+        # combined-product averages drop the same bad legs skipped above.
+        if skip_ranges:
+            keep = np.ones(time_all.shape, dtype=bool)
+            for t0, t1 in skip_ranges:
+                keep &= ~((time_all >= t0) & (time_all < t1))
+            alb_iter2_all = alb_iter2_all[keep, :]
+            time_all = time_all[keep]
+            lon_all  = lon_all[keep]
+            lat_all  = lat_all[keep]
+            alt_all  = alt_all[keep]
+            sza_all  = sza_all[keep]
+            sfc_T    = sfc_T[keep]
+
     if alb_iter2_all is None or len(time_all) == 0:
         print(f"No data found for {date_s} {case_tag}; nothing to simulate.")
         return
@@ -669,7 +689,6 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     lat_min, lat_max = np.round(np.min(lat_all), 2), np.round(np.max(lat_all), 2)
     alt_avg = np.round(np.nanmean(alt_all), 2)  # in km
     sza_avg = np.round(np.nanmean(sza_all), 2)
-    saa_avg = np.round(np.nanmean(saa_all), 2)
     sfc_T_avg = np.round(np.nanmean(sfc_T), 2)
     sfc_T_std = np.round(np.nanstd(sfc_T), 2)
     
@@ -699,7 +718,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     fdir = f'{_fdir_general_}/lrt/{date_s}_{case_tag}_{sky_tag}_cre'
         
     
-    del lon_all, lat_all, alt_all, sza_all, saa_all, sfc_T, marli_all_h, marli_all_wvmr
+    del lon_all, lat_all, alt_all, sza_all, sfc_T, marli_all_h, marli_all_wvmr
     gc.collect()
     
     
