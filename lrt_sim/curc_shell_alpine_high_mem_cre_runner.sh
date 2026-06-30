@@ -10,10 +10,10 @@
 #SBATCH --job-name=arcsix-cre_simulation
 #SBATCH --partition=amem
 #SBATCH --qos=mem-normal
-# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (10 entries:
-# indices 0-9). Keep this range in sync with len(MANUAL_ALB_SWEEP). %2 caps the
+# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (13 entries:
+# indices 0-12). Keep this range in sync with len(MANUAL_ALB_SWEEP). %2 caps the
 # job to 2 full amem nodes running concurrently.
-#SBATCH --array=0-9%2
+#SBATCH --array=0-12%2
 
 module load anaconda intel/2022.1.2 hdf5/1.10.1 zlib/1.2.11 netcdf/4.8.1 swig/4.1.1 gsl/2.7
 conda activate er3t
@@ -25,12 +25,12 @@ cd "$PROJECT_ROOT"
 # Usage: sbatch curc_shell_alpine_high_mem_cre_runner.sh [CASE_ID] [MODE]
 #   CASE_ID : catalog case id (default case_004)
 #   MODE    : sw | lw | both (default both)
-CASE_ID="${1:-case_004}"
+CASE_ID="${1:-case_014}"
 MODE="${2:-both}"
 
 # Reuse the prebuilt atmospheric profile (skips the MODIS-based rebuild); the
 # matching ch4_profiles_* is derived automatically. Resolved under data/zpt/<date>/.
-ATM_FILE="atm_profiles_20240613_cloudy_atm_corr_1_14.109_14.140_0.11km.dat"
+ATM_FILE="atm_profiles_20240607_cloudy_atm_corr_15.336_15.761_0.12km.dat"
 
 # Each uvspec CRE run peaks near ~64 GB; amem gives ~15.5 GB/core. Size the pool
 # by available RAM (not core count) so the flattened SZA x CWP sweep never OOMs.
@@ -55,13 +55,16 @@ echo "Array task ${SLURM_ARRAY_TASK_ID}: albedo ${MANUAL_ALB}"
 OVERWRITE_FLAG=""
 [ "${OVERWRITE:-0}" = "1" ] && OVERWRITE_FLAG="--overwrite-lrt"
 
-# python -m cre.cre_runner \
-#     --case-id "$CASE_ID" \
-#     --mode "$MODE" \
-#     --atm-file "$ATM_FILE" \
-#     --manual-alb "$MANUAL_ALB" \
-#     --workers "$WORKERS" \
-#     $OVERWRITE_FLAG
+# case_014 (2024-06-07): reuse the prebuilt full-window profile (ATM_FILE above)
+# instead of rebuilding from MODIS. The matching ch4_profiles_* is derived
+# automatically. Resolved under data/zpt/20240607/.
+python -m cre.cre_runner \
+    --case-id "$CASE_ID" \
+    --mode "$MODE" \
+    --atm-file "$ATM_FILE" \
+    --manual-alb "$MANUAL_ALB" \
+    --workers "$WORKERS" \
+    $OVERWRITE_FLAG
 
 
 # python -m cre.cre_runner --case-id case_004 --mode 'lw' \
@@ -70,8 +73,8 @@ OVERWRITE_FLAG=""
 # python -m cre.cre_runner --case-id case_004 --mode 'both' \
 #     --manual-alb sfc_alb_20240613_15.834_15.883_0.12km_cre_alb_scale_0.987X.dat
 
-python -m cre.cre_runner --case-id case_004 --mode 'both' \
-    --manual-alb sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat # peak 2-min broadband ~0.758
+# python -m cre.cre_runner --case-id case_004 --mode 'both' \
+#     --manual-alb sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat # peak 2-min broadband ~0.758
 
 # python -m cre.cre_runner --case-id case_004 --mode 'both' \
 #     --manual-alb sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat # peak 3-min broadband ~0.751

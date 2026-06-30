@@ -18,6 +18,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 CRE_CASE_IDS = [
     'case_004',       # 2024-06-03 cloudy_atm_corr_2 (present in combined product)
+    'case_014',       # 2024-06-07 cloudy_atm_corr (present in combined product)
     'case_019',       # 2024-06-13 cloudy_atm_corr_1 (100 m, cloudy)
     'bad_case_003',   # 2024-06-03 cloudy_atm_corr_1 (300 m, camera icing; not in
                       # the combined product -> cre_sim falls back to per-leg pickles)
@@ -79,9 +80,11 @@ MANUAL_ALB_SWEEP = [
     'sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat',             # 0.721
     # 0.748 (case_004 full-window) and 0.752 dropped: redundant with the 0.758
     # observation below; their tight clustering kinked the critical-LWP contour.
-    'sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 1-min albedo, observation)
+    # The peak 1-min albedo (also 0.758) is commented out because it collides with
+    # the 2-min broadband bin and corrupts that albedo's critical-LWP column.
+    # 'sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',           # 0.758  (case_004 peak 1-min albedo)
     'sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat',             # 0.758  (case_004 peak 2-min albedo, observation)
-    'sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat',             # 0.751  (case_004 peak 3-min albedo, observation)
+    'sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat',             # 0.751  (case_004 peak 3-min albedo)
     'sfc_alb_20240606_16.250_16.950_0.11km_cre_alb.dat',             # 0.776
     'sfc_alb_20240606_16.250_16.950_1.18km_cre_alb.dat',             # 0.797
 ]
