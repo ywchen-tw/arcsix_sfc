@@ -545,6 +545,16 @@ def _process_leg(ileg, selected_time_start, selected_time_end, *, date, case_tag
             fup_std = np.nanstd(cld_leg['ssfr_nad'], axis=0)
             fdn_std = np.nanstd(cld_leg['ssfr_zen'], axis=0)
 
+            # ---- Actinic flux on the extended grid (incl. <350 nm) ----
+            # Irradiance -> actinic flux: remove cos(SZA) from the direct beam;
+            # treat diffuse & upward fields as isotropic (factor of 2 per hemisphere).
+            #   F_act_dn = F_dir/cos(sza) + 2*F_diff ;  F_act_up = 2*F_up
+            mu0 = np.cos(np.deg2rad(sza_avg))
+            fact_dn_sfc = flux_down_dir[:, 0] / mu0 + 2.0 * flux_down_diff[:, 0]
+            fact_up_sfc = 2.0 * flux_up[:, 0]
+            fact_dn_p3  = flux_down_dir[:, 1] / mu0 + 2.0 * flux_down_diff[:, 1]
+            fact_up_p3  = 2.0 * flux_up[:, 1]
+
             output_dict = {
                 'wvl': effective_wvl,
                 'final_iter': np.full(effective_wvl.shape, iter, dtype=float),
@@ -567,6 +577,13 @@ def _process_leg(ileg, selected_time_start, selected_time_end, *, date, case_tag
                 'simu_fdn_p3_final': flux_down[:, 1],
                 'simu_fdn_p3_direct_final': flux_down_dir[:, 1],
                 'simu_fdn_p3_diff_final': flux_down_diff[:, 1],
+                # actinic flux (W m-2 nm-1), isotropic-diffuse approximation
+                'simu_fact_dn_sfc_final': fact_dn_sfc,          # downward, surface
+                'simu_fact_up_sfc_final': fact_up_sfc,          # upward, surface
+                'simu_fact_tot_sfc_final': fact_dn_sfc + fact_up_sfc,   # total 4pi, surface
+                'simu_fact_dn_p3_final': fact_dn_p3,            # downward, P-3
+                'simu_fact_up_p3_final': fact_up_p3,            # upward, P-3
+                'simu_fact_tot_p3_final': fact_dn_p3 + fact_up_p3,      # total 4pi, P-3
                 'simu_fup_toa_final': flux_up[:, -1],
                 'simu_fdn_toa_final': flux_down[:, -1],
             }
