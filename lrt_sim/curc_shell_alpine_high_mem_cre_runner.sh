@@ -57,13 +57,49 @@ echo "Array task ${SLURM_ARRAY_TASK_ID}: albedo ${MANUAL_ALB}"
 OVERWRITE_FLAG=""
 [ "${OVERWRITE:-0}" = "1" ] && OVERWRITE_FLAG="--overwrite-lrt"
 
-# case_019 (2024-06-13): reuse the prebuilt full-window profile (ATM_FILE above)
-# instead of rebuilding from MODIS. The matching ch4_profiles_* is derived
-# automatically. Resolved under data/zpt/20240613/.
+# --- Shared atmospheric profile: guarded prebuild ------------------------------
+# The array runs with --atm-file to REUSE a prebuilt full-window profile. The first
+# time a case is run that profile does not exist yet, so exactly one task must build
+# it from MODIS while the others wait -- otherwise all 13 array tasks would race on
+# writing the same file. An atomic `mkdir` lock selects the single builder (works
+# regardless of which task SLURM schedules first); the builder omits --atm-file so
+# cre_sim builds and caches the profile as a side effect of its own albedo sweep.
+# Once the profile exists (including on a resubmit) every task just reuses it. The
+# matching ch4_profiles_* is derived automatically. Path resolved from settings so
+# it never drifts from what cre_sim writes.
+DATA_ROOT="$(python -c 'from ssfr_atm_corr.settings import _fdir_general_; print(_fdir_general_)')"
+DATE_DIR="$(echo "$ATM_FILE" | sed -E 's/^atm_profiles_([0-9]{8})_.*/\1/')"
+PROFILE_PATH="$DATA_ROOT/zpt/$DATE_DIR/$ATM_FILE"
+LOCK_DIR="$DATA_ROOT/zpt/$DATE_DIR/.build_${ATM_FILE}.lock"
+
+ATM_FLAG=(--atm-file "$ATM_FILE")
+if [ ! -f "$PROFILE_PATH" ]; then
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        # Won the lock -> this task builds the profile. The trap frees the lock on
+        # exit (success or failure) so a resubmit is never blocked by a stale lock.
+        echo "Task ${SLURM_ARRAY_TASK_ID}: won build lock -> building ${ATM_FILE} from MODIS."
+        trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+        ATM_FLAG=()          # omit --atm-file so cre_sim builds (and caches) the profile
+    else
+        # Another task is building -> wait for the profile to appear (written early
+        # in the run, before the long libRadtran sweep), then reuse it.
+        echo "Task ${SLURM_ARRAY_TASK_ID}: another task is building ${ATM_FILE}; waiting ..."
+        for _ in $(seq 1 720); do        # up to ~1 h
+            [ -f "$PROFILE_PATH" ] && break
+            sleep 5
+        done
+        if [ ! -f "$PROFILE_PATH" ]; then
+            echo "ERROR: timed out waiting for ${PROFILE_PATH}; check the builder task." >&2
+            exit 1
+        fi
+        sleep 5              # settle: let the small profile file finish writing
+    fi
+fi
+
 python -m cre.cre_runner \
     --case-id "$CASE_ID" \
     --mode "$MODE" \
-    --atm-file "$ATM_FILE" \
+    "${ATM_FLAG[@]}" \
     --manual-alb "$MANUAL_ALB" \
     --workers "$WORKERS" \
     $OVERWRITE_FLAG
