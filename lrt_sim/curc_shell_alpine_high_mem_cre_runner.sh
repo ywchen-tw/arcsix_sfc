@@ -25,12 +25,14 @@ cd "$PROJECT_ROOT"
 # Usage: sbatch curc_shell_alpine_high_mem_cre_runner.sh [CASE_ID] [MODE]
 #   CASE_ID : catalog case id (default case_004)
 #   MODE    : sw | lw | both (default both)
-CASE_ID="${1:-case_014}"
+CASE_ID="${1:-case_019}"
 MODE="${2:-both}"
 
-# Reuse the prebuilt atmospheric profile (skips the MODIS-based rebuild); the
-# matching ch4_profiles_* is derived automatically. Resolved under data/zpt/<date>/.
-ATM_FILE="atm_profiles_20240607_cloudy_atm_corr_15.336_15.761_0.12km.dat"
+# Reuse the prebuilt full-window atmospheric profile for the active case (skips the
+# MODIS-based rebuild); the matching ch4_profiles_* is derived automatically.
+# Resolved under data/zpt/<date>/. Uncomment the line matching CASE_ID above.
+ATM_FILE="atm_profiles_20240613_cloudy_atm_corr_1_14.109_14.140_0.11km.dat"      # case_019 (2024-06-13)
+# ATM_FILE="atm_profiles_20240607_cloudy_atm_corr_15.336_15.761_0.12km.dat"      # case_014 (2024-06-07)
 
 # Each uvspec CRE run peaks near ~64 GB; amem gives ~15.5 GB/core. Size the pool
 # by available RAM (not core count) so the flattened SZA x CWP sweep never OOMs.
@@ -55,9 +57,9 @@ echo "Array task ${SLURM_ARRAY_TASK_ID}: albedo ${MANUAL_ALB}"
 OVERWRITE_FLAG=""
 [ "${OVERWRITE:-0}" = "1" ] && OVERWRITE_FLAG="--overwrite-lrt"
 
-# case_014 (2024-06-07): reuse the prebuilt full-window profile (ATM_FILE above)
+# case_019 (2024-06-13): reuse the prebuilt full-window profile (ATM_FILE above)
 # instead of rebuilding from MODIS. The matching ch4_profiles_* is derived
-# automatically. Resolved under data/zpt/20240607/.
+# automatically. Resolved under data/zpt/20240613/.
 python -m cre.cre_runner \
     --case-id "$CASE_ID" \
     --mode "$MODE" \
@@ -79,6 +81,8 @@ python -m cre.cre_runner \
 # python -m cre.cre_runner --case-id case_004 --mode 'both' \
 #     --manual-alb sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat # peak 3-min broadband ~0.751
 
-# python -m cre.cre_runner --case-id case_019 --mode 'lw' \
+# case_019 is now the array case above, so its own albedo (index 6 of
+# MANUAL_ALB_SWEEP) is already covered by the 0-12 sweep. Single-albedo reference:
+# python -m cre.cre_runner --case-id case_019 --mode 'both' \
 #     --atm-file "$ATM_FILE" \
 #     --manual-alb sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat
