@@ -143,9 +143,17 @@ def refine_contour_grid(cos_sza_arr, alb_arr, z, n_sza=160, n_alb=160, sigma=4.0
 
     ``z`` is shaped ``(len(cos_sza_arr), len(alb_arr))``. Uses **linear**
     interpolation onto the fine grid (no overshoot), then a NaN-aware Gaussian
-    smoothing (normalized convolution) confined to the data hull. ``sigma`` is in
+    smoothing (normalized convolution) confined to the data region. ``sigma`` is in
     fine-grid cells; set it to 0 to interpolate without smoothing. Returns
     ``(cos_sza_fine_mesh, alb_fine_mesh, z_fine)`` each shaped ``(n_sza, n_alb)``.
+
+    The critical-LWP data region is *concave*: at high albedo + high SZA the net
+    CRE never crosses zero (cloud always warms), so those cells are NaN. Plain
+    ``griddata`` linear fills the whole convex hull, bridging that empty corner with
+    a spurious low pocket. To keep NaN regions blank, a validity indicator (1 at
+    finite nodes, 0 at NaN nodes) is interpolated the same way and fine cells that
+    sit closer to NaN nodes than to real data (``valid < 0.5``) are masked out, so
+    only real data is interpolated and smoothed.
     """
     cos_sza_arr = np.asarray(cos_sza_arr, dtype=float)
     alb_arr = np.asarray(alb_arr, dtype=float)
@@ -159,16 +167,20 @@ def refine_contour_grid(cos_sza_arr, alb_arr, z, n_sza=160, n_alb=160, sigma=4.0
     alb_fine = np.linspace(alb_arr.min(), alb_arr.max(), n_alb)
     CS, AL = np.meshgrid(cs_fine, alb_fine, indexing='ij')
     z_lin = griddata(pts[ok], vals[ok], (CS, AL), method='linear')
-    mask = np.isfinite(z_lin)
+    # Interpolate the finite/NaN indicator over *all* nodes so originally-NaN
+    # regions stay blank instead of being bridged across the convex hull. A fine
+    # cell is kept only where it is at least half-supported by real data.
+    valid = griddata(pts, ok.astype(float), (CS, AL), method='linear')
+    mask = np.isfinite(z_lin) & np.isfinite(valid) & (valid >= 0.5)
     if sigma and sigma > 0:
         # NaN-aware Gaussian: smooth value*mask and mask, then divide, so edges of
-        # the data hull are not pulled toward zero.
+        # the data region are not pulled toward zero.
         num = ndimage.gaussian_filter(np.where(mask, z_lin, 0.0), sigma, mode='nearest')
         den = ndimage.gaussian_filter(mask.astype(float), sigma, mode='nearest')
         with np.errstate(invalid='ignore', divide='ignore'):
             z_fine = np.where(mask, num / den, np.nan)
     else:
-        z_fine = z_lin
+        z_fine = np.where(mask, z_lin, np.nan)
     return CS, AL, z_fine
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -521,6 +533,23 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         # else:
         #     output_csv_name = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}_alb-manual-{manual_alb.replace(".dat", "")}.csv'
 
+        # The per-SZA flux CSVs were named by cre_sim using the combined product's
+        # time window *at simulation time*. That product can be regenerated later
+        # (shifting the case's first/last sample by a point), so reconstructing the
+        # name from the *current* time_all may miss the files. Prefer the time window
+        # actually present on disk; fall back to the reconstructed one if none exist.
+        _time_win = f'{time_all[0]:.3f}-{time_all[-1]:.3f}'
+        _prefix = f'{fdir}/ssfr_simu_flux_{date_s}_'
+        _suffix = f'_alt-{alt_avg:.2f}km_cre_sw_sza_'
+        _hits = sorted(glob.glob(f'{_prefix}*{_suffix}*.csv'))
+        if _hits:
+            _stem = os.path.basename(_hits[0])
+            _disk_win = _stem[len(f'ssfr_simu_flux_{date_s}_'):_stem.index(f'_alt-{alt_avg:.2f}km')]
+            if _disk_win != _time_win:
+                print(f"  Note: using on-disk time window {_disk_win} (combined product "
+                      f"reconstructs {_time_win}); product drifted since simulation.")
+                _time_win = _disk_win
+
         for i in range(len(manual_alb)):
             print(f"Processing manual_alb {i+1}/{len(manual_alb)} ...")
 
@@ -530,7 +559,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             # sweep still plots the albedos that are available (instead of crashing).
             def _csv_name(mode, sza_sim, _alb=manual_alb_i):
                 """Path of the cre_sim flux CSV for this (mode sw/lw, SZA, albedo)."""
-                base = (f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}'
+                base = (f'{fdir}/ssfr_simu_flux_{date_s}_{_time_win}'
                         f'_alt-{alt_avg:.2f}km_cre_{mode}_sza_{sza_sim:.2f}')
                 if _alb is None:
                     return f'{base}_0.99.csv'
@@ -546,11 +575,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
 
                 manual_alb_i = manual_alb[i]
                 if manual_alb_i is None:
-                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_0.99.csv'
-                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_0.99.csv'
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{_time_win}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_0.99.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{_time_win}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_0.99.csv'
                 else:
-                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
-                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{time_all[0]:.3f}-{time_all[-1]:.3f}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
+                    output_csv_name_sw = f'{fdir}/ssfr_simu_flux_{date_s}_{_time_win}_alt-{alt_avg:.2f}km_cre_sw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
+                    output_csv_name_lw = f'{fdir}/ssfr_simu_flux_{date_s}_{_time_win}_alt-{alt_avg:.2f}km_cre_lw_sza_{sza_sim:.2f}_alb-manual-{manual_alb_i.replace(".dat", "")}_0.99.csv'
 
                 os.makedirs(fdir_tmp, exist_ok=True)
                 os.makedirs(fdir, exist_ok=True)
@@ -1807,6 +1836,6 @@ if __name__ == '__main__':
         manual_alb=MANUAL_ALB_SWEEP,
         overwrite_lrt=True,
         force_rebuild=True,
-        # Observation = case_004 peak 1-min albedo (broadband ~0.758).
-        obs_alb_file='sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat',
+        # Observation = case_004 peak 2-min albedo (broadband ~0.758).
+        obs_alb_file='sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat',
     )
