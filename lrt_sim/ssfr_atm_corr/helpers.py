@@ -56,25 +56,6 @@ except ImportError:
     )
 
 
-def fit_1d_poly(x, y, order=1, dx=None, x0=None):
-    """Fit a linear endpoint trend and return it as a poly1d object."""
-    mask = ~np.isnan(x) & ~np.isnan(y)
-    coeffs = np.polyfit(x[mask], y[mask], order)
-
-    if x0 is None:
-        x0 = np.nanmean(x[mask][:2])
-    y0 = np.nanmean(y[mask][:2])
-    x1 = np.nanmean(x[mask][-2:])
-    y1 = np.nanmean(y[mask][-2:])
-    if dx is None:
-        dx = x1 - x0
-    slope = (y1 - y0) / dx
-    intercept = y0 - slope * x0
-    coeffs = [slope, intercept]
-
-    return np.poly1d(coeffs)
-
-
 class ssfr_flags(IntFlag):
     pitcth_roll_exceed_threshold = auto()
     camera_icing = auto()

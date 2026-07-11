@@ -1688,39 +1688,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         ax.text(0.0, ypos, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
 
     fig.savefig(f'fig/{date_s}/surface_net_cre_lwp_and_contour_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
-
-    sys.exit()
-    
-    
     plt.close('all')
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'hspace': 0.3})
-    for i in range(5):
-        ax1.plot(cwp_list_all[i], F_sfc_sw_cre_all[i], '--', color=color_series[i], alpha=0.5)
-        ax1.plot(cwp_list_all[i], F_sfc_lw_cre_all[i], '-.', color=color_series[i], alpha=0.5)
-        ax1.plot(cwp_list_all[i], F_sfc_net_cre_all[i], '-', color=color_series[i], label=f'Albedo-{i+1}')
-        ax1.scatter(cwp_real_list_all[i], F_sfc_net_cre_real_all[i], color=color_series[i], marker='o', s=50, edgecolors='k')
 
-        ax2.plot(alb_wvl_all[i], alb_all[i], '-', color=color_series[i], label=f'Extended Broadband Albedo: {broadband_alb_i:.3f} (Original: {broadband_alb_ori_all[i]:.3f})')
-    
-    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$',
-                   fontsize=14)
-    ax1.set_ylabel('Surface CRE $\mathrm{(W/m^2)}$', 
-                   fontsize=14)
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    
-    ax2.legend(fontsize=12,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax1.hlines(0, xmin=0, xmax=np.max(cwp_list_all), colors='gray', linestyles='dashed')
-    ax1.set_xlim(0, 250)
-    ax2.set_xlim(300, 4000)
-    ax2.set_ylim(-0.05, 1.05)
-    ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
-    for ax, subcase in zip([ax1, ax2], ['(a)', '(b)']):
-        ax.text(0.0, 1.03, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
-    fig.savefig(f'fig/{date_s}/surface_cre_vs_lwp_all_alb_{date_s}_{case_tag}_all.png', dpi=300, bbox_inches='tight')
-    
-
- 
     #\----------------------------------------------------------------------------/#
 
     return

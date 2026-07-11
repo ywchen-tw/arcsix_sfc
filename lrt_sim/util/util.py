@@ -855,7 +855,7 @@ def read_ict_o3(filepath, encoding='utf-8', na_values=None):
             comment='#'
         )
         
-        df.loc[df['O3_ppm'] < 0, 'O3_ppm'] = np.nan
+        df.loc[df['O3_ppbv'] < 0, 'O3_ppbv'] = np.nan
         
         # convert to DataFrame
         o3_df = pd.DataFrame({'tmhr': df['Time_Mid']/86400*24.0, 
