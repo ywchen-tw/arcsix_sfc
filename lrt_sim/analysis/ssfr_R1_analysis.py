@@ -86,6 +86,7 @@ import er3t
 # from util.util import *
 # from util.arcsix_atm import prepare_atmospheric_profile
 from util import *
+from plot_style import apply_grl_style
 
 _mission_      = 'arcsix'
 _platform_     = 'p3b'
@@ -621,7 +622,8 @@ def exp_decay(x, a, b, c):
 
 if __name__ == '__main__':
 
-    
+    apply_grl_style()
+
     dir_fig = './fig'
     os.makedirs(dir_fig, exist_ok=True)
     

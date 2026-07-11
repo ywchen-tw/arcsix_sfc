@@ -84,6 +84,9 @@ from matplotlib import rcParams
 rcParams['font.sans-serif'] = "Arial"
 rcParams['font.family'] = "sans-serif" # Ensure sans-serif is used as the default family
 
+# Shared GRL figure style (lrt_sim root is inserted into sys.path above)
+from plot_style import apply_grl_style, figsize_mm, save_grl, add_panel_label, FULL_WIDTH_MM
+
 
 # from util.util import *
 # from util.arcsix_atm import prepare_atmospheric_profile
@@ -322,6 +325,8 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     """
     log = logging.getLogger("lrt")
     log.info("Starting processing for %s", date.strftime("%Y%m%d"))
+
+    apply_grl_style()
 
     assert config, "FlightConfig required"
     date_s = date.strftime("%Y%m%d")
@@ -977,8 +982,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             cos_sza_mesh, broadband_alb_mesh, cwp_zero_arr)
 
     plt.close('all')
-    # sza_select = 61.46
-    sza_select = 61.93
+    sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
     sza_select_ind = np.argmin(np.abs(sza_arr - sza_select))
     broadband_alb_select = ssfr_ext_broadband_alb
     broadband_alb_delect_ind = np.argmin(np.abs(np.array(broadband_alb_all_unique) - broadband_alb_select))
@@ -1028,8 +1032,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax1 = fig.add_subplot(gs[:5, :6])
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
-    # sza_select = 61.46
-    sza_select = 61.93
+    sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -1448,8 +1451,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     plt.close('all')
     fig, ax3 = plt.subplots(figsize=(7, 8))
-    # sza_select = 61.46
-    sza_select = 61.93
+    sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -1525,8 +1527,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     plt.close('all')
     fig, ax3 = plt.subplots(figsize=(7, 8))
-    # sza_select = 61.46
-    sza_select = 61.93
+    sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values)), reverse=False))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -1602,14 +1603,14 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # RIGHT. Reuses the same data/markers as those two standalone figures.
     # ------------------------------------------------------------------
     plt.close('all')
-    fig = plt.figure(figsize=(15, 9))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, 102.0))
     gs = gridspec.GridSpec(11, 11, figure=fig, hspace=0.5, wspace=0.4)
     ax1 = fig.add_subplot(gs[:5, :6])
     ax2 = fig.add_subplot(gs[6:, :6])
     ax3 = fig.add_subplot(gs[2:10, 7:])
 
     # Flight-case geometry (mean SZA) used for panel (a) and the contour markers.
-    sza_select = 61.93
+    sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
     sza_unique_sorted = np.array(sorted(list(set(df_all['sza'].values))))
     cos_sza_unique_sorted = np.cos(np.deg2rad(sza_unique_sorted))
     sza_select_ind = np.argmin(np.abs(cos_sza_unique_sorted - np.cos(np.deg2rad(sza_select))))
@@ -1637,57 +1638,53 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] + 4
             ax1.arrow(start_cwp, start_Fnet, end_cwp - start_cwp, end_Fnet - start_Fnet,
                       head_width=2, head_length=2, lw=1.5, fc='k', ec='k', linestyle='-')
-    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$', fontsize=14)
-    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$', fontsize=14)
+    ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$')
+    ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$')
     ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
     ax1.set_xlim(0, 200)
     ax1.set_ylim(-65, 40)
-    ax1.legend(fontsize=8, loc='lower left')
-    ax1.tick_params(axis='both', which='major', labelsize=12)
+    ax1.legend(fontsize=7, loc='lower left')
 
     # (b) Albedo spectra, ordered high -> low broadband albedo.
     for i in sorted(range(5), key=lambda k: broadband_alb_curve[k], reverse=True):
         broadband_alb_i = broadband_alb_curve[i]
         broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
         ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Broadband Albedo: {broadband_alb_i:.3f}')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     ax2.set_xlim(300, 4000)
     ax2.set_ylim(-0.05, 1.05)
-    ax2.legend(fontsize=9, loc='upper right')
-    ax2.tick_params(axis='both', which='major', labelsize=12)
+    ax2.legend(loc='upper right')
 
     # (c) Critical-LWP contour (cos SZA vs broadband albedo) with the Shupe (2003)
     #     LWP=30 line and the SSFR/ERA5 albedo markers + arrow.
-    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350, zorder=2)
-    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='cividis', vmin=10, vmax=350, zorder=2)
+    ax3.clabel(cc, level_labels, colors='k')
     shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
-    ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
-    ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15))
-    ax3.text(0.28, 0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+    ax3.set_xlabel('cos[Solar Zenith Angle]')
+    ax3.set_ylabel('Broadband Albedo')
+    ax3.legend(loc='center', bbox_to_anchor=(0.5, -0.15))
+    ax3.text(0.28, 0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$')
     ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
     ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
-    ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='orange', fontsize=12)
-    ax3.text(cos_sza_real + 0.01, era5_broadband_alb - 0.002, 'ERA5', color='orange', fontsize=12)
+    ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='orange')
+    ax3.text(cos_sza_real + 0.01, era5_broadband_alb - 0.002, 'ERA5', color='orange')
     ax3.annotate('', xy=(cos_sza_real, ssfr_ext_broadband_alb), xytext=(cos_sza_real, era5_broadband_alb),
                  arrowprops=dict(facecolor='purple', arrowstyle='->', edgecolor='purple', lw=2.5))
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
     ax3.set_ylim(0.55, 0.775)
     ax3.tick_params(axis='x', bottom=True, top=False, labelbottom=True, labeltop=False)
     ax3_top = ax3.secondary_xaxis('top')
-    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', fontsize=14, labelpad=15)
+    ax3_top.set_xlabel('Solar Zenith Angle (degrees)', labelpad=15)
     ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
-    ax3_top.tick_params(axis='x', labelsize=12)
 
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
-        ypos = 1.08 if ax is ax3 else 1.03
-        ax.text(0.0, ypos, subcase, transform=ax.transAxes, fontsize=16, va='bottom', ha='left')
+        add_panel_label(ax, subcase, y=1.08 if ax is ax3 else 1.01)
 
-    fig.savefig(f'fig/{date_s}/surface_net_cre_lwp_and_contour_{date_s}_{case_tag}_combined.png', dpi=300, bbox_inches='tight')
+    save_grl(fig, f'fig/{date_s}/surface_net_cre_lwp_and_contour_{date_s}_{case_tag}_combined')
     plt.close('all')
 
     #\----------------------------------------------------------------------------/#

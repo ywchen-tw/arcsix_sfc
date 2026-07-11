@@ -69,6 +69,7 @@ import platform
 import er3t
 
 from util.util import *
+from plot_style import apply_grl_style, figsize_mm, save_grl, FULL_WIDTH_MM
 
 _mission_      = 'arcsix'
 _platform_     = 'p3b'
@@ -191,7 +192,7 @@ def flt_trk_lwc(
         fig, axes = plt.subplots(2, 3, figsize=(18,8))
         ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
         # plt.rcParams['font.size'] = 12  # Sets default font size for all text elements
-        plt.rcParams['axes.titlesize'] = 16 # Sets default font size for titles
+        # plt.rcParams['axes.titlesize'] = 16 # disabled: global override leaked into the GRL-styled LWP figure below
         # plt.rcParams['axes.labelsize'] = 12 # Sets default font size for axis labels
         
         
@@ -332,12 +333,12 @@ def flt_trk_lwc(
             
 
 
-            fig, (axl, axe) = plt.subplots(1,2,figsize=(12,6.5))
+            fig, (axl, axe) = plt.subplots(1,2,figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*6.5/12.0))
             axl.plot(lwc_prof, zs, "k.-", lw=1.0, markersize=2.0, label="LWC (all)", zorder=10)
             axl.plot(lwc_i, z_grid, "r-",  lw=3.0, markersize=2.0, label="LWC (interp)", zorder=50)
             axl.set(title=f"LWC vs Altitude", xlabel="LWC (g m$^{-3}$)", ylabel="Altitude (km)")
             
-            text_fontsize = 10
+            text_fontsize = 8  # in-axes annotations; GRL body text is set by rcParams
 
 
             axl.plot(lwc_FCDP_i, z_grid, 'g-', lw=3.0, label='FCDP LWC (interp)', zorder=60)
@@ -347,7 +348,7 @@ def flt_trk_lwc(
             axl.plot(iwc_i, z_grid, 'b-', lw=2.0, label='2DGRAY50 IWC (interp)', zorder=30)
             # axl.plot(iwc_prof, zs, 'o-', color='cyan', lw=1.0, markersize=2.0, label='2DGRAY50 IWC (all)')
 
-            axl.legend(loc='center left', fontsize=10, bbox_to_anchor=(0.025, -0.15), ncol=3)
+            axl.legend(loc='center left', bbox_to_anchor=(0.025, -0.15), ncol=3)
 
             axl.text(0.6, 0.25, f'LWP: {lwp*1000:.2f} '+'g m$^{-2}$', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='left')
             # cloud altitude
@@ -362,10 +363,10 @@ def flt_trk_lwc(
             axe.text(0.65, 0.15, f'FCDP CER: {cer_FCDP:.1f} um', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='left')
             axe.set(title=f"Extinction", xlabel="Extinction (km$^{-1}$)", ylabel="Altitude (km)")
 
-            fig.suptitle(f'P3B LWC and Cloud Microphysics for {date_s} - {times_leg[0]:.2f} to {times_leg[-1]:.2f}', fontsize=20)
+            fig.suptitle(f'P3B LWC and Cloud Microphysics for {date_s} - {times_leg[0]:.2f} to {times_leg[-1]:.2f}')
             # fig.tight_layout(rect=[0,0,1,1])
             fig.tight_layout()
-            fig.savefig(f'fig/{date_s}/P3B_LWP_vs_Altitude_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}.png', bbox_inches='tight', dpi=300)
+            save_grl(fig, f'fig/{date_s}/P3B_LWP_vs_Altitude_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}')
             plt.close(fig)
             log.info("Leg %d LWP: %.4f g m$^{-2}$, COT: %.4f, CER: %.1f um", i, lwp*1000, cot, cer)
             log.info("Leg %d FCDP LWP: %.4f g m$^{-2}$, COT: %.4f, CER: %.1f um", i, lwp_FCDP*1000, cot_FCDP, cer_FCDP)
@@ -374,7 +375,9 @@ def flt_trk_lwc(
   
 
 if __name__ == '__main__':
-    
+
+    apply_grl_style()
+
     dir_fig = './fig'
     os.makedirs(dir_fig, exist_ok=True)
     

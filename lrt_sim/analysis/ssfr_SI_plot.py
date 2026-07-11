@@ -80,6 +80,7 @@ from collections import defaultdict
 import gc
 from pyproj import Transformer
 from util import *
+from plot_style import apply_grl_style
 # mpl.use('Agg')
 from matplotlib import rcParams
 
@@ -170,7 +171,8 @@ def pri_response_ori2(fig_dir):
 
 if __name__ == '__main__':
 
-    
+    apply_grl_style()
+
     dir_fig = './fig/SI'
     os.makedirs(dir_fig, exist_ok=True)
     

@@ -81,6 +81,10 @@ rcParams['font.family'] = "sans-serif" # Ensure sans-serif is used as the defaul
 # from the shared settings module so this analysis stays in lockstep with combined.py.
 from ssfr_atm_corr.settings import _fdir_general_, gas_bands, ice_frac_time_offset
 
+# Shared GRL/AGU manuscript figure style (lrt_sim/plot_style.py), resolvable via the
+# same _BASE_DIR_ sys.path insert used for ssfr_atm_corr.settings above.
+from plot_style import apply_grl_style, figsize_mm, save_grl, add_panel_label, FULL_WIDTH_MM, COLUMN_WIDTH_MM, OKABE_ITO
+
 
 def asymmetric_error(values, lower, upper):
     """Return nonnegative asymmetric error magnitudes for Matplotlib errorbar."""
@@ -910,8 +914,9 @@ def analyze_ice_frac_alb(alb_product='native'):
         print(f"    ('{dk}', '{ct}'): {sign}{abs(shift_s):.2f}/3600,  # r={r:.3f}")
     print("}")
 
+    # --- SI Fig S4.1: per-day broadband albedo at SIF=1 with 5th/95th bounds (GRL style) ---
     plt.close('all')
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.6))
     colors = ['blue' if 'clear' in dc else 'gray' for dc in date_conditions]
     ax.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond,
                 yerr=broadband_alb_date_cond_unc,
@@ -920,12 +925,11 @@ def analyze_ice_frac_alb(alb_product='native'):
     ax.set_xticks(np.arange(len(broadband_alb_date_cond)))
     ax.set_xticklabels(date_conditions, rotation=45, ha='right')
     ax.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
-                       mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
-    ax.set_xlabel('Date and Case', fontsize=14)
-    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
-    ax.tick_params(labelsize=12)
-    # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit', fontsize=13)
-    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_fit_summary.png', bbox_inches='tight', dpi=150)
+                       mpatches.Patch(color='gray', label='Cloudy')])
+    ax.set_xlabel('Date and Case')
+    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0')
+    # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit')
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_broadband_ice_frac_fit_summary')
     # plt.show()
     plt.close(fig)
 
@@ -1150,11 +1154,16 @@ def analyze_ice_frac_alb(alb_product='native'):
         
     def _plot_alb_vs_var1var2(x1_vals, x1_lower, x1_upper,
                               x2_vals, x2_lower, x2_upper,
-                              y_vals, y_unc, 
+                              y_vals, y_unc,
                               colors,
                               x1label, x2label,
-                              savename, fig_dir):
-        """WLS fit + scatter of broadband albedo vs one surface variable."""
+                              savename, fig_dir, grl=False):
+        """WLS fit + scatter of broadband albedo vs one surface variable.
+
+        ``grl=True`` renders the manuscript (GRL) version: full-page width,
+        rcParams font sizes, panel labels above the axes, PNG+PDF output.
+        Styling only — the fits and plotted values are identical.
+        """
         x1_arr = np.array(x1_vals)
         x1_lo  = np.array(x1_lower)
         x1_hi  = np.array(x1_upper)
@@ -1192,8 +1201,16 @@ def analyze_ice_frac_alb(alb_product='native'):
                               np.nanmax(x2_arr[finite_mask]) * 1.03, 100)
         y_line2 = intercept2 + slope2 * x_line2
 
+        # GRL (manuscript) vs diagnostic styling: sizes/fonts/labels only
+        label_kw  = {} if grl else {'fontsize': 14}
+        legend_kw = {} if grl else {'fontsize': 11}
+        if grl:
+            figsize = figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM / 3.0)   # ~15:5 aspect
+        else:
+            figsize = (15, 5)
+
         plt.close('all')
-        fig, (ax, ax2) = plt.subplots(1, 2, figsize=(15, 5), gridspec_kw={ 'wspace': 0.2})
+        fig, (ax, ax2) = plt.subplots(1, 2, figsize=figsize, gridspec_kw={ 'wspace': 0.2})
         ax.errorbar(x1_arr, y_arr,
                     xerr=asymmetric_error(x1_arr, x1_lo, x1_hi),
                     yerr=y_unc_arr,
@@ -1206,9 +1223,9 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax.plot(x_line1, y_line1, color='orange', linestyle='--',
                 label=r'$\mathrm{R^2}$=%.3f, p=%.2e'
                       % (r_value1, p_value1))
-        ax.legend(fontsize=11)
-        ax.set_xlabel(x1label, fontsize=14)
-        
+        ax.legend(**legend_kw)
+        ax.set_xlabel(x1label, **label_kw)
+
         ax2.errorbar(x2_arr, y_arr,
                     xerr=asymmetric_error(x2_arr, x2_lo, x2_hi),
                     yerr=y_unc_arr,
@@ -1218,15 +1235,21 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax2.plot(x_line2, y_line2, color='orange', linestyle='--',
                 label=r'$\mathrm{R^2}$=%.3f, p=%.2e'
                       % (r_value2, p_value2))
-        ax2.legend(fontsize=11)
-        ax2.set_xlabel(x2label, fontsize=14)
-        
+        ax2.legend(**legend_kw)
+        ax2.set_xlabel(x2label, **label_kw)
+
         for ax_, cap in zip([ax, ax2], ['(a)', '(b)']):
-            ax_.tick_params(labelsize=12)
-            ax_.text(0,  1.07, cap, transform=ax_.transAxes, fontsize=16, va='top', ha='left')
-            ax_.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+            if grl:
+                add_panel_label(ax_, cap)
+            else:
+                ax_.tick_params(labelsize=12)
+                ax_.text(0,  1.07, cap, transform=ax_.transAxes, fontsize=16, va='top', ha='left')
+            ax_.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', **label_kw)
         fig.tight_layout()
-        fig.savefig(f'{fig_dir}/{savename}', bbox_inches='tight', dpi=150)
+        if grl:
+            save_grl(fig, f'{fig_dir}/{savename}')   # strips .png, writes PNG+PDF
+        else:
+            fig.savefig(f'{fig_dir}/{savename}', bbox_inches='tight', dpi=150)
         plt.close(fig)
 
     myi_upper = myi_ratio_date_cond_upper
@@ -1253,14 +1276,15 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig_dir=fig_dir,
     )
 
+    # Manuscript Figure 3: broadband albedo at SIF=1 vs KT-19 and vs MYI coverage
     _plot_alb_vs_var1var2(kt19_date_cond, kt19_date_cond_lower, kt19_date_cond_upper,
                           myi_ratio_date_cond, myi_lower, myi_upper,
                           broadband_alb_date_cond, broadband_alb_date_cond_unc,
                           colors,
-                          x1label='Median KT-19 Surface Temperature ($^o$C)', 
+                          x1label='Median KT-19 Surface Temperature ($^o$C)',
                           x2label='Mean MYI Ratio (%)',
-                          savename='arcsix_albedo_broadband_vs_kt19_myi_ratio.png', 
-                          fig_dir=fig_dir)
+                          savename='arcsix_albedo_broadband_vs_kt19_myi_ratio.png',
+                          fig_dir=fig_dir, grl=True)
     _plot_alb_vs_var1var2(kt19_high_hdrf_date_cond,
                           kt19_high_hdrf_date_cond_lower,
                           kt19_high_hdrf_date_cond_upper,
@@ -1647,7 +1671,8 @@ def analyze_ice_frac_alb(alb_product='native'):
     time_ssfr_dt   = [base_date + timedelta(hours=t) for t in time_ssfr]
     cam_t_dt       = [base_date + timedelta(hours=t) for t in cam_t]
 
-    fig = plt.figure(figsize=(18, 9.5))
+    # Manuscript Figure 2: 0801 leg time series + fit + camera images (GRL style)
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 9.5 / 18.0))
     gs_fig = GridSpec(3, 16, height_ratios=[1, 1, 1.5], hspace=0.5, wspace=0.6, figure=fig)
     ax11   = fig.add_subplot(gs_fig[:2, :8])
     ax11_2 = ax11.twinx()
@@ -1659,11 +1684,11 @@ def analyze_ice_frac_alb(alb_product='native'):
 
     l1 = ax11.scatter(time_ssfr_dt, bb_alb, label='Broadband albedo', c='b', s=10)
     l2 = ax11_2.scatter(cam_t_dt, cam_ice, label='camera SIC', c='r', s=5)
-    ax11.set_xlabel('Time (UTC)', fontsize=14)
-    ax11.set_ylabel('Broadband Albedo', fontsize=14, color='b')
-    ax11_2.set_ylabel('Camera Sea Ice Fraction', fontsize=14, color='r')
+    ax11.set_xlabel('Time (UTC)')
+    ax11.set_ylabel('Broadband Albedo', color='b')
+    ax11_2.set_ylabel('Camera Sea Ice Fraction', color='r')
     ax11_2.set_ylim(-0.05, 1.05)
-    ax11.legend([l1, l2], [l1.get_label(), l2.get_label()], fontsize=10,
+    ax11.legend([l1, l2], [l1.get_label(), l2.get_label()],
                 loc='center left', bbox_to_anchor=(0.15, 0.1))
     ax11.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
     ax11.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
@@ -1685,7 +1710,6 @@ def analyze_ice_frac_alb(alb_product='native'):
         elif direction == 'rightup':
             ax11.annotate('', xy=(t_dt-timedelta(minutes=0.5), y_v-0.01),
                           xytext=(t_dt-timedelta(minutes=1.5), y_v-0.09), arrowprops=ap)
-    ax11.tick_params(labelsize=12)
 
     ax12.scatter(cam_ice[mask], bb_cam[mask], s=10, c='k')
     ax12.plot(sorted_cam_ice, slope_fig*sorted_cam_ice + intercept_fig, color='red', linestyle='--',
@@ -1694,10 +1718,9 @@ def analyze_ice_frac_alb(alb_product='native'):
                       models_fig[0.05].predict(sm.add_constant(sorted_cam_ice)),
                       models_fig[0.95].predict(sm.add_constant(sorted_cam_ice)),
                       color='coral', alpha=0.3, label='Quantile Regression (5th-95th)')
-    ax12.set_xlabel('Camera Sea Ice Fraction', fontsize=14)
-    ax12.set_ylabel('Broadband Albedo', fontsize=14)
-    ax12.legend(fontsize=10)
-    ax12.tick_params(labelsize=12)
+    ax12.set_xlabel('Camera Sea Ice Fraction')
+    ax12.set_ylabel('Broadband Albedo')
+    ax12.legend()
 
     img_crop = (slice(0, 1980), slice(500, 2500))
     for ax_img, fn, title, col in [
@@ -1708,14 +1731,13 @@ def analyze_ice_frac_alb(alb_product='native'):
     ]:
         img = plt.imread(fn)
         ax_img.imshow(img[img_crop[0], img_crop[1], :])
-        ax_img.set_title(title, color=col, fontsize=14)
+        ax_img.set_title(title, color=col)
         ax_img.axis('off')
 
     for ax_cap, cap in zip([ax11, ax12, ax21, ax22, ax23, ax24],
                             ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)']):
-        ax_cap.text(0, 1.025, cap, transform=ax_cap.transAxes, fontsize=16, va='bottom', ha='left')
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0801_clear_broadband_icefraction_combined.png',
-                bbox_inches='tight', dpi=150)
+        add_panel_label(ax_cap, cap)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0801_clear_broadband_icefraction_combined')
     plt.close(fig)
 
     # ---------------------------------------------------------------
@@ -1741,6 +1763,8 @@ def analyze_ice_frac_alb(alb_product='native'):
     plt.close(fig)
 
 if __name__ == '__main__':
+
+    apply_grl_style()   # GRL rcParams (fonts, line widths, Okabe-Ito cycle, 300 dpi)
 
     dir_fig = './fig'
     os.makedirs(dir_fig, exist_ok=True)

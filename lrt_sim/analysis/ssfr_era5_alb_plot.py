@@ -38,6 +38,7 @@ import cartopy.feature as cfeature
 from netCDF4 import Dataset
 
 from ssfr_atm_corr.settings import _fdir_general_
+from plot_style import apply_grl_style
 
 
 def make_polar_map(lon_all, lat_all, figsize=(8, 4)):
@@ -85,6 +86,7 @@ def _load_era5_field():
 def plot_era5_alb():
     """Reproduce ERA5 albedo collocation figures from the cached combined product."""
     log = logging.getLogger("era5 alb plot")
+    apply_grl_style()
 
     combined_file = f'{_fdir_general_}/sfc_alb_combined/sfc_alb_combined_spring_summer.pkl'
     print(f"Loading combined product: {combined_file}")

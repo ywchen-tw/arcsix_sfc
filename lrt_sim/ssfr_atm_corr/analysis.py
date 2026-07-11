@@ -77,6 +77,8 @@ from collections import defaultdict
 import gc
 from pyproj import Transformer
 from util import *
+from plot_style import (apply_grl_style, figsize_mm, save_grl,
+                        add_panel_label, FULL_WIDTH_MM)
 # mpl.use('Agg')
 from matplotlib import rcParams
 
@@ -224,6 +226,7 @@ def one_second_albedo_arrays(combined_data, date_select, final_mask):
 
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
+    apply_grl_style()
 
     output_dir = f'{_fdir_general_}/sfc_alb_combined'
     
@@ -286,7 +289,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -334,11 +337,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=10)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -348,29 +351,25 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)', fontsize=14)
-    ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
+    ax3.set_ylabel('Broadband Albedo')
+    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0729_clear_1_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0729_clear_1_summary')
     plt.close(fig)
     print("Broadband albedo avg and std high alt:", np.nanmean(broadband_alb_selected_all_high_alt), np.nanstd(broadband_alb_selected_all_high_alt))
     print("Broadband albedo avg and std low alt:", np.nanmean(broadband_alb_selected_all_low_alt), np.nanstd(broadband_alb_selected_all_low_alt))
@@ -435,7 +434,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -483,11 +482,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=10)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -497,29 +496,25 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)', fontsize=14)
-    ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
+    ax3.set_ylabel('Broadband Albedo')
+    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0605_clear_23_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0605_clear_23_summary')
     plt.close(fig)
     if maybe_stop():
         return
@@ -586,7 +581,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -634,11 +629,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=10)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -648,29 +643,25 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)', fontsize=14)
-    ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
+    ax3.set_ylabel('Broadband Albedo')
+    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0815_clear_12_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0815_clear_12_summary')
     plt.close(fig)
     # sys.exit()
     
@@ -746,7 +737,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=1.0, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -794,11 +785,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=10)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -808,10 +799,9 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
@@ -822,19 +812,16 @@ def combined_atm_corr():
     ax3.scatter(lon_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
     # revert x-axis for degrees W
     ax3.set_xlim(np.max(lon_selected_all)*-0.95, np.min(lon_selected_all)*-1.05)
-    ax3.set_xlabel(r'Longitude ($\mathrm{^o}$W)', fontsize=14)
-    ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_xlabel(r'Longitude ($\mathrm{^o}$W)')
+    ax3.set_ylabel('Broadband Albedo')
+    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0815_clear_23_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0815_clear_23_summary')
     plt.close(fig)
     if maybe_stop():
         return
@@ -906,7 +893,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -949,7 +936,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.jet # Or any other built-in colormap like cm.viridis
+    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -962,11 +949,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=14)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -979,28 +966,24 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)', fontsize=14)
-    ax3.set_xlabel('Broadband Albedo', fontsize=14)
-    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_ylabel('Altitude (km)')
+    ax3.set_xlabel('Broadband Albedo')
+    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0729_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0729_clear_spiral_summary')
     plt.close(fig)
     # sys.exit()
     
@@ -1071,7 +1054,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1114,7 +1097,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.jet # Or any other built-in colormap like cm.viridis
+    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1127,11 +1110,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=14)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1144,28 +1127,24 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)', fontsize=14)
-    ax3.set_xlabel('Broadband Albedo', fontsize=14)
-    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_ylabel('Altitude (km)')
+    ax3.set_xlabel('Broadband Albedo')
+    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0605_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0605_clear_spiral_summary')
     plt.close(fig)
     # sys.exit()
     
@@ -1236,7 +1215,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1279,7 +1258,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.jet # Or any other built-in colormap like cm.viridis
+    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1292,11 +1271,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=14)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1309,28 +1288,24 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)', fontsize=14)
-    ax3.set_xlabel('Broadband Albedo', fontsize=14)
-    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_ylabel('Altitude (km)')
+    ax3.set_xlabel('Broadband Albedo')
+    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0611_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0611_clear_spiral_summary')
     plt.close(fig)
     # sys.exit()
     
@@ -1401,7 +1376,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1444,7 +1419,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.jet # Or any other built-in colormap like cm.viridis
+    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1457,11 +1432,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend(fontsize=14)
+    leg = ax1.legend()
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude', fontsize=14)
-    ax1.set_ylabel('Latitude', fontsize=14)
+    ax1.set_xlabel('Longitude')
+    ax1.set_ylabel('Latitude')
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1474,28 +1449,24 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
-    ax2.set_ylabel('Surface Albedo', fontsize=14)
-    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
-    ax2.tick_params(labelsize=12)
+    ax2.set_xlabel('Wavelength (nm)')
+    ax2.set_ylabel('Surface Albedo')
+    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)', fontsize=14)
-    ax3.set_xlabel('Broadband Albedo', fontsize=14)
-    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
-    ax3.tick_params(labelsize=12)
+    ax3.set_ylabel('Altitude (km)')
+    ax3.set_xlabel('Broadband Albedo')
+    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
-                fontsize=16, fontweight='bold', va='center', ha='left')
-        ax.tick_params(labelsize=12, which='both')
+        add_panel_label(ax, f'({ax_num})')
     
     
     fig.tight_layout()
-    fig.savefig(f'{fig_dir}/arcsix_albedo_0730_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
+    save_grl(fig, f'{fig_dir}/arcsix_albedo_0730_clear_spiral_summary')
     plt.close(fig)
     if maybe_stop():
         return
