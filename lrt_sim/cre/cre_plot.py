@@ -26,6 +26,7 @@ This code has been tested under:
 """
 
 import os
+import re
 import sys
 import platform
 from pathlib import Path
@@ -463,6 +464,21 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
               f"-> broadband {ssfr_ext_broadband_alb}")
     print(f"{date_s} {case_tag}: SSFR extended broadband albedo = {ssfr_ext_broadband_alb}, "
           f"ERA5 broadband albedo = {era5_broadband_alb}")
+
+    # SZA for the flight-case markers in the contour panels: when the marker
+    # albedo comes from obs_alb_file (e.g. the 14:43-14:45 window), use the
+    # mean SZA over that window (parsed from the filename) rather than the
+    # case-mean SZA of the whole leg, so the marker sits at the observed SZA.
+    obs_sza = sza_avg
+    if obs_alb_file is not None:
+        _m = re.search(r'_(\d+\.\d+)_(\d+\.\d+)_', obs_alb_file)
+        if _m:
+            _t0, _t1 = float(_m.group(1)), float(_m.group(2))
+            _in_win = (time_all >= _t0) & (time_all <= _t1) & np.isfinite(sza_all)
+            if np.any(_in_win):
+                obs_sza = np.round(np.nanmean(sza_all[_in_win]), 2)
+                print(f"{date_s} {case_tag}: observation-window SZA "
+                      f"({_t0:.3f}-{_t1:.3f} h) = {obs_sza} (case mean {sza_avg})")
 
 
         
@@ -1115,7 +1131,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1130,7 +1146,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
-    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
+    cos_sza_real = np.cos(np.deg2rad(obs_sza))
     ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color=real_cond_color, marker='^', s=100, label='Flight Case SZA and Albedo', zorder=4 )
     # ax3.set_xlim(50, 80)
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
@@ -1488,7 +1504,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1503,11 +1519,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
-    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
-    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
-    ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
-    ax3.text(cos_sza_real+0.01, ssfr_ext_broadband_alb-0.002, 'ARCSIX', color='orange', fontsize=12)
-    ax3.text(cos_sza_real+0.01, era5_broadband_alb-0.002, 'ERA5', color='orange', fontsize=12)
+    cos_sza_real = np.cos(np.deg2rad(obs_sza))
+    # Marker colors match the panel-(a) curves (green = SSFR obs, red = ERA5);
+    # black edges keep them visible on the viridis contours.
+    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, facecolors='tab:green', edgecolors='k', linewidths=0.7, marker='*', s=150, label='SSFR Albedo', zorder=4)
+    ax3.scatter(cos_sza_real, era5_broadband_alb, facecolors='tab:red', edgecolors='k', linewidths=0.7, marker='^', s=150, label='ERA5 Albedo', zorder=4)
+    ax3.text(cos_sza_real+0.01, ssfr_ext_broadband_alb-0.002, 'ARCSIX', color='tab:green', fontsize=12)
+    ax3.text(cos_sza_real+0.01, era5_broadband_alb-0.002, 'ERA5', color='tab:red', fontsize=12)
     # plot arrow from SSFR Albedo to ERA5 Albedo
     ax3.annotate('', xy=(cos_sza_real, ssfr_ext_broadband_alb), xytext=(cos_sza_real, era5_broadband_alb),
                  arrowprops=dict(facecolor='purple', arrowstyle='->', 
@@ -1572,7 +1590,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1587,7 +1605,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cbar = fig.colorbar(cc , ax=ax3, orientation='vertical', pad=0.02, shrink=0.8)
     # cbar.set_label('Critical LWP ($\mathrm{g/m^2}$)',
     #                fontsize=14)
-    cos_sza_real = np.cos(np.deg2rad(sza_unique_sorted[sza_select_ind]))
+    cos_sza_real = np.cos(np.deg2rad(obs_sza))
     # plot arrow from SSFR Albedo to ERA5 Albedo
     # ax3.annotate('', xy=(cos_sza_real, 0.657), xytext=(cos_sza_real, 0.701),
     #              arrowprops=dict(facecolor='purple', arrowstyle='->', 
@@ -1726,7 +1744,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                title_fontsize=6, handletextpad=0.4, columnspacing=0.8,
                handlelength=1.4)
 
-    # (c) Critical-LWP contour (cos SZA vs broadband albedo) with the Shupe (2003)
+    # (c) Critical-LWP contour (cos SZA vs broadband albedo) with the Shupe (2004)
     #     LWP=30 line and the SSFR/ERA5 albedo markers + arrow.
     # Thin the levels above 100 g/m2 (they crowd the steep upper-left corner)
     # and use a log color scale so small-LWP contours are distinguishable.
@@ -1737,7 +1755,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3.clabel(cc, combined_levels, colors='k', fontsize=7)
     shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
-    ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
+    ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
     ax3.set_xlabel('cos[Solar Zenith Angle]')
     ax3.set_ylabel('Broadband Albedo')
     # Hang the legend fully below the x-label; keep the contour-level note in
@@ -1745,10 +1763,12 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3.legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), frameon=False)
     ax3.text(0.97, 0.03, 'Contour levels:\nLWP in $\mathrm{g/m^2}$', fontsize=7,
              ha='right', va='bottom', transform=ax3.transAxes)
-    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
-    ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
-    ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='orange')
-    ax3.text(cos_sza_real + 0.01, era5_broadband_alb - 0.002, 'ERA5', color='orange')
+    # Marker colors match the panel-(a) curves (green = SSFR obs, red = ERA5);
+    # black edges keep them visible on the viridis contours.
+    ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, facecolors='tab:green', edgecolors='k', linewidths=0.7, marker='*', s=150, label='SSFR Albedo', zorder=4)
+    ax3.scatter(cos_sza_real, era5_broadband_alb, facecolors='tab:red', edgecolors='k', linewidths=0.7, marker='^', s=150, label='ERA5 Albedo', zorder=4)
+    ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='tab:green')
+    ax3.text(cos_sza_real + 0.01, era5_broadband_alb - 0.002, 'ERA5', color='tab:red')
     ax3.annotate('', xy=(cos_sza_real, ssfr_ext_broadband_alb), xytext=(cos_sza_real, era5_broadband_alb),
                  arrowprops=dict(facecolor='purple', arrowstyle='->', edgecolor='purple', lw=2.5))
     ax3.set_xlim(np.cos(np.deg2rad(75)), np.cos(np.deg2rad(50)))
