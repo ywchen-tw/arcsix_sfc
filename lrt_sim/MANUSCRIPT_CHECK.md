@@ -20,7 +20,7 @@ the new `case_004` sweep that the Fig 4 caption describes:
 |----------------------------|-----------|-----------------------------------------------------|
 | Observed SZA               | 61.46°    | **61.72°** (case mean; 61.52° for 14:43–14:45)      |
 | Critical LWP, SSFR albedo  | 119.6     | **129.5 g m⁻²** (at albedo 0.758)                   |
-| Critical LWP, ERA5 albedo  | 69.0      | **~30 g m⁻²** (30.3 at grid 0.638; ERA5 mean 0.651) |
+| Critical LWP, ERA5 albedo  | 69.0      | **33.3 g m⁻²** (interpolated at ERA5 mean 0.651; the plotted figure value) |
 | Measured cloud LWP         | 77.8      | **113.65 g m⁻²** (case_004 cloud; 77.82 = the 13:37–13:45 cloud) |
 
 Old-run provenance: at SZA 61.93, albedo 0.704 → 119.6 and 0.655 → 69.0.
@@ -64,9 +64,16 @@ actually warm the surface" accordingly. The ERA5-marker shift (69 → ~30)
   final 1-s broadband) from the new product gives **0.574±0.020 vs
   0.570±0.063**. Stds and altitudes (3.65/0.11 km) match; the means dropped
   ~0.10 — figure/text predate the June 12 product regeneration. Regenerate.
-- **Saturated albedo range (Fig S4.1 / §4.2)**: manuscript 0.54–0.81; new
-  solar-weighted values span **0.534 (Aug 1) to 0.786 (Jun 5)**. Min agrees;
-  max is 0.79 unless 0.81 refers to the 95th-percentile fit bound.
+- **Saturated albedo range (Fig S4.1 / §4.2)**: manuscript 0.54–0.81.
+  Solar-slit-weighted `alb_sif1` from the per-case fits
+  (`data/sfc_alb_ice_frac/`), checked for both products (2026-07-13):
+  * **native** (352–1996 nm): **0.548 (Aug 1) – 0.804 (Jun 5)** — matches the
+    manuscript's 0.54–0.81 within rounding / the 5th–95th quantile bounds, so
+    Fig S4.1 and the §4.2 text are evidently based on the native broadband.
+  * **extended** (300–4000 nm): **0.534 (Aug 1) – 0.786 (Jun 5)** — the dark
+    2–4 µm tail lowers every case by ~0.015–0.06.
+  Not a stale-data issue, but §4.2 should state which product the range refers
+  to, since the CRE/ERA5 sections use the extended broadband convention.
 - **"Spring broadband albedo >0.7"**: new daily means (alt < 1.6 km) are
   0.728, 0.764, 0.800, 0.801, 0.764, **0.691 (Jun 11), 0.685 (Jun 13)** —
   consider "≈0.7 or above" / "mostly >0.7".
@@ -105,8 +112,8 @@ actually warm the surface" accordingly. The ERA5-marker shift (69 → ~30)
   CRE `.dat` TOA-solar-slit weighted 0.748 (0.758 for the 2-min window);
   combined-product extended broadband (surface-flux weighted, cloudy sky)
   0.856; native 352–1996 nm broadband 0.764. The S4.3 caption should state
-  which weighting is plotted. ERA5's `fal` is an actual-sky quantity, so the
-  flux-weighted convention is the closest comparison.
+  which weighting is plotted (see the `fal` definition below: the
+  TOA-weighted value is the direct `fal` comparison).
 - Campaign means (alt ≤ 1.6 km, no spirals), TOA / flux-weighted vs ERA5:
   spring 0.717 / 0.751 vs 0.637; summer 0.537 / 0.570 vs 0.412.
   Cloudy legs only: spring 0.744 / 0.822 vs 0.647; summer 0.622 / 0.685 vs
@@ -115,6 +122,41 @@ actually warm the surface" accordingly. The ERA5-marker shift (69 → ~30)
 - New SI figures (commit d46c55f): `fig/SI/sfc_alb_ssfr_vs_era5_2panel`,
   `..._2panel_cloudy`, `..._5panel` — both weightings, ghost means, cloudy
   variant.
+
+### What ERA5 `fal` is, and whether the comparison is sound (checked 2026-07-12)
+
+The manuscript compares against ERA5 "forecast albedo" (`fal`, param 243) from
+the reanalysis-era5-single-levels CDS dataset. Per the ECMWF radiation
+documentation (Hogan 2015) and ERA5 docs:
+
+- `fal` is a **diagnostic broadband albedo**: the model's **diffuse**
+  UV-visible and near-IR surface albedos averaged with a **fixed
+  top-of-atmosphere solar spectrum** — not weighted by the actual sky's
+  downward flux. ECMWF notes it "differs somewhat from the true broadband
+  all-sky albedo" for exactly these reasons.
+- Consequently the **TOA-solar-weighted SSFR broadband is the
+  apples-to-apples comparison with `fal`**; the ERA5 counterpart of the
+  actual-sky flux-weighted SSFR broadband is the model's true all-sky albedo
+  **α = 1 − SSR/SSRD** (both fluxes in the same single-levels dataset;
+  undefined at night, and time-of-day dependent, so use hours near flight
+  time rather than daily statistics).
+- Over sea ice, `fal` follows the **Ebert & Curry (1993) monthly
+  climatology** (dry snow Sep–May, melting snow June, bare ice Jul–Aug;
+  mid-month values linearly interpolated), blended with open water by
+  sea-ice concentration. It cannot respond to the actual surface state — so
+  the SSFR−`fal` difference quantifies the bias of that climatology, which
+  is precisely §4.3's argument. The comparison approach is well-precedented
+  (Pohl et al. 2020 evaluated MERIS sea-ice albedo against `fal`).
+- Manuscript wording to tighten: "the ERA5 albedo is from 0.2 to 4 µm" —
+  more precisely, `fal` is a fixed-solar-spectrum weighted average of the
+  model's UV-visible and near-IR diffuse albedos.
+
+Sources:
+- Hogan (2015), *Radiation Quantities in the ECMWF model and MARS*:
+  <https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf>
+- ERA5 data documentation:
+  <https://confluence.ecmwf.int/spaces/CKB/pages/76414402/ERA5+data+documentation>
+- Pohl et al. (2020), *The Cryosphere*: <https://tc.copernicus.org/articles/14/165/2020/>
 
 ## 6. Follow-ups
 
@@ -130,3 +172,7 @@ actually warm the surface" accordingly. The ERA5-marker shift (69 → ~30)
 - [ ] case_004 CRE sweep is missing albedo 0.676
       (`sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat`, MANUAL_ALB_SWEEP
       index 6) — run `cre_runner` for it to complete the 13-albedo contour.
+- [ ] S4.3 caption: state the SSFR weighting plotted; pair `fal` with the
+      TOA-weighted broadband. Optionally download hourly `ssr`+`ssrd` for the
+      flight days and add ERA5's true all-sky albedo (1 − SSR/SSRD) as the
+      counterpart for the flux-weighted panels.

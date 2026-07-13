@@ -18,8 +18,26 @@ The SSFR broadband is shown under two weightings:
     broadband definition).
   * Actual-sky flux weighted (triangles) - the ``broadband_alb_final_ext_*``
     arrays stored in the combined product, weighted by the simulated downward
-    flux at the surface under each leg's own (clear or cloudy) sky. This is
-    the convention closest to how ERA5 defines its forecast albedo (fal).
+    flux at the surface under each leg's own (clear or cloudy) sky.
+
+ERA5 comparison notes (ECMWF radiation documentation; Hogan 2015):
+  * ``fal`` (forecast albedo, param 243) is a diagnostic broadband albedo:
+    the model's DIFFUSE UV-visible and near-IR surface albedos averaged with
+    a FIXED top-of-atmosphere solar spectrum. The TOA-solar weighted SSFR
+    broadband (circles) is therefore the apples-to-apples comparison with
+    ``fal``; the ERA5 counterpart of the actual-sky flux-weighted SSFR
+    broadband (triangles) would be the model's true all-sky albedo
+    1 - SSR/SSRD (surface net / downward shortwave fluxes), not ``fal``.
+  * Over sea ice, ``fal`` follows the Ebert & Curry (1993) monthly climatology
+    (dry snow Sep-May, melting snow Jun, bare ice Jul-Aug; mid-month values
+    linearly interpolated), blended with open water by sea-ice concentration.
+    It cannot respond to the actual surface state - which is exactly what the
+    SSFR - fal difference quantifies.
+  * Sources:
+    https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf
+    https://confluence.ecmwf.int/spaces/CKB/pages/76414402/ERA5+data+documentation
+    https://tc.copernicus.org/articles/14/165/2020/  (Pohl et al. 2020, same
+    fal-based evaluation approach)
 
 Figure geometry/fonts/colors follow the shared GRL style (``plot_style``).
 

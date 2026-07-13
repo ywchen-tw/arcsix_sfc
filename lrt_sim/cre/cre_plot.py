@@ -891,7 +891,10 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         return float(_alb_unique_arr[np.argmin(np.abs(_alb_unique_arr - target))])
     broadband_alb_curve = [
         _nearest_curve_alb(0.70),                      # context (~0.699)
-        _nearest_curve_alb(0.543),
+        # 0.564 (2024-08-08) replaces 0.543 (2024-07-25): the 0.543 spectrum's
+        # extension is ~0 beyond 1.5 um, which reads as an artifact in the
+        # albedo-spectra panel.
+        _nearest_curve_alb(0.564),
         _nearest_curve_alb(ssfr_ext_broadband_alb),   # observation (~0.758)
         _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.638)
         _nearest_curve_alb(0.797),
@@ -1098,8 +1101,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     
     print("cwp_zero_arr min and max:", np.nanmin(cwp_zero_arr), np.nanmax(cwp_zero_arr))
 
-    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
-    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # Same style as the combined figure's panel (c): thinned levels above
+    # 100 g/m2 and a log-scaled viridis colormap for small-LWP contrast.
+    contour_levels_c = [lv for lv in level_labels if lv <= 100 or lv in (150, 200, 300)]
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont,
+                     levels=contour_levels_c, cmap='viridis',
+                     norm=mpl.colors.LogNorm(vmin=10, vmax=350), zorder=2)
+    ax3.clabel(cc, contour_levels_c, fontsize=9, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
@@ -1111,8 +1119,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
-    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+    # Legend fully below the x-label; contour-level note in the sparse
+    # lower-right corner, clear of the contour labels (panel-c style).
+    ax3.legend(fontsize=12, loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
+    ax3.text(0.97, 0.03, 'Contour levels:\nLWP in $\mathrm{g/m^2}$', fontsize=12,
+             ha='right', va='bottom', transform=ax3.transAxes)
 
     
     
@@ -1463,8 +1474,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_real_df_all length:", len(sza_real_df_all))
     print("sza_real_df_real_all length:", len(sza_real_df_real_all))
     
-    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
-    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # Same style as the combined figure's panel (c): thinned levels above
+    # 100 g/m2 and a log-scaled viridis colormap for small-LWP contrast.
+    contour_levels_c = [lv for lv in level_labels if lv <= 100 or lv in (150, 200, 300)]
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont,
+                     levels=contour_levels_c, cmap='viridis',
+                     norm=mpl.colors.LogNorm(vmin=10, vmax=350), zorder=2)
+    ax3.clabel(cc, contour_levels_c, fontsize=9, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
@@ -1476,8 +1492,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
-    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+    # Legend fully below the x-label; contour-level note in the sparse
+    # lower-right corner, clear of the contour labels (panel-c style).
+    ax3.legend(fontsize=12, loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
+    ax3.text(0.97, 0.03, 'Contour levels:\nLWP in $\mathrm{g/m^2}$', fontsize=12,
+             ha='right', va='bottom', transform=ax3.transAxes)
 
     
     
@@ -1539,8 +1558,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     print("sza_real_df_all length:", len(sza_real_df_all))
     print("sza_real_df_real_all length:", len(sza_real_df_real_all))
     
-    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='jet', vmin=10, vmax=350 , zorder=2)
-    ax3.clabel(cc, level_labels, fontsize=12, colors='k')
+    # Same style as the combined figure's panel (c): thinned levels above
+    # 100 g/m2 and a log-scaled viridis colormap for small-LWP contrast.
+    contour_levels_c = [lv for lv in level_labels if lv <= 100 or lv in (150, 200, 300)]
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont,
+                     levels=contour_levels_c, cmap='viridis',
+                     norm=mpl.colors.LogNorm(vmin=10, vmax=350), zorder=2)
+    ax3.clabel(cc, contour_levels_c, fontsize=9, colors='k')
     # cc = ax3.contour(sza_mesh, broadband_alb_mesh, cwp_zero_arr, levels=20, cmap='jet')
     # ax3.clabel(cc, cc.levels, fontsize=12, colors='k')
     
@@ -1552,8 +1576,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
-    ax3.legend(fontsize=12, loc='center', bbox_to_anchor=(0.5, -0.15), )#frame=None)
-    ax3.text(0.28,  0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$', fontsize=12)
+    # Legend fully below the x-label; contour-level note in the sparse
+    # lower-right corner, clear of the contour labels (panel-c style).
+    ax3.legend(fontsize=12, loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
+    ax3.text(0.97, 0.03, 'Contour levels:\nLWP in $\mathrm{g/m^2}$', fontsize=12,
+             ha='right', va='bottom', transform=ax3.transAxes)
 
     
     
@@ -1603,11 +1630,16 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # RIGHT. Reuses the same data/markers as those two standalone figures.
     # ------------------------------------------------------------------
     plt.close('all')
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, 102.0))
-    gs = gridspec.GridSpec(11, 11, figure=fig, hspace=0.5, wspace=0.4)
+    # Taller than the default 0.62 aspect: three dense panels plus the top SZA
+    # axis on (c) need the extra height to breathe at GRL print size. The extra
+    # row between (a) and (b) hosts panel (a)'s below-axes legend.
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, 138.0))
+    # 3 empty rows between (a) and (b) (x-label + legend live there) and 2
+    # empty columns between the left panels and (c).
+    gs = gridspec.GridSpec(13, 13, figure=fig, hspace=0.5, wspace=0.4)
     ax1 = fig.add_subplot(gs[:5, :6])
-    ax2 = fig.add_subplot(gs[6:, :6])
-    ax3 = fig.add_subplot(gs[2:10, 7:])
+    ax2 = fig.add_subplot(gs[8:, :6])
+    ax3 = fig.add_subplot(gs[2:11, 8:])
 
     # Flight-case geometry (mean SZA) used for panel (a) and the contour markers.
     sza_select = np.round(sza_avg, 2)  # case-mean SZA; always present in the sweep grid
@@ -1618,56 +1650,101 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     sza_real_df_real_all = df_real_all.loc[df_real_all['sza'] == sza_unique_sorted[sza_select_ind], :]
     cos_sza_real = cos_sza_unique_sorted[sza_select_ind]
 
+    # ERA5 reference: interpolate across the simulated sweep albedos at the case
+    # SZA to the ERA5 mean broadband albedo (the sweep has no run at e.g. 0.651),
+    # instead of snapping to the nearest sweep albedo.
+    _alb_asc = np.array(broadband_alb_all_unique)[::-1]              # ascending
+    _cwp_zero_asc = cwp_zero_arr[sza_select_ind, :][::-1]
+    _ok = np.isfinite(_cwp_zero_asc)
+    era5_cwp_zero = float(np.interp(era5_broadband_alb, _alb_asc[_ok], _cwp_zero_asc[_ok]))
+    _ins = np.searchsorted(_alb_asc, era5_broadband_alb)
+    _a_lo = _alb_asc[max(_ins - 1, 0)]
+    _a_hi = _alb_asc[min(_ins, len(_alb_asc) - 1)]
+    _w_hi = 0.0 if _a_hi == _a_lo else (era5_broadband_alb - _a_lo) / (_a_hi - _a_lo)
+    print(f'ERA5 albedo {era5_broadband_alb}: interpolated critical LWP = {era5_cwp_zero:.1f} g/m2 '
+          f'(between sweep albedos {_a_lo:.3f} and {_a_hi:.3f})')
+
     # (a) Surface net CRE vs LWP for the 5 selected albedos, with the observation
-    #     (i==2) and ERA5 (i==3) real-case markers, zero crossings and arrow.
+    #     (i==2) and ERA5 (i==3, interpolated) real-case markers, zero crossings
+    #     and arrow.
     for i in range(5):
         broadband_alb_i = broadband_alb_curve[i]
         sza_real_df_all_i = sza_real_df_all.loc[sza_real_df_all['broadband_alb'].values == broadband_alb_i, :]
         sza_real_df_real_all_i = sza_real_df_real_all.loc[sza_real_df_real_all['broadband_alb'].values == broadband_alb_i, :]
-        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i])
-        if i == 2:
-            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'Real Case net CRE @ SSFR albedo={broadband_alb_i:.3f}')
-            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'Zero-crossing @ SSFR albedo={broadband_alb_i:.3f}')
-            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
-            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] - 3
         if i == 3:
-            broadband_alb_delect_ind_0655 = np.argmin(np.abs(np.array(broadband_alb_all_unique) - era5_broadband_alb))
-            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE @ ERA5 albedo={broadband_alb_i:.3f}')
-            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind_0655], 0, color=color_series[i], marker='^', s=100, label=f'Zero-crossing @ ERA5 albedo={broadband_alb_i:.3f}')
-            end_cwp = sza_real_df_real_all_i['cwp'].values[0]
-            end_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] + 4
+            # ERA5 curve/markers at the ERA5 mean broadband albedo: linear blend
+            # of the two bracketing sweep-albedo curves (weight _w_hi).
+            _df_lo = sza_real_df_all.loc[sza_real_df_all['broadband_alb'].values == _a_lo, :].sort_values('cwp')
+            _df_hi = sza_real_df_all.loc[sza_real_df_all['broadband_alb'].values == _a_hi, :].sort_values('cwp')
+            _F_hi_on_lo = np.interp(_df_lo['cwp'].values, _df_hi['cwp'].values, _df_hi['F_sfc_net_cre'].values)
+            era5_curve_F = (1 - _w_hi) * _df_lo['F_sfc_net_cre'].values + _w_hi * _F_hi_on_lo
+            ax1.plot(_df_lo['cwp'].values, era5_curve_F, '-', color=color_series[i])
+            _dfr_lo = sza_real_df_real_all.loc[sza_real_df_real_all['broadband_alb'].values == _a_lo, :]
+            _dfr_hi = sza_real_df_real_all.loc[sza_real_df_real_all['broadband_alb'].values == _a_hi, :]
+            era5_real_cwp = _dfr_lo['cwp'].values[0]
+            era5_real_F = ((1 - _w_hi) * _dfr_lo['F_sfc_net_cre'].values[0]
+                           + _w_hi * _dfr_hi['F_sfc_net_cre'].values[0])
+            ax1.scatter(era5_real_cwp, era5_real_F, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE at obs. LWP (ERA5 {era5_broadband_alb:.3f})')
+            ax1.scatter(era5_cwp_zero, 0, color=color_series[i], marker='^', s=100, label=f'critical LWP (ERA5 {era5_broadband_alb:.3f})')
+            end_cwp = era5_real_cwp
+            end_Fnet = era5_real_F + 4
             ax1.arrow(start_cwp, start_Fnet, end_cwp - start_cwp, end_Fnet - start_Fnet,
                       head_width=2, head_length=2, lw=1.5, fc='k', ec='k', linestyle='-')
+            continue
+        ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i])
+        if i == 2:
+            ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE at obs. LWP (SSFR {broadband_alb_i:.3f})')
+            ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'critical LWP (SSFR {broadband_alb_i:.3f})')
+            start_cwp = sza_real_df_real_all_i['cwp'].values[0]
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] - 3
     ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$')
     ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$')
     ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')
     ax1.set_xlim(0, 200)
     ax1.set_ylim(-65, 40)
-    ax1.legend(fontsize=7, loc='lower left')
+    # Legend below the axes (SSFR column, ERA5 column) so it never covers the
+    # CRE curves; anchored slightly left so it stays clear of panel (c).
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.45, -0.24), ncol=2,
+               fontsize=6, frameon=False, handletextpad=0.4, columnspacing=0.8)
 
     # (b) Albedo spectra, ordered high -> low broadband albedo.
     for i in sorted(range(5), key=lambda k: broadband_alb_curve[k], reverse=True):
         broadband_alb_i = broadband_alb_curve[i]
         broadband_alb_ind = np.argmin(np.abs(np.array(broadband_alb_all) - broadband_alb_i))
-        ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=f'Broadband Albedo: {broadband_alb_i:.3f}')
+        # i==3 is a measured spectrum; the ERA5 markers in (a)/(c) sit at the
+        # interpolated ERA5 broadband, so flag this curve as merely the closest.
+        _lbl = f'{broadband_alb_i:.3f}' + (' (ERA5-closest)' if i == 3 else '')
+        ax2.plot(alb_wvl_all[broadband_alb_ind], alb_all[broadband_alb_ind], '-', color=color_series[i], label=_lbl)
     ax2.set_xlabel('Wavelength (nm)')
     ax2.set_ylabel('Surface Albedo')
     ax2.hlines(0, xmin=300, xmax=4000, colors='gray', linestyles='dashed')
     ax2.set_xlim(300, 4000)
     ax2.set_ylim(-0.05, 1.05)
-    ax2.legend(loc='upper right')
+    # One-row legend below the axes so the spectra stay unobstructed.
+    ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.28), ncol=5,
+               fontsize=6, frameon=False, title='Broadband albedo',
+               title_fontsize=6, handletextpad=0.4, columnspacing=0.8,
+               handlelength=1.4)
 
     # (c) Critical-LWP contour (cos SZA vs broadband albedo) with the Shupe (2003)
     #     LWP=30 line and the SSFR/ERA5 albedo markers + arrow.
-    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont, levels=level_labels, cmap='cividis', vmin=10, vmax=350, zorder=2)
-    ax3.clabel(cc, level_labels, colors='k')
+    # Thin the levels above 100 g/m2 (they crowd the steep upper-left corner)
+    # and use a log color scale so small-LWP contours are distinguishable.
+    combined_levels = [lv for lv in level_labels if lv <= 100 or lv in (150, 200, 300)]
+    cc = ax3.contour(cos_sza_cont_mesh, broadband_alb_cont_mesh, cwp_zero_cont,
+                     levels=combined_levels, cmap='viridis',
+                     norm=mpl.colors.LogNorm(vmin=10, vmax=350), zorder=2)
+    ax3.clabel(cc, combined_levels, colors='k', fontsize=7)
     shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2003)')
     ax3.set_xlabel('cos[Solar Zenith Angle]')
     ax3.set_ylabel('Broadband Albedo')
-    ax3.legend(loc='center', bbox_to_anchor=(0.5, -0.15))
-    ax3.text(0.28, 0.74, 'Contour levels:\n LWP in $\mathrm{g/m^2}$')
+    # Hang the legend fully below the x-label; keep the contour-level note in
+    # the sparse lower-right corner so it clears the contour labels.
+    ax3.legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), frameon=False)
+    ax3.text(0.97, 0.03, 'Contour levels:\nLWP in $\mathrm{g/m^2}$', fontsize=7,
+             ha='right', va='bottom', transform=ax3.transAxes)
     ax3.scatter(cos_sza_real, ssfr_ext_broadband_alb, color='orange', marker='*', s=150, label='SSFR Albedo', zorder=4, alpha=0.7)
     ax3.scatter(cos_sza_real, era5_broadband_alb, color='orange', marker='^', s=150, label='ERA5 Albedo', zorder=4, alpha=0.7)
     ax3.text(cos_sza_real + 0.01, ssfr_ext_broadband_alb - 0.002, 'ARCSIX', color='orange')
@@ -1682,7 +1759,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3_top.set_xticks([np.cos(np.deg2rad(angle)) for angle in range(75, 45, -5)], labels=[f'{angle}°' for angle in range(75, 45, -5)])
 
     for ax, subcase in zip([ax1, ax2, ax3], ['(a)', '(b)', '(c)']):
-        add_panel_label(ax, subcase, y=1.08 if ax is ax3 else 1.01)
+        # (c) sits above the secondary top axis ('Solar Zenith Angle') so the
+        # panel letter clears its label.
+        add_panel_label(ax, subcase, y=1.26 if ax is ax3 else 1.01)
 
     save_grl(fig, f'fig/{date_s}/surface_net_cre_lwp_and_contour_{date_s}_{case_tag}_combined')
     plt.close('all')
