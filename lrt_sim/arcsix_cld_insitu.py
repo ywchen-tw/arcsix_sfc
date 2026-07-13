@@ -69,7 +69,7 @@ import platform
 import er3t
 
 from util.util import *
-from plot_style import apply_grl_style, figsize_mm, save_grl, FULL_WIDTH_MM
+from plot_style import apply_grl_style, figsize_mm, save_grl, FULL_WIDTH_MM, OKABE_ITO, add_panel_label
 
 _mission_      = 'arcsix'
 _platform_     = 'p3b'
@@ -189,23 +189,21 @@ def flt_trk_lwc(
                      i, leg["alt"][start], leg["alt"][end])
 
         # --- PLOT TIME SERIES PANEL ---
-        fig, axes = plt.subplots(2, 3, figsize=(18,8))
+        fig, axes = plt.subplots(2, 3, figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*8.0/18.0))
         ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
-        # plt.rcParams['font.size'] = 12  # Sets default font size for all text elements
-        # plt.rcParams['axes.titlesize'] = 16 # disabled: global override leaked into the GRL-styled LWP figure below
-        # plt.rcParams['axes.labelsize'] = 12 # Sets default font size for axis labels
-        
-        
+
         # altitude
-        ax1.plot(leg["time"], leg["alt"], "k.-")
-        ax1.set(title="P3B Altitude", xlabel="Time (UTC)", ylabel="Altitude (km)")
+        ax1.plot(leg["time"], leg["alt"], ".-", color=OKABE_ITO[7])
+        ax1.set(xlabel="Time (UTC)", ylabel="Altitude (km)")
+        add_panel_label(ax1, '(a)')
 
         # LWC
-        ax2.plot(leg["time"], leg["twc"], "b.-", label="TWC")
-        ax2.plot(leg["time"], leg["lwc1"], "k.-", label="LWC1")
-        ax2.plot(leg["time"], leg["lwc2"], "r.-", label="LWC2")
-        ax2.plot(leg["time"], leg["lwc_fcdp"], "g.-", label="FCDP LWC")
-        ax2.legend(); ax2.set(title="P3B LWC", xlabel="Time (UTC)", ylabel="LWC (g m$^{-3}$)")
+        ax2.plot(leg["time"], leg["twc"], ".-", color=OKABE_ITO[0], label="TWC")
+        ax2.plot(leg["time"], leg["lwc1"], ".-", color=OKABE_ITO[7], label="LWC1")
+        ax2.plot(leg["time"], leg["lwc2"], ".-", color=OKABE_ITO[1], label="LWC2")
+        ax2.plot(leg["time"], leg["lwc_fcdp"], ".-", color=OKABE_ITO[2], label="FCDP LWC")
+        ax2.legend(fontsize=6); ax2.set(xlabel="Time (UTC)", ylabel="LWC (g m$^{-3}$)")
+        add_panel_label(ax2, '(b)')
         if crossings.size:
             for ax in [ax1, ax2]:
                 ax.axvline(leg["time"][crossings[0]], color="gray", ls="--", lw=0.5, alpha=0.5)
@@ -215,31 +213,65 @@ def flt_trk_lwc(
         wvl=550.0
         idx_hsr1 = np.argmin(abs(data_hsr1["wvl_dn_tot"] - wvl))
         dif_ratio = leg["hsr1_dif"][:,idx_hsr1] / leg["hsr1_tot"][:,idx_hsr1]
-        ax3.plot(leg["time"], dif_ratio, "k.-")
-        ax3.set(title=f"HSR1 Diff Ratio @ {wvl:.0f}nm", xlabel="Time (UTC)", ylabel="HSR1 diffussion ratio")
-        
+        ax3.plot(leg["time"], dif_ratio, ".-", color=OKABE_ITO[7])
+        ax3.set(xlabel="Time (UTC)", ylabel="HSR1 diffusion ratio")
+        add_panel_label(ax3, '(c)')
+
         # SSFR vs HSR1 flux
         idx_ssfr = np.argmin(abs(data_ssfr["wvl_dn"] - wvl))
-        ax4.plot(leg["time"], leg["ssfr_zen"][:,idx_ssfr], "k.-", label="SSFR zen")
-        ax4.plot(leg["time"], leg["hsr1_tot"][:,idx_hsr1], "r.-", label="HSR1 tot")
-        ax4.legend()
-        ax4.set(
-            title=f"SSFR Downward and HSR1 total Flux @ {wvl:.0f}nm", xlabel="UTC hr", ylabel="Flux (W m$^{-2}$)"
-        )
+        ax4.plot(leg["time"], leg["ssfr_zen"][:,idx_ssfr], ".-", color=OKABE_ITO[7], label="SSFR zen")
+        ax4.plot(leg["time"], leg["hsr1_tot"][:,idx_hsr1], ".-", color=OKABE_ITO[1], label="HSR1 tot")
+        ax4.legend(fontsize=6)
+        ax4.set(xlabel="UTC hr", ylabel="Flux (W m$^{-2}$)")
+        add_panel_label(ax4, '(d)')
 
         # cloud micro physics
-        ax5.plot(leg["time"], leg["ext_fcdp"], "k.-")
-        ax5.set(title="Cloud Extinction", xlabel="Time (UTC)", ylabel="FCDP Cloud extinction (km^${-1}$)")
+        ax5.plot(leg["time"], leg["ext_fcdp"], ".-", color=OKABE_ITO[7])
+        ax5.set(xlabel="Time (UTC)", ylabel="FCDP Cloud extinction (km$^{-1}$)")
+        add_panel_label(ax5, '(e)')
 
 
-        ax6.plot(leg["time"], leg["iwc_2DGRAY50"], "b.-", label="2DGRAY50 IWC")
-        ax6.plot(leg["time"], leg["lwc_fcdp"], "k.-", label="FCDP LWC")
-        ax6.set(title="FCDP LWC", xlabel="Time (UTC)", ylabel="Water content (g/m^${-3}$)")
-        ax6.legend()
+        ax6.plot(leg["time"], leg["iwc_2DGRAY50"], ".-", color=OKABE_ITO[0], label="2DGRAY50 IWC")
+        ax6.plot(leg["time"], leg["lwc_fcdp"], ".-", color=OKABE_ITO[7], label="FCDP LWC")
+        ax6.set(xlabel="Time (UTC)", ylabel="Water content (g m$^{-3}$)")
+        ax6.legend(fontsize=6)
+        add_panel_label(ax6, '(f)')
 
-        fig.suptitle(f'P3B LWC and HSR1/SSFR data for {date_s} - {times_leg[0]:.2f} to {times_leg[-1]:.2f}', fontsize=20)
-        fig.tight_layout(rect=[0,0,1,1])
-        fig.savefig(f"{dir_fig}/P3B_LWC_HSR1_SSFR_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}.png")
+        fig.tight_layout()
+        save_grl(fig, f"{dir_fig}/P3B_LWC_HSR1_SSFR_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}")
+        plt.close(fig)
+
+        # --- PLOT 4-PANEL MANUSCRIPT FIGURE ---
+        fig, axes = plt.subplots(2, 2, figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*8.0/10.0))
+        pa, pb, pc, pd = axes.flatten()
+
+        # (a) aircraft altitude
+        pa.plot(leg["time"], leg["alt"], ".-", color=OKABE_ITO[7])
+        pa.set(xlabel="Time (UTC)", ylabel="Altitude (km)")
+        add_panel_label(pa, '(a)')
+
+        # (b) LWC (LWC1 probe, as used for the LWP retrieval in P3B_LWP_vs_Altitude panel a)
+        pb.plot(leg["time"], leg["lwc1"], ".-", color=OKABE_ITO[7])
+        pb.set(xlabel="Time (UTC)", ylabel="LWC (g m$^{-3}$)")
+        add_panel_label(pb, '(b)')
+
+        # (c) HSR1 diffusion ratio @ 550 nm
+        pc.plot(leg["time"], dif_ratio, ".-", color=OKABE_ITO[7])
+        pc.set(xlabel="Time (UTC)", ylabel="HSR1 diffusion ratio")
+        add_panel_label(pc, '(c)')
+
+        # (d) derived cloud extinction
+        pd.plot(leg["time"], leg["ext_fcdp"], ".-", color=OKABE_ITO[7])
+        pd.set(xlabel="Time (UTC)", ylabel="Cloud extinction (km$^{-1}$)")
+        add_panel_label(pd, '(d)')
+
+        if crossings.size:
+            for ax in [pa, pb]:
+                ax.axvline(leg["time"][crossings[0]], color="gray", ls="--", lw=0.5, alpha=0.5)
+                ax.axvline(leg["time"][crossings[-1]], color="gray", ls="--", lw=0.5, alpha=0.5)
+
+        fig.tight_layout()
+        save_grl(fig, f"{dir_fig}/P3B_insitu_4panel_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}")
         plt.close(fig)
 
         # --- OPTIONAL LWP / COT / CER CALC AND PLOT ---
@@ -334,36 +366,37 @@ def flt_trk_lwc(
 
 
             fig, (axl, axe) = plt.subplots(1,2,figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*6.5/12.0))
-            axl.plot(lwc_prof, zs, "k.-", lw=1.0, markersize=2.0, label="LWC (all)", zorder=10)
-            axl.plot(lwc_i, z_grid, "r-",  lw=3.0, markersize=2.0, label="LWC (interp)", zorder=50)
-            axl.set(title=f"LWC vs Altitude", xlabel="LWC (g m$^{-3}$)", ylabel="Altitude (km)")
-            
+            axl.plot(lwc_prof, zs, ".-", color=OKABE_ITO[7], lw=0.8, markersize=2.0, label="LWC (all)", zorder=10)
+            axl.plot(lwc_i, z_grid, "-", color=OKABE_ITO[1], lw=2.0, markersize=2.0, label="LWC (interp)", zorder=50)
+            axl.set(xlabel="LWC (g m$^{-3}$)", ylabel="Altitude (km)")
+            add_panel_label(axl, '(a)')
+
             text_fontsize = 8  # in-axes annotations; GRL body text is set by rcParams
 
 
-            axl.plot(lwc_FCDP_i, z_grid, 'g-', lw=3.0, label='FCDP LWC (interp)', zorder=60)
-            axl.plot(lwc_fcdp_prof, zs, 'o-', color='orange', lw=1.0, markersize=2.0, label='FCDP LWC (all)', zorder=20)        
-            axl.text(0.6, 0.3, f'FCDP LWP: {lwp_FCDP*1000:.2f} '+'g m$^{-2}$', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='left')
-            
-            axl.plot(iwc_i, z_grid, 'b-', lw=2.0, label='2DGRAY50 IWC (interp)', zorder=30)
+            # axl.plot(lwc_FCDP_i, z_grid, '-', color=OKABE_ITO[2], lw=2.0, label='FCDP LWC (interp)', zorder=60)
+            # axl.plot(lwc_fcdp_prof, zs, 'o-', color=OKABE_ITO[3], lw=0.8, markersize=2.0, label='FCDP LWC (all)', zorder=20)
+            # axl.text(0.97, 0.3, f'FCDP LWP: {lwp_FCDP*1000:.2f} '+'g m$^{-2}$', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='right')
+
+            axl.plot(iwc_i, z_grid, '-', color=OKABE_ITO[0], lw=1.2, label='2DGRAY50 IWC (interp)', zorder=30)
             # axl.plot(iwc_prof, zs, 'o-', color='cyan', lw=1.0, markersize=2.0, label='2DGRAY50 IWC (all)')
 
-            axl.legend(loc='center left', bbox_to_anchor=(0.025, -0.15), ncol=3)
+            axl.legend(loc='upper left', bbox_to_anchor=(0.025, -0.22), ncol=3, fontsize=6)
 
-            axl.text(0.6, 0.25, f'LWP: {lwp*1000:.2f} '+'g m$^{-2}$', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='left')
+            axl.text(0.97, 0.25, f'LWP: {lwp*1000:.2f} '+'g m$^{-2}$', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='right')
             # cloud altitude
-            axl.text(0.6, 0.2, f'Alt: {z_grid.min():.3f} to {z_grid.max():.3f} km', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='left')
+            axl.text(0.97, 0.2, f'Alt: {z_grid.min():.3f} to {z_grid.max():.3f} km', transform=axl.transAxes, fontsize=text_fontsize, va='top', ha='right')
 
- 
 
-            axe.plot(ext_prof, zs, "k.-", lw=1.0, markersize=2.0, label='Extinction data (all)')
-            axe.plot(ext_i, z_grid, "b-", lw=2.5, label='Extinction data (all)')
-            axe.text(0.65, 0.25, f'COT: {cot:.3f}', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='left')
-            axe.text(0.65, 0.2, f'CER: {cer:.1f} um', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='left')
-            axe.text(0.65, 0.15, f'FCDP CER: {cer_FCDP:.1f} um', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='left')
-            axe.set(title=f"Extinction", xlabel="Extinction (km$^{-1}$)", ylabel="Altitude (km)")
 
-            fig.suptitle(f'P3B LWC and Cloud Microphysics for {date_s} - {times_leg[0]:.2f} to {times_leg[-1]:.2f}')
+            axe.plot(ext_prof, zs, ".-", color=OKABE_ITO[7], lw=0.8, markersize=2.0, label='Extinction data (all)')
+            axe.plot(ext_i, z_grid, "-", color=OKABE_ITO[0], lw=1.5, label='Extinction data (all)')
+            axe.text(0.97, 0.25, f'COT: {cot:.3f}', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='right')
+            axe.text(0.97, 0.2, f'CER: {cer:.1f} um', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='right')
+            # axe.text(0.97, 0.15, f'FCDP CER: {cer_FCDP:.1f} um', transform=axe.transAxes, fontsize=text_fontsize, va='top', ha='right')
+            axe.set(xlabel="Extinction (km$^{-1}$)", ylabel="Altitude (km)")
+            add_panel_label(axe, '(b)')
+
             # fig.tight_layout(rect=[0,0,1,1])
             fig.tight_layout()
             save_grl(fig, f'fig/{date_s}/P3B_LWP_vs_Altitude_{date_s}_{times_leg[0]:.2f}_{times_leg[-1]:.2f}')
@@ -377,6 +410,7 @@ def flt_trk_lwc(
 if __name__ == '__main__':
 
     apply_grl_style()
+    mpl.rcParams['lines.linewidth'] = 0.8   # thinner traces for the in-situ time series
 
     dir_fig = './fig'
     os.makedirs(dir_fig, exist_ok=True)
@@ -471,16 +505,16 @@ if __name__ == '__main__':
     #             config=config
     #             )
     
-    # flt_trk_lwc(date=datetime.datetime(2024, 6, 7),
-    #             tmhr_ranges_select=[[15.243, 15.295], [15.764, 15.814]],
-    #             output_lwp_alt=[True, True],
-    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240607_R1.ict',
-    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240607104243_R1.ict',
-    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240607_R1.ict',
-    #             timeoff_FCDP=0.002,
-    #             timeoff_total=-0.002,
-    #             config=config
-    #             )
+    flt_trk_lwc(date=datetime.datetime(2024, 6, 7),
+                tmhr_ranges_select=[[15.243, 15.295], [15.764, 15.814]],
+                output_lwp_alt=[True, True],
+                fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240607_R1.ict',
+                fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240607104243_R1.ict',
+                fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240607_R1.ict',
+                timeoff_FCDP=0.002,
+                timeoff_total=-0.002,
+                config=config
+                )
     
     # flt_trk_lwc(date=datetime.datetime(2024, 6, 13),
     #             tmhr_ranges_select=[[14.060, 14.117], [14.120, 14.184], [15.883, 15.927], [15.987, 16.033]],
@@ -530,16 +564,16 @@ if __name__ == '__main__':
     #             config=config
     #             )
     
-    flt_trk_lwc(date=datetime.datetime(2024, 8, 9),
-                tmhr_ranges_select=[[13.145, 13.286], [13.614, 13.676], [16.230, 16.270]],
-                output_lwp_alt=[True, True, True],
-                fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240809_R1.ict',
-                fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240809105414_R1.ict',
-                fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240809_R1.ict',
-                timeoff_FCDP=0.003,
-                timeoff_2DGRAY50=0.003,
-                timeoff_total=-0.003,
-                config=config
-                )
+    # flt_trk_lwc(date=datetime.datetime(2024, 8, 9),
+    #             tmhr_ranges_select=[[13.145, 13.286], [13.614, 13.676], [16.230, 16.270]],
+    #             output_lwp_alt=[True, True, True],
+    #             fname_LWC=f'{_fdir_general_}/lwc/ARCSIX-Lwc123_P3B_20240809_R1.ict',
+    #             fname_cloud_micro_2DGRAY50=f'{_fdir_general_}/cloud_prob/2DGRAY50/ARCSIX-2DGRAY50_P3B_20240809105414_R1.ict',
+    #             fname_cloud_micro_FCDP=f'{_fdir_general_}/cloud_prob/FCDP/ARCSIX-FCDP_P3B_20240809_R1.ict',
+    #             timeoff_FCDP=0.003,
+    #             timeoff_2DGRAY50=0.003,
+    #             timeoff_total=-0.003,
+    #             config=config
+    #             )
     
     
