@@ -1704,9 +1704,11 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
                            + _w_hi * _dfr_hi['F_sfc_net_cre'].values[0])
             ax1.scatter(era5_real_cwp, era5_real_F, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE at obs. LWP (ERA5 {era5_broadband_alb:.3f})')
             ax1.scatter(era5_cwp_zero, 0, color=color_series[i], marker='^', s=100, label=f'critical LWP (ERA5 {era5_broadband_alb:.3f})')
+            # Arrow from the ERA5 point up to the SSFR point, matching panel
+            # (c)'s ERA5 -> ARCSIX direction.
             end_cwp = era5_real_cwp
             end_Fnet = era5_real_F + 4
-            ax1.arrow(start_cwp, start_Fnet, end_cwp - start_cwp, end_Fnet - start_Fnet,
+            ax1.arrow(end_cwp, end_Fnet, start_cwp - end_cwp, start_Fnet - end_Fnet,
                       head_width=2, head_length=2, lw=1.5, fc='k', ec='k', linestyle='-')
             continue
         ax1.plot(sza_real_df_all_i['cwp'].values, sza_real_df_all_i['F_sfc_net_cre'].values, '-', color=color_series[i])
@@ -1714,7 +1716,9 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
             ax1.scatter(sza_real_df_real_all_i['cwp'].values, sza_real_df_real_all_i['F_sfc_net_cre'].values, color=color_series[i], marker='o', s=50, edgecolors='k', label=f'net CRE at obs. LWP (SSFR {broadband_alb_i:.3f})')
             ax1.scatter(cwp_zero_arr[sza_select_ind, broadband_alb_delect_ind], 0, color=color_series[i], marker='*', s=100, label=f'critical LWP (SSFR {broadband_alb_i:.3f})')
             start_cwp = sza_real_df_real_all_i['cwp'].values[0]
-            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] - 3
+            # Arrow head stops well below the SSFR circle so it does not poke
+            # into the marker (ax.arrow draws the head beyond the endpoint).
+            start_Fnet = sza_real_df_real_all_i['F_sfc_net_cre'].values[0] - 10
     ax1.set_xlabel('Cloud Liquid Water Path $\mathrm{(g/m^2)}$')
     ax1.set_ylabel('Surface Net CRE $\mathrm{(W/m^2)}$')
     ax1.hlines(0, xmin=0, xmax=np.max(sza_real_df_all['cwp'].values), colors='gray', linestyles='dashed')

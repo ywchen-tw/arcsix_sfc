@@ -14,6 +14,13 @@ History:
   Most 0711 findings were fixed; §1 records what was resolved, §2 what remains.
 - 2026-07-13 (later): re-check against `..._0713-2.docx` (+ SI). Nearly all
   remaining items fixed (see §1); §2 now holds only the short leftover list.
+- 2026-07-13 (-3): re-check against `..._0713-3.docx` (+ SI). Only two
+  items remained open: the mangled ERA5 CDS reference entry and the CoI
+  statement (marked "[To be completed]").
+- 2026-07-13 (-4): re-check of `..._0713-4.docx` (main text only). CDS
+  author/DOI fixed; still open: the CDS entry's dataset title ("hourly" →
+  "post-processed daily statistics"), a "(CDS." paren typo, and the CoI
+  statement. See end of §2.
 
 ## 1. Resolved in the 0713 revision (verified against data)
 
@@ -31,9 +38,10 @@ History:
   reads (`data/era5/forecast_albedo_0_daily-mean.nc`).
 - **Fig S4.2 replaced** with the case_014 cloud: June 7 (RF07)
   15:14:24–15:17:24 (15.24–15.29 h), CER 6.7 µm, CTH 0.43 km, CBH 0.15 km,
-  LWP 26.96 g m⁻² — verified against the case catalog and
-  `fig/20240607/P3B_LWP_vs_Altitude_20240607_15.24_15.29.png` (cloud
-  0.154–0.426 km). The "yields results similar to Shupe & Intrieri (2004)"
+  LWP 26.96 g m⁻² (simulation; the regenerated profile figure
+  `fig/20240607/P3B_LWP_vs_Altitude_20240607_15.24_15.29.png` integrates
+  0.138–0.426 km → 26.99, the S2.5 value) — verified against the case
+  catalog. The "yields results similar to Shupe & Intrieri (2004)"
   claim is supported by the regenerated contour (the LWP=30 overlay tracks
   the simulated 25–30 g m⁻² contours). The old RF05/RF07/SF07 flight-number
   confusion around §4.3/S4.2/S4.3 is resolved (all RF04/RF07 now).
@@ -51,7 +59,7 @@ History:
 - SI figure numbering S1.9–S1.11 now internally consistent; per-case values
   (case_004/014/019 table in §3 below) all reproduce.
 
-## 2. 0713 open issues → status after the 0713-2 revision
+## 2. 0713 open issues → status after the 0713-2 / 0713-3 revisions
 
 Resolved in the **0713-2** revision (checked 2026-07-13):
 
@@ -79,29 +87,37 @@ Resolved in the **0713-2** revision (checked 2026-07-13):
 
 Still open after 0713-2:
 
-- **§4.3 sentence**: "The **orange triangle** indicates the critical LWP on
-  June 3rd from 14:43 to 14:45 … albedo of 0.758" — the 0.758/SSFR critical
-  LWP is the **green star** in panel (a) (the red triangle is ERA5's) and,
-  as of 2026-07-13, the **green star** in panel (c) too.
-- **Fig 4 caption, marker mapping**: panel-(c) markers now reuse the
-  panel-(a) colors (green star = SSFR, red triangle = ERA5; black edges;
-  figures regenerated 2026-07-13), so the "They correspond to the triangle
-  and star symbols in (c)" sentence — whose order was reversed anyway — can
-  simply become "the same symbols/colors mark them in (c)". The **red
-  circle** in (a) (ERA5 net CRE at the observed LWP, −38.4 W m⁻²) is still
-  not mentioned.
-- **References**: "(Copernicus Climate Change Service, Climate Data Store,
-  2024)" still missing from the main reference list; **Pilewskie et al.
-  (2003)** is cited in SI S1.2 but missing from the new SI reference list.
-- **S2.4 caption says "June 3rd"** — the profiling maneuver containing the
-  15:14:24–15:17:24 window is **June 7 (RF07)**, per the S2.5/S4.2 captions.
-- **S2.5 small slips**: LWP "26.99" should be **26.96** g m⁻² (the profile
-  figure's integrated value); "the radiative transfer simulations presented
-  in the main text" — this cloud initializes the **Fig. S4.2 (SI)**
-  simulation, not the main-text Fig. 4 one (which uses the June 3 cloud,
-  LWP 113.65 / CER 7.0).
-- Conflict-of-interest section is still the journal template text.
-- Typo: "forcast albedo" (§4.3).
+Resolved in the **0713-3** revision (checked 2026-07-13):
+
+- §4.3 sentence fixed: "The **green star** indicates the critical LWP …".
+- **Fig 4 caption replaced** with the rewritten version (marker/color scheme,
+  113.7 g m⁻² obs LWP, the red circle via "Circles mark …", the ERA5
+  interpolation note, the Shupe line description, and the ERA5→SSFR arrow
+  direction all now stated). Matches the regenerated figure.
+- "forcast" → "single-level forecast albedo".
+- SI: S2.4 caption now "June 7th (RF07)"; S2.5 now points at Fig. S4.2
+  ("baseline to initialize the radiative transfer simulations shown in
+  Fig. S4.2"); **Pilewskie et al. (2003)** added to the SI reference list.
+  (S2.5's LWP 26.99 was already correct — matches the regenerated profile
+  figure, integrated 0.138–0.426 km; the simulated cloud uses 26.96 from the
+  0.15-km-base integration, within the caption's "approximately".)
+- Hersbach et al. (2020, QJRMS) added and cited alongside the ERA5 dataset.
+
+Mostly resolved in the **0713-4** revision (checked 2026-07-13):
+
+- ERA5 CDS reference largely fixed: corporate author restored (in-text now
+  "(Copernicus Climate Change Service, Climate Data Store, 2024; Hersbach
+  et al., 2020)"), [Data set] marker and DOI 10.24381/cds.4991cf48 added,
+  junk text removed.
+
+- CDS entry title ("hourly" → "post-processed daily statistics") and the
+  "(CDS." paren typo: fixed per author after 0713-4 (not re-verified against
+  a new docx).
+
+Still open:
+
+- **Conflict-of-interest statement**: still the "[To be completed]" journal
+  template text.
 
 ## 3. Reference values (verified 2026-07-11/13)
 
@@ -197,15 +213,18 @@ Sources:
       fixed (0713-2).
 - [x] Fig 4c / contour-only markers recolored to match panel (a)
       (green star = SSFR, red triangle = ERA5) and regenerated (2026-07-13).
-- [ ] §4.3 sentence: "orange triangle … 0.758" → "green star"; Fig 4 caption:
-      replace the "correspond to the triangle and star" sentence with "the
-      same symbols and colors mark them in (c)" and mention the ERA5 obs-LWP
-      red circle.
-- [ ] Add the ERA5 CDS reference to the main list; add Pilewskie et al.
-      (2003) to the SI list.
-- [ ] S2.4 caption "June 3rd" → June 7; S2.5 "26.99" → 26.96; point the
-      "baseline" sentence at Fig. S4.2 rather than the main text.
-- [ ] CoI template text; "forcast albedo" typo.
+- [x] §4.3 "orange triangle" → "green star"; Fig 4 caption replaced with the
+      rewritten version incl. the red circle and arrows (0713-3).
+- [x] Pilewskie et al. (2003) added to the SI list; Hersbach et al. (2020)
+      added to the main list (0713-3).
+- [x] S2.4 caption → "June 7th (RF07)"; S2.5 baseline sentence → Fig. S4.2
+      (0713-3).
+- [x] "forcast albedo" typo fixed (0713-3).
+- [x] ERA5 CDS reference: corporate author, [Data set], and DOI fixed
+      (0713-4).
+- [x] CDS entry title ("hourly" → "post-processed daily statistics") and
+      "(CDS." paren — fixed per author after 0713-4.
+- [ ] CoI statement (marked "[To be completed]").
 - [x] case_004 CRE sweep albedo 0.676
       (`sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat`): CURC CSVs
       downloaded to `data/lrt/20240603_cloudy_atm_corr_2_sat_cloud/`, copied
