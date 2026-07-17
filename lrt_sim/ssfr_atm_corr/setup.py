@@ -203,7 +203,7 @@ def write_ssfr_support_files(iter, clear_sky):
         )
 
     wvl_solar_vis = np.arange(300, 950.1, 1.0)
-    wvl_solar_nir = np.arange(951, 2500.1, 1.0)
+    wvl_solar_nir = np.arange(951, 4050.1, 1.0)
     wvl_solar_coarse = np.concatenate([wvl_solar_vis, wvl_solar_nir])
     effective_wvl = wvl_solar_coarse[
         np.logical_and(wvl_solar_coarse >= xx_wvl_grid.min(), wvl_solar_coarse <= xx_wvl_grid.max())
@@ -215,10 +215,10 @@ def write_ssfr_support_files(iter, clear_sky):
         flux_solar = np.array(df_solor.iloc[:, 1])
 
         f_interp = interp1d(wvl_solar, flux_solar, kind='linear', bounds_error=False, fill_value=0.0)
-        wvl_solar_interp = np.arange(250, 2550.1, 1.0)
+        wvl_solar_interp = np.arange(250, 4050.1, 1.0)
         flux_solar_interp = f_interp(wvl_solar_interp)
 
-        mask = wvl_solar_interp <= 2500
+        mask = wvl_solar_interp <= 4050
         wvl_solar = wvl_solar_interp[mask]
         flux_solar = flux_solar_interp[mask]
 
