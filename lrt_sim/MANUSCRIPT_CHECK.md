@@ -21,6 +21,10 @@ History:
   author/DOI fixed; still open: the CDS entry's dataset title ("hourly" →
   "post-processed daily statistics"), a "(CDS." paren typo, and the CoI
   statement. See end of §2.
+- 2026-07-17: `arcsix_ssfr_solar_flux_slit.dat` extended 2500 → 4050 nm; all
+  TOA-solar-weighted broadbands recomputed (see §5). §3/§4 reference values
+  updated in place; §1/§2 keep the pre-update values they verified
+  historically against the 0711/0713 docx revisions.
 
 ## 1. Resolved in the 0713 revision (verified against data)
 
@@ -119,27 +123,30 @@ Still open:
 - **Conflict-of-interest statement**: still the "[To be completed]" journal
   template text.
 
-## 3. Reference values (verified 2026-07-11/13)
+## 3. Reference values (verified 2026-07-11/13; TOA-weighted albedos updated 2026-07-17, see §5)
 
 - **Fig 4a cloud** (case_004): CER 7.0 µm, CTH 1.91 km, CBH 0.50 km, LWP
   113.65 g m⁻², COT 24.3
   (`fig/20240603/P3B_LWP_vs_Altitude_20240603_14.61_14.71.png`).
-- **Albedo 0.758 (0.30–4.0 µm, TOA-weighted)** for June 3 14:43–14:45:
-  `sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat` gives 0.7580.
-  Flux-weighted counterpart 0.859±0.006 (window) / 0.856±0.011 (leg);
-  native (352–1996 nm) 0.764.
+- **Albedo 0.742 (0.30–4.0 µm, TOA-weighted)** for June 3 14:43–14:45:
+  `sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat` gives 0.7418
+  (0.758 with the pre-2026-07-17 solar file, which zero-weighted
+  2500–4000 nm). Flux-weighted counterpart 0.859±0.006 (window) /
+  0.856±0.011 (leg); native (352–1996 nm) 0.764 — both unchanged.
 - **Fig 2 (RF14, Aug 1)**: window 13:50:24–14:07:12 = the code's
   13.84–14.12 h window; R² = 0.96 consistent (per-wavelength R² averages
   0.958 over 400–900 nm, max 0.966).
 - **"Critical LWP can exceed 100 g m⁻²"** holds: 115–281 g m⁻² for albedos
-  0.751–0.797 at the case SZA.
-- Per-case values (case-mean SZA data-derived, commit 7c2b897):
+  0.735–0.778 at the case SZA (albedo labels recomputed 2026-07-17;
+  zero-crossings unchanged).
+- Per-case values (case-mean SZA data-derived, commit 7c2b897; albedo labels
+  and ERA5 interpolations updated 2026-07-17):
 
   | Case              | Flight SZA | SSFR albedo → crit. LWP | ERA5 albedo → crit. LWP |
   |-------------------|-----------|--------------------------|--------------------------|
-  | case_004 (Jun 3)  | 61.72°    | 0.758 → 129.5            | 0.651 → 33.3 (interp.)   |
-  | case_014 (Jun 7)  | 61.47°    | 0.752 → 132.6            | 0.646 → 33.0             |
-  | case_019 (Jun 13) | 60.40°    | 0.676 → 125.5            | 0.644 → 88.7             |
+  | case_004 (Jun 3)  | 61.72°    | 0.742 → 129.5            | 0.651 → 37.0 (interp.)   |
+  | case_014 (Jun 7)  | 61.47°    | 0.735 → 132.6            | 0.646 → 39.3 (interp.)   |
+  | case_019 (Jun 13) | 60.40°    | 0.661 → 125.5            | 0.644 → 102.0 (interp.)  |
 
 - Saturated albedo (SIF=1, solar-slit-weighted spectral fits in
   `data/sfc_alb_ice_frac/`): native 0.55–0.80 (per-day regression, Fig S4.1),
@@ -155,17 +162,55 @@ Still open:
 - ERA5 `fal` collocated to the Fig 4 leg: **mean 0.651** (0.648–0.658;
   effectively one static grid-box value → supports S4.3's "static,
   homogeneous" remark). 14:43–14:45 window: 0.648.
-- "ERA5 systematically underestimates": confirmed — ERA5 < SSFR for 100% of
-  leg seconds, and campaign-wide 86–100% (spring) / 59–100% (summer) of
-  seconds per day; mean daily bias +0.04 to +0.24.
+- "ERA5 systematically underestimates": still holds after the 2026-07-17
+  update, but weaker — ERA5 < SSFR for 100% of leg seconds; campaign-wide
+  52–100% (spring) / 58–100% (summer) of seconds per day, 79% (spring) /
+  91% (summer) of all points; mean daily bias +0.00 to +0.15. The
+  manuscript's "nearly all points" (spring) phrasing now needs softening
+  (see §5).
 - Campaign means (alt ≤ 1.6 km, no spirals), TOA / flux-weighted vs ERA5:
-  spring 0.717 / 0.751 vs 0.637; summer 0.537 / 0.570 vs 0.412.
-  Cloudy legs only: spring 0.744 / 0.822 vs 0.647; summer 0.622 / 0.685 vs
+  spring 0.701 / 0.751 vs 0.637; summer 0.525 / 0.570 vs 0.412.
+  Cloudy legs only: spring 0.727 / 0.822 vs 0.647; summer 0.609 / 0.685 vs
   0.480 — the weighting gap roughly doubles under cloud, and ERA5's
-  underestimate grows to ~0.18–0.21 under the actual-sky convention.
+  underestimate grows to ~0.18–0.21 under the actual-sky convention
+  (flux-weighted values unaffected by the solar-file update).
 - SI figures (commit d46c55f): `fig/SI/sfc_alb_ssfr_vs_era5_2panel`,
   `..._2panel_cloudy`, `..._5panel` — both weightings, ghost means, cloudy
-  variant.
+  variant (regenerated 2026-07-17 with the extended solar file).
+
+## 5. 2026-07-17 solar-flux extension (TOA-weighted albedos recomputed)
+
+- `arcsix_ssfr_solar_flux_slit.dat` regenerated: 250–2500 → 250–4050 nm.
+  Values below 2494 nm are unchanged (the old file's 2494–2500 nm slit-edge
+  roll-off is fixed); the new 2500–4000 nm tail carries ~2.5% of the TOA
+  solar weight where the ice albedo is ~0.05, so every TOA-solar-weighted
+  broadband drops by ~0.012–0.016. Flux-weighted (simulated-surface-flux)
+  and native-range values are unchanged; the retrieval pipeline
+  (`preprocess`/`processing`) never TOA-weights, so the combined product and
+  spectra are untouched.
+- Regenerated 2026-07-17: `fig/SI/sfc_alb_ssfr_vs_era5_*`,
+  `data/sfc_alb_cre/ext_alb_broadband.csv`, CRE aggregate caches + figures
+  for case_004/014/019 (RT sims untouched; only the albedo-axis labels and
+  the ERA5 interpolations moved), `fig/SI/arcsix_vs_sheba_mosaic`.
+- Pending manuscript edits for the next docx revision:
+  * §4.3 + Fig 4 caption: SSFR TOA-weighted albedo 0.758 → **0.742**
+    (0.859 flux-weighted unchanged).
+  * §4.3: ERA5 critical LWP "around 33.0" → **37.0 g m⁻²** (SSFR 129.5
+    unchanged; obs LWP 113.7 still between them, so the sign argument holds).
+  * §4.3: campaign-mean biases −0.081/−0.125 → **−0.064/−0.113**.
+  * Albedo threshold ">0.68" (abstract, §4.3, conclusions): decision
+    2026-07-17 — keep the TOA convention and use **">0.64"** (spring daily
+    TOA means now 0.648–0.766, min June 13). Key points: prefer
+    threshold-free phrasing.
+  * §4.3 "nearly all points" (spring, below the 1:1 line): now 79% of
+    spring points — soften to "most points" or quote ~80%.
+  * Saturated-albedo products (Fig 3, Fig S4.1, `data/sfc_alb_ice_frac/`):
+    verified unaffected (2026-07-17) — `ssfr_ice_frac_alb_analysis.py` never
+    reads the slit file; the native broadband is weighted by `ssfr_toa`
+    (built from the slit file on the 352–1996 nm native grid, unchanged
+    below 2494 nm) and the extended broadband by the simulated surface
+    flux. Native 0.55–0.80 and extended 0.56–0.86 both stand; no
+    regeneration needed.
 
 ### What ERA5 `fal` is, and whether the comparison is sound (checked 2026-07-12)
 

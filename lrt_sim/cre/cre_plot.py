@@ -906,14 +906,14 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         """Snap a target broadband albedo to the nearest actually-simulated one."""
         return float(_alb_unique_arr[np.argmin(np.abs(_alb_unique_arr - target))])
     broadband_alb_curve = [
-        _nearest_curve_alb(0.70),                      # context (~0.699)
-        # 0.564 (2024-08-08) replaces 0.543 (2024-07-25): the 0.543 spectrum's
-        # extension is ~0 beyond 1.5 um, which reads as an artifact in the
-        # albedo-spectra panel.
+        _nearest_curve_alb(0.70),                      # context (~0.704)
+        # The 2024-08-08 spectrum (now 0.553) replaces 2024-07-25 (0.530): the
+        # 0.530 spectrum's extension is ~0 beyond 1.5 um, which reads as an
+        # artifact in the albedo-spectra panel.
         _nearest_curve_alb(0.564),
-        _nearest_curve_alb(ssfr_ext_broadband_alb),   # observation (~0.758)
-        _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.638)
-        _nearest_curve_alb(0.797),
+        _nearest_curve_alb(ssfr_ext_broadband_alb),   # observation (~0.742)
+        _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.655)
+        _nearest_curve_alb(0.797),                     # brightest (~0.778)
     ]
     print("broadband_alb_curve (5 plotted):", broadband_alb_curve)
 
@@ -1905,6 +1905,6 @@ if __name__ == '__main__':
         manual_alb=MANUAL_ALB_SWEEP,
         overwrite_lrt=True,
         force_rebuild=True,
-        # Observation = case_004 peak 2-min albedo (broadband ~0.758).
+        # Observation = case_004 peak 2-min albedo (broadband ~0.742).
         obs_alb_file='sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat',
     )

@@ -39,6 +39,6 @@ plot_cre_case(
     overwrite_lrt=False,      # plotting never re-runs libRadtran
     force_rebuild=True,       # rebuild the aggregate cache from the per-SZA CSVs
     # obs_alb_file=None -> observation albedo = combined case mean (default);
-    # case_019's own albedo is index 6 of MANUAL_ALB_SWEEP (broadband ~0.676).
+    # case_019's own albedo is index 6 of MANUAL_ALB_SWEEP (broadband ~0.661).
 )
 print('DONE case_019')

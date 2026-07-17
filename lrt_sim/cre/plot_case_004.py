@@ -34,7 +34,7 @@ plot_cre_case(
     manual_alb=MANUAL_ALB_SWEEP,
     overwrite_lrt=False,      # plotting never re-runs libRadtran
     force_rebuild=True,       # rebuild the aggregate cache from the per-SZA CSVs
-    # Observation = case_004 peak 2-min albedo (broadband ~0.758), matching the
+    # Observation = case_004 peak 2-min albedo (broadband ~0.742), matching the
     # cre_plot __main__ default for this case.
     obs_alb_file='sfc_alb_20240603_14.716_14.749_0.34km_cre_alb.dat',
 )
