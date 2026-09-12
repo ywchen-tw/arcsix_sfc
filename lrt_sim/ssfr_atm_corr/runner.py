@@ -40,7 +40,7 @@ CLEAR_SKY_CASE_ID_LIST = [
 ]
 
 CLOUDY_CASE_ID_LIST = [
-    # git 'case_003', 
+    'case_003', 
     'case_004',
     'case_014',
     'case_019', 'case_020', 'case_021',

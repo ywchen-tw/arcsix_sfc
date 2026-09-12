@@ -1131,7 +1131,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='Critical LWP = 30 g m$^{-2}$, Shupe & Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1504,7 +1504,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='Critical LWP = 30 g m$^{-2}$, Shupe & Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1590,7 +1590,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
     shupe_cos_sza = np.cos(np.deg2rad(shupe_sza.copy()))
     shupe_lwp = np.ones_like(shupe_alb, dtype=np.float32)*30
-    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
+    ax3.plot(shupe_cos_sza, shupe_alb, linewidth=1.5, color='orange', label='Critical LWP = 30 g m$^{-2}$, Shupe & Intrieri (2004)')
     # cc = ax3.contourf(sza_mesh, broadband_alb_mesh, cwp_zero_arr, cmap='jet', vmin=20, vmax=300, zorder=1)
     ax3.set_xlabel('cos[Solar Zenith Angle]', fontsize=14)
     ax3.set_ylabel('Broadband Albedo', fontsize=14)
@@ -1759,7 +1759,7 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     ax3.clabel(cc, combined_levels, colors='k', fontsize=7)
     shupe_sza = np.array([50, 54, 60, 65, 68, 70, 72, 73, 75])
     shupe_alb = np.array([0.653, 0.639, 0.614, 0.583, 0.562, 0.545, 0.517, 0.500, 0.464])
-    ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='LWP=30 in Shupe and Intrieri (2004)')
+    ax3.plot(np.cos(np.deg2rad(shupe_sza)), shupe_alb, linewidth=1.5, color='orange', label='Critical LWP = 30 g m$^{-2}$, Shupe & Intrieri (2004)')
     ax3.set_xlabel('cos[Solar Zenith Angle]')
     ax3.set_ylabel('Broadband Albedo')
     # Hang the legend fully below the x-label; keep the contour-level note in

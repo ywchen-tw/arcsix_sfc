@@ -1986,15 +1986,15 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     date_alb_std        = []
     date_broadband_alb  = []
     date_broadband_alb_std = []
-    date_broadband_alb_p10 = []
-    date_broadband_alb_p90 = []
+    date_broadband_alb_p05 = []
+    date_broadband_alb_p95 = []
     date_broadband_alb_690_1190     = []
-    date_broadband_alb_690_1190_p10 = []
-    date_broadband_alb_690_1190_p90 = []
+    date_broadband_alb_690_1190_p05 = []
+    date_broadband_alb_690_1190_p95 = []
     date_ice_frac       = []
     date_ice_frac_std   = []
-    date_ice_frac_p10   = []
-    date_ice_frac_p90   = []
+    date_ice_frac_p05   = []
+    date_ice_frac_p95   = []
     date_myi_ratio      = []
     date_myi_ratio_std  = []
     date_ice_age_avg    = []
@@ -2016,8 +2016,8 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     date_alb_clear_wvl  = []
     date_alb_cloudy_wvl = []
     date_amsr2_ice_conc     = []
-    date_amsr2_ice_conc_p10 = []
-    date_amsr2_ice_conc_p90 = []
+    date_amsr2_ice_conc_p05 = []
+    date_amsr2_ice_conc_p95 = []
 
     for season_obj in [spring, summer]:
         for date in sorted(set(season_obj.dates)):
@@ -2037,16 +2037,16 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
 
             date_broadband_alb.append(np.nanmean(season_obj.broadband_alb_iter2[date_mask]))
             date_broadband_alb_std.append(np.nanstd(season_obj.broadband_alb_iter2[date_mask]))
-            date_broadband_alb_p10.append(np.nanpercentile(season_obj.broadband_alb_iter2[date_mask], 10))
-            date_broadband_alb_p90.append(np.nanpercentile(season_obj.broadband_alb_iter2[date_mask], 90))
+            date_broadband_alb_p05.append(np.nanpercentile(season_obj.broadband_alb_iter2[date_mask], 5))
+            date_broadband_alb_p95.append(np.nanpercentile(season_obj.broadband_alb_iter2[date_mask], 95))
             date_broadband_alb_690_1190.append(np.nanmean(season_obj.bb_alb_iter2_690_1190[date_mask]))
-            date_broadband_alb_690_1190_p10.append(np.nanpercentile(season_obj.bb_alb_iter2_690_1190[date_mask], 10))
-            date_broadband_alb_690_1190_p90.append(np.nanpercentile(season_obj.bb_alb_iter2_690_1190[date_mask], 90))
+            date_broadband_alb_690_1190_p05.append(np.nanpercentile(season_obj.bb_alb_iter2_690_1190[date_mask], 5))
+            date_broadband_alb_690_1190_p95.append(np.nanpercentile(season_obj.bb_alb_iter2_690_1190[date_mask], 95))
 
             date_ice_frac.append(np.nanmean(season_obj.ice_frac[date_mask]))
             date_ice_frac_std.append(np.nanstd(season_obj.ice_frac[date_mask]))
-            date_ice_frac_p10.append(np.nanpercentile(season_obj.ice_frac[date_mask], 10))
-            date_ice_frac_p90.append(np.nanpercentile(season_obj.ice_frac[date_mask], 90))
+            date_ice_frac_p05.append(np.nanpercentile(season_obj.ice_frac[date_mask], 5))
+            date_ice_frac_p95.append(np.nanpercentile(season_obj.ice_frac[date_mask], 95))
 
             date_myi_ratio.append(np.nanmean(season_obj.myi_ratio[date_mask] / season_obj.ice_ratio[date_mask]))
             date_myi_ratio_std.append(np.nanstd(season_obj.myi_ratio[date_mask] / season_obj.ice_ratio[date_mask]))
@@ -2058,8 +2058,8 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
             )
 
             date_amsr2_ice_conc.append(np.nanmean(season_obj.amsr2_ice_conc[date_mask]))
-            date_amsr2_ice_conc_p10.append(np.nanpercentile(season_obj.amsr2_ice_conc[date_mask], 10))
-            date_amsr2_ice_conc_p90.append(np.nanpercentile(season_obj.amsr2_ice_conc[date_mask], 90))
+            date_amsr2_ice_conc_p05.append(np.nanpercentile(season_obj.amsr2_ice_conc[date_mask], 5))
+            date_amsr2_ice_conc_p95.append(np.nanpercentile(season_obj.amsr2_ice_conc[date_mask], 95))
 
             clear_mask  = date_mask & (season_obj.conditions == 'clear')
             if np.any(clear_mask):
@@ -2317,10 +2317,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
 
         ice_frac_arr   = np.array(date_ice_frac)
         bb_alb_arr     = np.array(date_broadband_alb)
-        xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p10))
-        xerr_hi = np.maximum(0, np.array(date_ice_frac_p90)   - ice_frac_arr)
-        yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_p10))
-        yerr_hi = np.maximum(0, np.array(date_broadband_alb_p90) - bb_alb_arr)
+        xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p05))
+        xerr_hi = np.maximum(0, np.array(date_ice_frac_p95)   - ice_frac_arr)
+        yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_p05))
+        yerr_hi = np.maximum(0, np.array(date_broadband_alb_p95) - bb_alb_arr)
         ax22.errorbar(date_ice_frac, date_broadband_alb,
                     xerr=[xerr_lo, xerr_hi], yerr=[yerr_lo, yerr_hi],
                     fmt='o', color='black', ecolor='lightgray',
@@ -2366,18 +2366,18 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     mask = np.array(date_all_list) == '0801'
     date_ice_frac_mask   = np.array(date_ice_frac)[mask]
     date_broadband_alb_690_1190_mask = np.array(date_broadband_alb_690_1190)[mask]
-    date_ice_frac_p10_mask   = np.array(date_ice_frac_p10)[mask]
-    date_ice_frac_p90_mask   = np.array(date_ice_frac_p90)[mask]
-    date_broadband_alb_690_1190_p10_mask = np.array(date_broadband_alb_690_1190_p10)[mask]
-    date_broadband_alb_690_1190_p90_mask = np.array(date_broadband_alb_690_1190_p90)[mask]
+    date_ice_frac_p05_mask   = np.array(date_ice_frac_p05)[mask]
+    date_ice_frac_p95_mask   = np.array(date_ice_frac_p95)[mask]
+    date_broadband_alb_690_1190_p05_mask = np.array(date_broadband_alb_690_1190_p05)[mask]
+    date_broadband_alb_690_1190_p95_mask = np.array(date_broadband_alb_690_1190_p95)[mask]
     ice_frac_arr_mask   = np.array(date_ice_frac_mask)
     bb_alb_arr_mask     = np.array(date_broadband_alb_690_1190_mask)
     ice_frac_arr   = np.array(date_ice_frac)
     bb_alb_arr     = np.array(date_broadband_alb_690_1190)
-    xerr_lo = np.maximum(0, ice_frac_arr_mask   - np.array(date_ice_frac_p10_mask))
-    xerr_hi = np.maximum(0, np.array(date_ice_frac_p90_mask)   - ice_frac_arr_mask)
-    yerr_lo = np.maximum(0, bb_alb_arr_mask     - np.array(date_broadband_alb_690_1190_p10_mask))
-    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p90_mask) - bb_alb_arr_mask)
+    xerr_lo = np.maximum(0, ice_frac_arr_mask   - np.array(date_ice_frac_p05_mask))
+    xerr_hi = np.maximum(0, np.array(date_ice_frac_p95_mask)   - ice_frac_arr_mask)
+    yerr_lo = np.maximum(0, bb_alb_arr_mask     - np.array(date_broadband_alb_690_1190_p05_mask))
+    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p95_mask) - bb_alb_arr_mask)
     ax22.errorbar(date_ice_frac_mask, date_broadband_alb_690_1190_mask,
                   xerr=[xerr_lo, xerr_hi], yerr=[yerr_lo, yerr_hi],
                   fmt='o', color='black', ecolor='lightgray',
@@ -2433,10 +2433,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
 
     ice_frac_arr   = np.array(date_ice_frac)
     bb_alb_arr     = np.array(date_broadband_alb_690_1190)
-    xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p10))
-    xerr_hi = np.maximum(0, np.array(date_ice_frac_p90)   - ice_frac_arr)
-    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_690_1190_p10))
-    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p90) - bb_alb_arr)
+    xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p05))
+    xerr_hi = np.maximum(0, np.array(date_ice_frac_p95)   - ice_frac_arr)
+    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_690_1190_p05))
+    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p95) - bb_alb_arr)
     ax22.errorbar(date_ice_frac, date_broadband_alb_690_1190,
                   xerr=[xerr_lo, xerr_hi], yerr=[yerr_lo, yerr_hi],
                   fmt='o', color='black', ecolor='lightgray',
@@ -2491,10 +2491,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
 
     ice_frac_arr   = np.array(date_ice_frac)
     bb_alb_arr     = np.array(date_broadband_alb_690_1190)
-    xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p10))
-    xerr_hi = np.maximum(0, np.array(date_ice_frac_p90)   - ice_frac_arr)
-    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_690_1190_p10))
-    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p90) - bb_alb_arr)
+    xerr_lo = np.maximum(0, ice_frac_arr   - np.array(date_ice_frac_p05))
+    xerr_hi = np.maximum(0, np.array(date_ice_frac_p95)   - ice_frac_arr)
+    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_690_1190_p05))
+    yerr_hi = np.maximum(0, np.array(date_broadband_alb_690_1190_p95) - bb_alb_arr)
     ax22.errorbar(date_ice_frac, date_broadband_alb_690_1190,
                   xerr=[xerr_lo, xerr_hi], yerr=[yerr_lo, yerr_hi],
                   fmt='o', color='black', ecolor='lightgray',
@@ -2552,10 +2552,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     print("date_amsr2_ice_conc min/max:", np.nanmin(date_amsr2_ice_conc), np.nanmax(date_amsr2_ice_conc))
     amsr2_ice_frac_arr   = np.array(date_amsr2_ice_conc)/100
     bb_alb_arr     = np.array(date_broadband_alb)
-    xerr_lo = np.maximum(0,  amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p10)/100)
-    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p90)/100   - amsr2_ice_frac_arr)
-    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_p10))
-    yerr_hi = np.maximum(0, np.array(date_broadband_alb_p90) - bb_alb_arr)
+    xerr_lo = np.maximum(0,  amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p05)/100)
+    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p95)/100   - amsr2_ice_frac_arr)
+    yerr_lo = np.maximum(0, bb_alb_arr     - np.array(date_broadband_alb_p05))
+    yerr_hi = np.maximum(0, np.array(date_broadband_alb_p95) - bb_alb_arr)
     ax22.errorbar(amsr2_ice_frac_arr, date_broadband_alb,
                   xerr=[xerr_lo, xerr_hi], yerr=[yerr_lo, yerr_hi],
                   fmt='o', color='black', ecolor='lightgray',
@@ -2622,10 +2622,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     plt.close('all')
     amsr2_ice_frac_arr = np.array(date_amsr2_ice_conc) / 100.0
     ice_frac_arr       = np.array(date_ice_frac)
-    xerr_lo = np.maximum(0, amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p10) / 100.0)
-    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p90) / 100.0 - amsr2_ice_frac_arr)
-    yerr_lo = np.maximum(0, ice_frac_arr - np.array(date_ice_frac_p10))
-    yerr_hi = np.maximum(0, np.array(date_ice_frac_p90) - ice_frac_arr)
+    xerr_lo = np.maximum(0, amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p05) / 100.0)
+    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p95) / 100.0 - amsr2_ice_frac_arr)
+    yerr_lo = np.maximum(0, ice_frac_arr - np.array(date_ice_frac_p05))
+    yerr_hi = np.maximum(0, np.array(date_ice_frac_p95) - ice_frac_arr)
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.errorbar(amsr2_ice_frac_arr, ice_frac_arr,
@@ -2649,10 +2649,10 @@ def combined_atm_corr(force=False, make_plots=True, make_collocation_plots=True)
     plt.close('all')
     amsr2_ice_frac_arr = np.array(date_amsr2_ice_conc) / 100.0
     ice_frac_arr       = np.array(date_ice_frac)
-    xerr_lo = np.maximum(0, amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p10) / 100.0)
-    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p90) / 100.0 - amsr2_ice_frac_arr)
-    yerr_lo = np.maximum(0, ice_frac_arr - np.array(date_ice_frac_p10))
-    yerr_hi = np.maximum(0, np.array(date_ice_frac_p90) - ice_frac_arr)
+    xerr_lo = np.maximum(0, amsr2_ice_frac_arr - np.array(date_amsr2_ice_conc_p05) / 100.0)
+    xerr_hi = np.maximum(0, np.array(date_amsr2_ice_conc_p95) / 100.0 - amsr2_ice_frac_arr)
+    yerr_lo = np.maximum(0, ice_frac_arr - np.array(date_ice_frac_p05))
+    yerr_hi = np.maximum(0, np.array(date_ice_frac_p95) - ice_frac_arr)
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.errorbar(amsr2_ice_frac_arr, ice_frac_arr,

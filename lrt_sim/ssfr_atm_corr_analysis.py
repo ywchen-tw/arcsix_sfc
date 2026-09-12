@@ -27,14 +27,16 @@ This code has been tested under:
 
 import os
 import sys
-from pathlib import Path
+import platform
 
-_THIS_FILE = Path(__file__).resolve()
-_LRT_SIM_ROOT = str(_THIS_FILE.parents[1])
-_REPO_ROOT = str(_THIS_FILE.parents[2])
-for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
+if platform.system() == 'Linux':
+    # Define the path to your module directory
+    # Use os.path.abspath and os.path.join for platform independence
+    # module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'util'))
+
+    # Add the directory to the Python search path
+    # sys.path.insert(0, module_path)
+    sys.path.append("/projects/yuch8913/arcsix_sfc/lrt_sim/")  
 
 import glob
 import copy
@@ -44,6 +46,7 @@ import datetime
 import multiprocessing as mp
 import pickle
 from dataclasses import dataclass
+from pathlib import Path
 import logging
 from typing import Optional
 import h5py
@@ -77,163 +80,77 @@ from collections import defaultdict
 import gc
 from pyproj import Transformer
 from util import *
-from plot_style import (apply_grl_style, figsize_mm, save_grl,
-                        add_panel_label, FULL_WIDTH_MM)
 # mpl.use('Agg')
 from matplotlib import rcParams
 
 rcParams['font.sans-serif'] = "Arial"
 rcParams['font.family'] = "sans-serif" # Ensure sans-serif is used as the default family
 
-try:
-    if __package__:
-        from .helpers import gas_abs_masking
-        from .settings import _fdir_data_, _fdir_general_, gas_bands
-    else:
-        from helpers import gas_abs_masking
-        from settings import _fdir_data_, _fdir_general_, gas_bands
-except ImportError:
-    from lrt_sim.ssfr_atm_corr.helpers import gas_abs_masking
-    from lrt_sim.ssfr_atm_corr.settings import _fdir_data_, _fdir_general_, gas_bands
-
-RUN_ALL_CASE_STUDIES = True
-BROADBAND_ALBEDO_COLOR_LIMITS = (0.1, 0.9)
 
 
-def combined_key(combined_data, preferred_key, fallback_key=None):
-    """Read a combined-product key, preferring the current name."""
-    if preferred_key in combined_data:
-        return combined_data[preferred_key]
-    if fallback_key is not None and fallback_key in combined_data:
-        return combined_data[fallback_key]
-    tried = preferred_key if fallback_key is None else f'{preferred_key}, {fallback_key}'
-    raise KeyError(f'Missing combined-data key; tried: {tried}')
+_mission_      = 'arcsix'
+_platform_     = 'p3b'
+
+_hsk_          = 'hsk'
+_alp_          = 'alp'
+_spns_         = 'spns-a'
+_ssfr1_        = 'ssfr-a'
+_ssfr2_        = 'ssfr-b'
+_cam_          = 'nac'
+
+# _fdir_main_       = 'data/%s/flt-vid' % _mission_
+_fdir_main_       = 'data/flt-vid'
+_fdir_sat_img_    = 'data/%s/sat-img' % _mission_
+_fdir_sat_data_   = 'data/%s/sat' % _mission_
+_fdir_cam_img_    = 'data/%s/2024-Spring/p3' % _mission_
+_wavelength_      = 555.0
+
+_fdir_sat_img_vn_ = 'data/%s/sat-img-vn' % _mission_
+
+_preferred_region_ = 'ca_archipelago'
+_aspect_ = 'equal'
+
+if platform.system() == 'Darwin':
+    _fdir_data_ = '/Volumes/argus/field/%s/processed' % _mission_
+    _fdir_data_ = '../data/processed' 
+    _fdir_general_ = '../data'
+    _fdir_tmp_ = './tmp'
+elif platform.system() == 'Linux':
+    _fdir_data_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data/processed"
+    _fdir_general_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/data"
+    _fdir_tmp_ = "/pl/active/vikas-arcsix/yuch8913/arcsix/tmp"
+_fdir_tmp_graph_ = 'tmp-graph_flt-vid'
 
 
-def season_suffix(date_s):
-    """Return the season suffix used in the combined product."""
-    return 'summer' if date_s > '20240630' else 'spring'
 
+o2a_1_start, o2a_1_end = 748, 780
+# h2o_1_start, h2o_1_end = 672, 706
+# h2o_2_start, h2o_2_end = 705, 746
+h2o_1_start, h2o_1_end = 650 , 706
+h2o_2_start, h2o_2_end = 705, 760
+h2o_3_start, h2o_3_end = 884, 996
+h2o_4_start, h2o_4_end = 1084, 1175
+h2o_5_start, h2o_5_end = 1230, 1286
+h2o_6_start, h2o_6_end = 1290, 1509
+h2o_7_start, h2o_7_end = 1748, 2050
+h2o_8_start, h2o_8_end = 801, 843
+final_start, final_end = 2110, 2200
 
-def season_data(combined_data, base_name, date_s, fallback_base_name=None):
-    """Read a spring/summer array from a combined product."""
-    suffix = season_suffix(date_s)
-    preferred_key = f'{base_name}_{suffix}'
-    fallback_key = None if fallback_base_name is None else f'{fallback_base_name}_{suffix}'
-    return combined_key(combined_data, preferred_key, fallback_key)
-
-
-def selected_case_arrays(combined_data, date_select, case_tags):
-    """Return common arrays for one date/case-tag selection."""
-    suffix = season_suffix(date_select)
-    dates = combined_data[f'dates_{suffix}_all']
-    tags = combined_data[f'case_tags_{suffix}_all']
-    if isinstance(case_tags, str):
-        case_tags = [case_tags]
-    date_mask = dates == int(date_select)
-    case_tag_mask = np.zeros(len(tags), dtype=bool)
-    for case_tag in case_tags:
-        case_tag_mask |= np.array([case_tag in ct for ct in tags])
-    final_mask = date_mask & case_tag_mask
-    alb, broadband_alb = one_second_albedo_arrays(combined_data, date_select, final_mask)
-    return {
-        'suffix': suffix,
-        'mask': final_mask,
-        'wvl': season_data(combined_data, 'native_wvl', date_select, fallback_base_name='wvl'),
-        'lon': combined_data[f'lon_all_{suffix}'][final_mask],
-        'lat': combined_data[f'lat_all_{suffix}'][final_mask],
-        'alt': combined_data[f'alt_all_{suffix}'][final_mask],
-        'time': combined_data[f'time_{suffix}_all'][final_mask],
-        'alb': alb,
-        'broadband_alb': broadband_alb,
-    }
-
-
-def unpack_combined_arrays(combined_data):
-    """Expose commonly reused combined arrays for the legacy plotting blocks."""
-    spring_broadband = combined_key(
-        combined_data,
-        'broadband_alb_final_spring_all',
-        'broadband_alb_iter2_all_filter_spring',
-    )
-    summer_broadband = combined_key(
-        combined_data,
-        'broadband_alb_final_summer_all',
-        'broadband_alb_iter2_all_filter_summer',
-    )
-    arrays = {
-        'dates_spring_all': combined_data['dates_spring_all'],
-        'dates_summer_all': combined_data['dates_summer_all'],
-        'lon_all_spring': combined_data['lon_all_spring'],
-        'lat_all_spring': combined_data['lat_all_spring'],
-        'lon_all_summer': combined_data['lon_all_summer'],
-        'lat_all_summer': combined_data['lat_all_summer'],
-        'lon_avg_spring': combined_data['lon_avg_spring'],
-        'lon_avg_summer': combined_data['lon_avg_summer'],
-        'broadband_alb_iter2_all_spring': spring_broadband,
-        'broadband_alb_iter2_all_summer': summer_broadband,
-    }
-    arrays['lat_avg_spring'] = combined_data.get(
-        'lat_avg_spring',
-        np.full_like(arrays['lon_avg_spring'], np.nan, dtype=float),
-    )
-    arrays['lat_avg_summer'] = combined_data.get(
-        'lat_avg_summer',
-        np.full_like(arrays['lon_avg_summer'], np.nan, dtype=float),
-    )
-    arrays['lon_all'] = np.concatenate((arrays['lon_all_spring'], arrays['lon_all_summer']))
-    arrays['lat_all'] = np.concatenate((arrays['lat_all_spring'], arrays['lat_all_summer']))
-    arrays['lon_avg_all'] = np.concatenate((arrays['lon_avg_spring'], arrays['lon_avg_summer']))
-    arrays['lat_avg_all'] = np.concatenate((arrays['lat_avg_spring'], arrays['lat_avg_summer']))
-    arrays['broadband_alb_iter2_spring'] = spring_broadband
-    arrays['broadband_alb_iter2_summer'] = summer_broadband
-    return arrays
-
-
-def maybe_stop():
-    """Keep the old one-case workflow available while allowing all blocks to run."""
-    return not RUN_ALL_CASE_STUDIES
-
-
-def finite_color_limits(values, default=BROADBAND_ALBEDO_COLOR_LIMITS):
-    """Return robust color limits for finite broadband-albedo values."""
-    values = np.asarray(values, dtype=float)
-    finite = values[np.isfinite(values)]
-    if finite.size == 0:
-        return default
-    vmin, vmax = np.nanpercentile(finite, [2, 98])
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or np.isclose(vmin, vmax):
-        vmin, vmax = np.nanmin(finite), np.nanmax(finite)
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or np.isclose(vmin, vmax):
-        return default
-    return float(vmin), float(vmax)
-
-
-def one_second_albedo_arrays(combined_data, date_select, final_mask):
-    """Return final-iteration albedo on the combined product's 1-second timeline."""
-    alb = season_data(combined_data, 'alb_final_all_1s', date_select, fallback_base_name='alb_final_all')[
-        final_mask, :
-    ]
-    broadband_alb = season_data(
-        combined_data,
-        'broadband_alb_final_all_1s',
-        date_select,
-        fallback_base_name='broadband_alb_iter2_all_filter',
-    )[final_mask]
-    return alb, broadband_alb
+gas_bands = [(o2a_1_start, o2a_1_end), (h2o_1_start, h2o_1_end), (h2o_2_start, h2o_2_end),
+                (h2o_3_start, h2o_3_end), (h2o_4_start, h2o_4_end), (h2o_5_start, h2o_5_end),
+                (h2o_6_start, h2o_6_end), (h2o_7_start, h2o_7_end), (h2o_8_start, h2o_8_end),
+                (final_start, final_end)]
 
 
 
 def combined_atm_corr():
     log = logging.getLogger("atm corr combined")
-    apply_grl_style()
 
-    output_dir = f'{_fdir_general_}/sfc_alb_combined'
+    output_dir = f'{_fdir_general_}/sfc_alb_combined_smooth_450nm'
     
     combined_output_file = f'{output_dir}/sfc_alb_combined_spring_summer.pkl'
     with open(combined_output_file, 'rb') as r:
         combined_data = pickle.load(r)
-    globals().update(unpack_combined_arrays(combined_data))
         
     fig_dir = f'fig/sfc_alb_corr_analysis'
     os.makedirs(fig_dir, exist_ok=True)
@@ -249,7 +166,8 @@ def combined_atm_corr():
     lon_selected_all = combined_data['lon_all_summer'][final_mask] if date_select > '20240630' else combined_data['lon_all_spring'][final_mask]
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     lon_selected_all = lon_selected_all[lat_mask]
@@ -289,7 +207,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -337,11 +255,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=10)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -351,46 +269,54 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
-    ax3.set_ylabel('Broadband Albedo')
-    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_xlabel('Latitude ($\mathrm{^o}$N)', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0729_clear_1_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0729_clear_1_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     print("Broadband albedo avg and std high alt:", np.nanmean(broadband_alb_selected_all_high_alt), np.nanstd(broadband_alb_selected_all_high_alt))
     print("Broadband albedo avg and std low alt:", np.nanmean(broadband_alb_selected_all_low_alt), np.nanstd(broadband_alb_selected_all_low_alt))
     
-    if maybe_stop():
-        return
+    # sys.exit()
     
     #"""
     
-    # 6/5 clear_atm_corr_2, 3 (old 0605_clear_2 -> new clear_2..4, old 0605_clear_3 -> new clear_5..7)
+    """
+    # 6/5 clear_atm_corr_2, 3
     date_select = '20240605'
     date_summer_mask = combined_data['dates_spring_all'] == int(date_select)
-    case_tags_select = [f'clear_atm_corr_{n}' for n in range(2, 8)]
-    case_tag_mask = np.array([ct in case_tags_select for ct in combined_data['case_tags_spring_all']])
+    case_tag_select_1 = 'clear_atm_corr_2'
+    case_tag_mask_1 = np.array([case_tag_select_1 in ct for ct in combined_data['case_tags_spring_all']])
+    case_tag_select_2 = 'clear_atm_corr_3'
+    case_tag_mask_2 = np.array([case_tag_select_2 in ct for ct in combined_data['case_tags_spring_all']])
+    case_tag_mask = case_tag_mask_1 | case_tag_mask_2
     final_mask = date_summer_mask & case_tag_mask
     alb_wvl = combined_data['wvl_summer'] if date_select > '20240630' else combined_data['wvl_spring']
     lon_selected_all = combined_data['lon_all_summer'][final_mask] if date_select > '20240630' else combined_data['lon_all_spring'][final_mask]
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # lon_selected_all = lon_selected_all[lat_mask]
@@ -434,7 +360,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -482,11 +408,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=10)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -496,31 +422,35 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
-    ax3.set_ylabel('Broadband Albedo')
-    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_xlabel('Latitude ($\mathrm{^o}$N)', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0605_clear_23_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0605_clear_23_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
-    if maybe_stop():
-        return
+    sys.exit()
     
     #"""
     
+    """
     # 8/15 clear_atm_corr 100 & 3500 m
     date_select = '20240815'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -535,7 +465,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # lon_selected_all = lon_selected_all[lat_mask]
@@ -581,7 +512,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -629,11 +560,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=10)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -643,30 +574,35 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
     ax3.scatter(lat_selected_high_alt, broadband_alb_selected_all_high_alt, label=f'{alt_selected_high_alt_avg:.1f} km', c='b', s=10)
     ax3.scatter(lat_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
-    ax3.set_xlabel(r'Latitude ($\mathrm{^o}$N)')
-    ax3.set_ylabel('Broadband Albedo')
-    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_xlabel('Latitude ($\mathrm{^o}$N)', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0815_clear_12_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0815_clear_12_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     # sys.exit()
     
     #"""
     
+    """
     # 8/15 clear_atm_corr 1.7 & 3.5 km
     date_select = '20240815'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -681,7 +617,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     # lat_mask = (lat_selected_all >= 83.9) & (lat_selected_all <=   85.0)
     # time_selected_all = time_selected_all[lat_mask]
@@ -737,7 +674,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=1.0, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -785,11 +722,11 @@ def combined_atm_corr():
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=10)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     
     ax2.plot(alb_wvl, alb_selected_high_alt_avg, label=f'{alt_selected_high_alt_avg:.1f} km', color='b')
@@ -799,9 +736,10 @@ def combined_atm_corr():
     ax2.fill_between(alb_wvl, alb_selected_low_alt_avg-alb_selected_low_alt_std, alb_selected_low_alt_avg+alb_selected_low_alt_std, 
                     color='r', alpha=0.1)
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2, label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    ax2.legend()#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    ax2.legend(fontsize=10,)#loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
@@ -812,22 +750,25 @@ def combined_atm_corr():
     ax3.scatter(lon_selected_low_alt, broadband_alb_selected_all_low_alt, label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=10)
     # revert x-axis for degrees W
     ax3.set_xlim(np.max(lon_selected_all)*-0.95, np.min(lon_selected_all)*-1.05)
-    ax3.set_xlabel(r'Longitude ($\mathrm{^o}$W)')
-    ax3.set_ylabel('Broadband Albedo')
-    ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_xlabel('Longitude ($\mathrm{^o}$W)', fontsize=14)
+    ax3.set_ylabel('Broadband Albedo', fontsize=14)
+    ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0815_clear_23_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0815_clear_23_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
-    if maybe_stop():
-        return
+    sys.exit()
     
     #"""
     
+    """
     # 0729 clear_sky_spiral_atm_corr
     date_select = '20240729'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -839,7 +780,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     lon_select = []
     lat_select = []
@@ -893,7 +835,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -936,7 +878,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
+    cmap = cm.jet # Or any other built-in colormap like cm.viridis
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -949,11 +891,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=14)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -966,29 +908,34 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)')
-    ax3.set_xlabel('Broadband Albedo')
-    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_ylabel('Altitude (km)', fontsize=14)
+    ax3.set_xlabel('Broadband Albedo', fontsize=14)
+    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0729_clear_spiral_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0729_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     # sys.exit()
     
     #"""
     
+    """
     # 0605 clear_sky_spiral_atm_corr
     date_select = '20240605'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -1000,7 +947,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     lon_select = []
     lat_select = []
@@ -1054,7 +1002,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1097,7 +1045,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
+    cmap = cm.jet # Or any other built-in colormap like cm.viridis
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1110,11 +1058,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=14)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1127,29 +1075,34 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)')
-    ax3.set_xlabel('Broadband Albedo')
-    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_ylabel('Altitude (km)', fontsize=14)
+    ax3.set_xlabel('Broadband Albedo', fontsize=14)
+    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0605_clear_spiral_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0605_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     # sys.exit()
     
     #"""
     
+    """
     # 0611 clear_sky_spiral_atm_corr
     date_select = '20240611'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -1161,7 +1114,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     lon_select = []
     lat_select = []
@@ -1215,7 +1169,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1258,7 +1212,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
+    cmap = cm.jet # Or any other built-in colormap like cm.viridis
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1271,11 +1225,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=14)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1288,29 +1242,34 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)')
-    ax3.set_xlabel('Broadband Albedo')
-    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_ylabel('Altitude (km)', fontsize=14)
+    ax3.set_xlabel('Broadband Albedo', fontsize=14)
+    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0611_clear_spiral_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0611_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
     # sys.exit()
     
     #"""
     
+    """
     # 0730 clear_sky_spiral_atm_corr
     date_select = '20240730'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -1322,7 +1281,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     lon_select = []
     lat_select = []
@@ -1376,7 +1336,7 @@ def combined_atm_corr():
     
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
+    fig = plt.figure(figsize=(16, 10))
     gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
     ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
     ax2 = fig.add_subplot(gs1[0, 3:])
@@ -1419,7 +1379,7 @@ def combined_atm_corr():
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
     norm = mcolors.Normalize(vmin=data_min, vmax=data_max)
-    cmap = cm.cividis # perceptually uniform, colorblind-safe (GRL)
+    cmap = cm.jet # Or any other built-in colormap like cm.viridis
     s_m = cm.ScalarMappable(norm=norm, cmap=cmap)
     color_series = s_m.to_rgba(np.arange(len(alt_select_avg)))
     
@@ -1432,11 +1392,11 @@ def combined_atm_corr():
 
     
     # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(fontsize=14)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
-    ax1.set_xlabel('Longitude')
-    ax1.set_ylabel('Latitude')
+    ax1.set_xlabel('Longitude', fontsize=14)
+    ax1.set_ylabel('Latitude', fontsize=14)
     
     for i in range(len(alb_select_avg)):
         alt_avg = alt_select_avg[i]
@@ -1449,30 +1409,34 @@ def combined_atm_corr():
         
     
     ax2.fill_between(alb_wvl, -0.05, 1.05, where=np.isnan(eff_alb_), color='gray', alpha=0.2,)#  label='Mask Gas absorption bands')
-    ax2.set_xlabel('Wavelength (nm)')
-    ax2.set_ylabel('Surface Albedo')
-    # ax2.legend(loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.set_xlabel('Wavelength (nm)', fontsize=14)
+    ax2.set_ylabel('Surface Albedo', fontsize=14)
+    # ax2.legend(fontsize=14, loc='center left', bbox_to_anchor=(1.02, -0.1))
+    ax2.tick_params(labelsize=12)
     ax2.set_ylim(-0.05, 1.05)
     ax2.hlines(0, 350, 2000, colors='k', linestyles='dashed', linewidth=1)
     ax2.set_xlim(350, 2000)
     
 
-    ax3.set_ylabel('Altitude (km)')
-    ax3.set_xlabel('Broadband Albedo')
-    # ax3.legend()# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.set_ylabel('Altitude (km)', fontsize=14)
+    ax3.set_xlabel('Broadband Albedo', fontsize=14)
+    # ax3.legend(fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
+    ax3.tick_params(labelsize=12)
     
     for ax, ax_num in zip([ax1, ax2, ax3], ['a', 'b', 'c']):
-        add_panel_label(ax, f'({ax_num})')
+        ax.text(0.01, 1.05, f'({ax_num})', transform=ax.transAxes,
+                fontsize=16, fontweight='bold', va='center', ha='left')
+        ax.tick_params(labelsize=12, which='both')
     
     
     fig.tight_layout()
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_0730_clear_spiral_summary')
+    fig.savefig(f'{fig_dir}/arcsix_albedo_0730_clear_spiral_summary.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
-    if maybe_stop():
-        return
+    sys.exit()
     
     #"""
     
+    """
     # 7/30 clear_atm_corr 
     date_select = '20240730'
     date_summer_mask = combined_data['dates_summer_all'] == int(date_select) if date_select > '20240630' else combined_data['dates_spring_all'] == int(date_select)
@@ -1487,7 +1451,8 @@ def combined_atm_corr():
     lat_selected_all = combined_data['lat_all_summer'][final_mask] if date_select > '20240630' else combined_data['lat_all_spring'][final_mask]
     alt_selected_all = combined_data['alt_all_summer'][final_mask] if date_select > '20240630' else combined_data['alt_all_spring'][final_mask]
     time_selected_all = combined_data['time_summer_all'][final_mask] if date_select > '20240630' else combined_data['time_spring_all'][final_mask]
-    alb_selected_all, broadband_alb_selected_all = one_second_albedo_arrays(combined_data, date_select, final_mask)
+    alb_selected_all = combined_data['alb_iter2_all_summer'][final_mask, :] if date_select > '20240630' else combined_data['alb_iter2_all_spring'][final_mask, :]
+    broadband_alb_selected_all = combined_data['broadband_alb_iter2_all_filter_summer'][final_mask] if date_select > '20240630' else combined_data['broadband_alb_iter2_all_filter_spring'][final_mask]
     
     
     time_mask = (time_selected_all >= 14.726) & (time_selected_all <= 14.936)
@@ -1642,18 +1607,17 @@ def combined_atm_corr():
 
         # scatter the flight-leg centers (and all points) using PlateCarree transform
         # color by broadband surface albedo from iteration 2 if available
-        color_vals = np.array(broadband_alb_iter2_all_spring[date_mask]) if 'broadband_alb_iter2_all_spring' in globals() else None
+        color_vals = np.array(broadband_alb_iter2_all_spring[date_mask]) if 'broadband_alb_iter2_spring' in locals() else None
         if color_vals is None or np.all(np.isnan(color_vals)):
-            sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+            sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
         else:
-            vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_spring[date_mask], lat_all_spring[date_mask], s=5, c=color_vals, cmap='jet',
-                            transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                            transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
             cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
         # also plot all sampled points along legs (optional, lighter marker)
-        if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+        if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
             ax.scatter(lon_all, lat_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
         ax.set_title(f'Polar projection (North) - Spring Flight {date}', fontsize=12)
@@ -1699,18 +1663,17 @@ def combined_atm_corr():
 
         # scatter the flight-leg centers (and all points) using PlateCarree transform
         # color by broadband surface albedo from iteration 2 if available
-        color_vals = np.array(broadband_alb_iter2_all_summer[date_mask]) if 'broadband_alb_iter2_all_summer' in globals() else None
+        color_vals = np.array(broadband_alb_iter2_all_summer[date_mask]) if 'broadband_alb_iter2_summer' in locals() else None
         if color_vals is None or np.all(np.isnan(color_vals)):
-            sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+            sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
         else:
-            vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
             sc = ax.scatter(lon_all_summer[date_mask], lat_all_summer[date_mask], s=5, c=color_vals, cmap='jet',
-                            transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                            transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+            cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
             cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
         # also plot all sampled points along legs (optional, lighter marker)
-        if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+        if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
             ax.scatter(lon_all, lat_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
         ax.set_title(f'Polar projection (North) - Summer Flight {date}', fontsize=12)
@@ -1754,23 +1717,17 @@ def combined_atm_corr():
 
     # scatter the flight-leg centers (and all points) using PlateCarree transform
     # color by broadband surface albedo from iteration 2 if available
-    color_vals = (
-        np.array(broadband_alb_iter2_spring)
-        if 'broadband_alb_iter2_spring' in globals()
-        and len(broadband_alb_iter2_spring) == len(lon_avg_spring)
-        else None
-    )
+    color_vals = np.array(broadband_alb_iter2_spring) if 'broadband_alb_iter2_spring' in locals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+        sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
     else:
-        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_spring, lat_avg_spring, s=5, c=color_vals, cmap='jet',
-                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
-    if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+    if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
         ax.scatter(lon_avg_all, lat_avg_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
     ax.set_title(f'Polar projection (North) - Spring Flight legs', fontsize=12)
@@ -1814,23 +1771,17 @@ def combined_atm_corr():
 
     # scatter the flight-leg centers (and all points) using PlateCarree transform
     # color by broadband surface albedo from iteration 2 if available
-    color_vals = (
-        np.array(broadband_alb_iter2_summer)
-        if 'broadband_alb_iter2_summer' in globals()
-        and len(broadband_alb_iter2_summer) == len(lon_avg_summer)
-        else None
-    )
+    color_vals = np.array(broadband_alb_iter2_summer) if 'broadband_alb_iter2_summer' in locals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+        sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
     else:
-        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_avg_summer, lat_avg_summer, s=5, c=color_vals, cmap='jet',
-                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
-    if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+    if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
         ax.scatter(lon_avg_all, lat_avg_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
     ax.set_title(f'Polar projection (North) - Summer Flight legs', fontsize=12)
@@ -1875,18 +1826,17 @@ def combined_atm_corr():
 
     # scatter the flight-leg centers (and all points) using PlateCarree transform
     # color by broadband surface albedo from iteration 2 if available
-    color_vals = np.array(broadband_alb_iter2_all_spring) if 'broadband_alb_iter2_all_spring' in globals() else None
+    color_vals = np.array(broadband_alb_iter2_all_spring) if 'broadband_alb_iter2_all_spring' in locals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+        sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
     else:
-        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_spring, lat_all_spring, s=5, c=color_vals, cmap='jet',
-                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
-    if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+    if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
         ax.scatter(lon_all, lat_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
     ax.set_title(f'Polar projection (North) - Spring Flight legs', fontsize=12)
@@ -1930,18 +1880,17 @@ def combined_atm_corr():
 
     # scatter the flight-leg centers (and all points) using PlateCarree transform
     # color by broadband surface albedo from iteration 2 if available
-    color_vals = np.array(broadband_alb_iter2_all_summer) if 'broadband_alb_iter2_all_summer' in globals() else None
+    color_vals = np.array(broadband_alb_iter2_all_summer) if 'broadband_alb_iter2_all_summer' in locals() else None
     if color_vals is None or np.all(np.isnan(color_vals)):
-        sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=BROADBAND_ALBEDO_COLOR_LIMITS[0], vmax=BROADBAND_ALBEDO_COLOR_LIMITS[1], label='Flight legs')
+        sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c='red', transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1, label='Flight legs')
     else:
-        vmin, vmax = BROADBAND_ALBEDO_COLOR_LIMITS
         sc = ax.scatter(lon_all_summer, lat_all_summer, s=5, c=color_vals, cmap='jet',
-                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=vmin, vmax=vmax)
-        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.63)
+                        transform=ccrs.PlateCarree(), zorder=3, edgecolor=None, vmin=0.1, vmax=1)
+        cbar = fig.colorbar(sc, ax=ax, orientation='vertical', pad=0.02, shrink=0.7)
         cbar.set_label('Broadband Albedo (atm corr + fit)', fontsize=10)
 
     # also plot all sampled points along legs (optional, lighter marker)
-    if 'lon_all' in globals() and 'lat_all' in globals() and len(lon_all) > 0:
+    if 'lon_all' in locals() and 'lat_all' in locals() and len(lon_all) > 0:
         ax.scatter(lon_all, lat_all, s=6, c='gray', alpha=0.5, transform=ccrs.PlateCarree(), zorder=2)
 
     ax.set_title(f'Polar projection (North) - Summer Flight legs', fontsize=12)

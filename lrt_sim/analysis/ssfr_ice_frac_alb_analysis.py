@@ -34,6 +34,7 @@ import pickle
 from dataclasses import dataclass
 from pathlib import Path
 import logging
+import warnings
 from typing import Optional
 import h5py
 from netCDF4 import Dataset
@@ -143,6 +144,56 @@ def linear_regression_with_confidence(x, y, confidence=0.95):
     
     return x_sorted, y_pred, lower_bound, upper_bound, res
 
+
+def plot_sif_fit_panel(ax, cam_ice, bb_alb, scatter_size=4, legend_fontsize=6,
+                       legend_loc='upper left', note=None):
+    """Draw the albedo vs sea-ice-fraction fit panel on *ax*.
+
+    Same construction as panel (b) of the Aug-1 manuscript figure: the 5th-95th
+    quantile-regression band, the black scatter, and the red dashed OLS line
+    whose legend carries the fit equation and R^2. The band is evaluated on
+    sorted x so the envelope is smooth rather than the zigzag an unsorted
+    ``fill_between`` produces.
+
+    ``legend_fontsize=None`` skips the legend, for grids where the equation is
+    written as in-panel text instead. *note* goes in the lower right, e.g. to
+    flag legs whose SIF=1 end member comes from the high-SIF mean, not this fit.
+
+    Returns the ``linregress`` result, or ``None`` where the leg has fewer than
+    three finite pairs or no spread in sea-ice fraction to regress against.
+    """
+    cam_ice = np.asarray(cam_ice, dtype=float)
+    bb_alb  = np.asarray(bb_alb,  dtype=float)
+    m = np.isfinite(cam_ice) & np.isfinite(bb_alb)
+    if np.sum(m) < 3 or np.unique(cam_ice[m]).size < 2:
+        return None
+    x, y     = cam_ice[m], bb_alb[m]
+    x_sorted = np.sort(x)
+    X, X_sorted = sm.add_constant(x), sm.add_constant(x_sorted)
+    try:
+        ax.fill_between(x_sorted,
+                        sm.QuantReg(y, X).fit(q=0.05).predict(X_sorted),
+                        sm.QuantReg(y, X).fit(q=0.95).predict(X_sorted),
+                        color='coral', alpha=0.3, lw=0, zorder=1,
+                        label='Quantile Regression (5th-95th)')
+    except (ValueError, np.linalg.LinAlgError):   # quantile fit failed to converge
+        pass
+    ax.scatter(x, y, s=scatter_size, c='k', alpha=0.6, zorder=2)
+    res = linregress(x, y)
+    ax.plot(x_sorted, res.slope * x_sorted + res.intercept,
+            color='red', linestyle='--', zorder=3,
+            label=r'Linear Fit: y=%.2fx%+.2f, $\mathrm{R^2}$=%.2f'
+                  % (res.slope, res.intercept, res.rvalue ** 2))
+    # lower left: the legs that carry a note are exactly those whose points pile
+    # up at high sea-ice fraction, so this corner is empty for them
+    if note is not None:
+        ax.text(0.03, 0.03, note, transform=ax.transAxes, fontsize=5,
+                va='bottom', ha='left', color='0.35')
+    if legend_fontsize is not None:
+        ax.legend(fontsize=legend_fontsize, loc=legend_loc, framealpha=0.85)
+    return res
+
+
 def analyze_ice_frac_alb(alb_product='native'):
     log = logging.getLogger("atm corr combined")
 
@@ -198,6 +249,9 @@ def analyze_ice_frac_alb(alb_product='native'):
     
 
     date_conditions = []
+    sif1_audit = []               # per-leg ice/snow end-member gate diagnostics
+    sif_fit_legs = []             # (leg, cam SIF, broadband alb, is_high_sif_mean) for the all-leg overview
+    era5_date_cond = []           # per-leg collocated ERA5 broadband albedo
     broadband_alb_date_cond = []
     broadband_alb_date_cond_upper = []
     broadband_alb_date_cond_lower = []
@@ -274,6 +328,17 @@ def analyze_ice_frac_alb(alb_product='native'):
 
 
     
+    # --- ice/snow end-member (SIF=1) retrieval settings ---------------------
+    # The albedo at sea-ice fraction = 1 is normally the OLS extrapolation of the
+    # albedo-vs-camera-SIF fit. Over legs where the camera SIF barely varies the
+    # extrapolation is unconstrained (2024-05-28 spans 0.03 in SIF and fits a
+    # slope of -1.58 at 500 nm), so those legs fall back to the mean of the
+    # high-SIF points instead. Both conditions must hold to trigger the fallback.
+    _SIF1_SPREAD_MIN_ = 0.10   # p95-p5 camera SIF spread
+    _SIF1_R2_MIN_     = 0.50   # r^2 of the broadband albedo vs SIF fit
+    _SIF1_HIGH_       = 0.98   # SIF above which a point is treated as all ice/snow
+    _SIF1_HIGH_N_MIN_ = 3      # minimum high-SIF points needed for the fallback
+
     def _ice_weighted_mean_std(values, weights):
         """Ice-ratio weighted mean and standard deviation."""
         total_w = np.nansum(weights) + 1e-8
@@ -281,19 +346,79 @@ def analyze_ice_frac_alb(alb_product='native'):
         std  = np.sqrt(np.nansum(((values - mean) ** 2) * weights) / total_w)
         return mean, std
 
-    def _append_stats(lst, lst_lo, lst_hi, arr, lo=10, hi=90):
-        """Append median, lo-th and hi-th percentile of finite values."""
+    def _append_stats(lst, lst_lo, lst_hi, arr, lo=5, hi=95):
+        """Append median, lo-th and hi-th percentile of finite values.
+
+        5th/95th to match the quantile-regression interval of the SIF=1
+        end member (_alb_at_sif1), so x and y error bars share one convention.
+        """
         v = arr[np.isfinite(arr)]
         lst.append(   np.median(v)       if len(v) > 0 else np.nan)
         lst_lo.append(np.percentile(v, lo) if len(v) > 0 else np.nan)
         lst_hi.append(np.percentile(v, hi) if len(v) > 0 else np.nan)
 
-    def _fit_wvl_icefraction(alb_wvl, cam_ice_frac, alb_cam, prefix, date_label):
+    def _alb_at_sif1(ice_frac, alb_arr, clip=True, method=None):
+        """Ice/snow end-member albedo at sea-ice fraction = 1.
+
+        Returns ``(med, lo, hi, info)``. By default the value is the OLS
+        extrapolation to SIF=1 with 5th/95th quantile-regression predictions as
+        bounds. Where the leg's SIF spread and fit quality both fall below
+        ``_SIF1_SPREAD_MIN_`` / ``_SIF1_R2_MIN_`` the extrapolation is a leverage
+        artifact, so the mean of the SIF > ``_SIF1_HIGH_`` points is reported
+        instead, bounded by their 5th/95th percentiles.
+
+        Pass *method* (``'fit'`` or ``'high_sif_mean'``) to force the choice made
+        for the broadband fit onto the other SIF=1 quantities of the same leg, so
+        they stay mutually consistent. *info* carries the audit diagnostics.
+        """
+        info = dict(method='none', n=0, n_high=0, spread=np.nan, r2=np.nan,
+                    sif_min=np.nan, sif_max=np.nan, alb_fit=np.nan, alb_high=np.nan)
+        vmask = np.isfinite(ice_frac) & np.isfinite(alb_arr)
+        if np.sum(vmask) < 3:
+            return np.nan, np.nan, np.nan, info
+        x, y = ice_frac[vmask], alb_arr[vmask]
+        _, _, _, _, r = linear_regression_with_confidence(x, y, confidence=0.95)
+        high = x > _SIF1_HIGH_
+        info.update(n=int(x.size), n_high=int(high.sum()),
+                    spread=float(np.percentile(x, 95) - np.percentile(x, 5)),
+                    r2=float(r.rvalue ** 2), sif_min=float(x.min()), sif_max=float(x.max()),
+                    alb_fit=float(r.intercept + r.slope),
+                    alb_high=float(np.mean(y[high])) if high.any() else np.nan)
+
+        if method is None:
+            method = ('high_sif_mean'
+                      if (info['spread'] < _SIF1_SPREAD_MIN_ and info['r2'] < _SIF1_R2_MIN_
+                          and info['n_high'] >= _SIF1_HIGH_N_MIN_)
+                      else 'fit')
+        # a forced fallback still needs enough high-SIF points to average over
+        if method == 'high_sif_mean' and info['n_high'] < _SIF1_HIGH_N_MIN_:
+            method = 'fit'
+        info['method'] = method
+
+        if method == 'high_sif_mean':
+            med = info['alb_high']
+            lo, hi = np.percentile(y[high], [5, 95])
+        else:
+            med = info['alb_fit']
+            X   = sm.add_constant(x)
+            lo  = sm.QuantReg(y, X).fit(q=0.05).predict([1.0, 1.0])[0]
+            hi  = sm.QuantReg(y, X).fit(q=0.95).predict([1.0, 1.0])[0]
+        if clip:
+            med, lo, hi = (np.clip(v, 1e-6, 1.0) for v in (med, lo, hi))
+        return med, lo, hi, info
+
+    def _fit_wvl_icefraction(alb_wvl, cam_ice_frac, alb_cam, prefix, date_label,
+                             method='fit'):
         """Per-wavelength linear fit of albedo vs camera ice fraction.
 
         Writes ``{prefix}_wvl_icefraction_fit.csv`` (wvl, slope, intercept=SIF=0,
-        r2, alb_sif1=extrapolated to SIF=1) and the companion intercept/SIF=1
-        spectra figure. Returns (slope, intercept, r2, alb_sif1) arrays for reuse.
+        r2, alb_sif1=ice/snow end member at SIF=1) and the companion
+        intercept/SIF=1 spectra figure. Returns (slope, intercept, r2, alb_sif1)
+        arrays for reuse.
+
+        *method* comes from the leg's broadband gate (see ``_alb_at_sif1``):
+        ``'fit'`` extrapolates the per-wavelength regression to SIF=1,
+        ``'high_sif_mean'`` averages the SIF > ``_SIF1_HIGH_`` spectra instead.
         """
         wvl_slope     = np.full_like(alb_wvl, np.nan, dtype=float)
         wvl_intercept = np.full_like(alb_wvl, np.nan, dtype=float)   # albedo at SIF=0
@@ -307,14 +432,22 @@ def analyze_ice_frac_alb(alb_product='native'):
                 wvl_intercept[i] = res_i.intercept
                 wvl_r2[i]        = res_i.rvalue ** 2
                 wvl_pval[i]      = res_i.pvalue
-        wvl_alb_sif1 = wvl_intercept + wvl_slope   # extrapolated to SIF=1
+        high = np.isfinite(cam_ice_frac) & (cam_ice_frac > _SIF1_HIGH_)
+        if method == 'high_sif_mean' and high.sum() >= _SIF1_HIGH_N_MIN_:
+            with warnings.catch_warnings():        # all-NaN wavelengths are expected
+                warnings.simplefilter('ignore', category=RuntimeWarning)
+                wvl_alb_sif1 = np.nanmean(alb_cam[high, :], axis=0)
+        else:
+            method = 'fit'
+            wvl_alb_sif1 = wvl_intercept + wvl_slope   # extrapolated to SIF=1
         pd.DataFrame({
             'wvl_nm':    alb_wvl,
             'slope':     wvl_slope,
             'intercept': wvl_intercept,   # albedo at SIF=0
             'r2':        wvl_r2,
             'pval':      wvl_pval,
-            'alb_sif1':  wvl_alb_sif1,     # albedo extrapolated to SIF=1
+            'alb_sif1':  wvl_alb_sif1,     # ice/snow end member at SIF=1
+            'alb_sif1_method': method,     # 'fit' or 'high_sif_mean'
         }).to_csv(f'{wvl_fit_dir}/{prefix}_wvl_icefraction_fit.csv', index=False)
 
         # spectrum-average R2 and p value over non-gas-band wavelengths
@@ -328,11 +461,13 @@ def analyze_ice_frac_alb(alb_product='native'):
         mean_r2 = np.nanmean(wvl_r2[avg_mask])  if np.any(avg_mask) else np.nan
         mean_p  = np.nanmean(wvl_pval[avg_mask]) if np.any(avg_mask) else np.nan
 
-        # intercept (SIF=0) and extrapolated (SIF=1) albedo spectra in one figure
+        # intercept (SIF=0) and ice/snow end-member (SIF=1) albedo spectra in one figure
+        sif1_label = ('Extrapolated (sea ice fraction = 1)' if method == 'fit' else
+                      f'Mean of sea ice fraction > {_SIF1_HIGH_:.2f} (n={int(high.sum())})')
         plt.close('all')
         fig, ax = plt.subplots(figsize=(9, 5))
         ax.plot(alb_wvl, wvl_intercept, color='b', label='Intercept (sea ice fraction = 0)')
-        ax.plot(alb_wvl, wvl_alb_sif1,  color='r', label='Extrapolated (sea ice fraction = 1)')
+        ax.plot(alb_wvl, wvl_alb_sif1,  color='r', label=sif1_label)
         for band in gas_bands:
             ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
         ax.set_xlabel('Wavelength (nm)', fontsize=14)
@@ -385,6 +520,7 @@ def analyze_ice_frac_alb(alb_product='native'):
             nad_hdrf_selected_all = combined_data[f'nad_hdrf_{sfx}_all'][final_mask] if f'nad_hdrf_{sfx}_all' in combined_data else np.full(n_pts, np.nan)
             nad_rad_selected_all  = combined_data[f'nad_rad_{sfx}_all'][final_mask]  if f'nad_rad_{sfx}_all'  in combined_data else np.full(n_pts, np.nan)
             sza_selected_all     = combined_data[f'sza_{sfx}_all'][final_mask]
+            era5_selected_all    = combined_data[f'era5_alb_{sfx}_all'][final_mask]
             brt19h_selected_all  = combined_data[f'brt19h_{sfx}_all'][final_mask]
             brt37h_selected_all  = combined_data[f'brt37h_{sfx}_all'][final_mask]
             brt37v_selected_all  = combined_data[f'brt37v_{sfx}_all'][final_mask]
@@ -428,6 +564,7 @@ def analyze_ice_frac_alb(alb_product='native'):
             grain_size_ratio_1650_1020_selected_all = grain_size_ratio_1650_1020_selected_all[alt_mask]
             grain_size_1240_selected_all = grain_size_1240_selected_all[alt_mask]
             sza_selected_all             = sza_selected_all[alt_mask]
+            era5_selected_all            = era5_selected_all[alt_mask]
 
             # Interpolate spectral albedo to 1700 nm and 1240 nm
             def _interp_alb_to_wvl(alb_arr, wvl_arr, target_nm):
@@ -483,6 +620,7 @@ def analyze_ice_frac_alb(alb_product='native'):
             grain_size_ratio_1650_1020_cam_time = np.where(m, grain_size_ratio_1650_1020_selected_all[closest_idx], np.nan)
             grain_size_1240_cam_time            = np.where(m, grain_size_1240_selected_all[closest_idx],            np.nan)
             sza_cam_time                        = np.where(m, sza_selected_all[closest_idx],                        np.nan)
+            era5_cam_time                       = np.where(m, era5_selected_all[closest_idx],                       np.nan)
             alb_1700_cam_time = np.where(m, alb_1700_selected_all[closest_idx], np.nan)
             alb_1240_cam_time = np.where(m, alb_1240_selected_all[closest_idx], np.nan)
             alb_1280_cam_time = np.where(m, alb_1280_selected_all[closest_idx], np.nan)
@@ -494,7 +632,10 @@ def analyze_ice_frac_alb(alb_product='native'):
             alb_cam_time = np.where(m[:, np.newaxis], alb_selected_all[closest_idx], np.nan)
 
 
-            fig, (ax, axr) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.3})
+            # fig_bb, not fig: the KT19 diagnostics below rebind `fig` many times,
+            # so a plain `fig` here would make the save at the end of the leg write
+            # out whichever figure happened to be created last.
+            fig_bb, (ax, axr) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.3})
             ax2 = ax.twinx()
             l1 = ax.plot(time_selected_all, broadband_alb_selected_all, c='skyblue', label='Broadband Albedo', alpha=0.75, linewidth=2)
             l2 = ax2.plot(cam_time, cam_ice_fraction, c='coral', label='Camera Ice Fraction', alpha=0.75, linewidth=1.5)
@@ -510,25 +651,39 @@ def analyze_ice_frac_alb(alb_product='native'):
             # ax.set_xlim(350, 2000)
         
             cc = axr.scatter(cam_ice_fraction, broadband_alb_cam_time, c=myi_cam_time, alpha=0.6, cmap='jet', vmin=0, vmax=100)
-            cbar = fig.colorbar(cc, ax=axr)
+            cbar = fig_bb.colorbar(cc, ax=axr)
             cbar.set_label('Multi-year sea ice ratio (%)', fontsize=12)
             # calculate slope and correlation coefficient
             valid_mask = ~np.isnan(cam_ice_fraction) & ~np.isnan(broadband_alb_cam_time)
             if np.sum(valid_mask) > 2:
+                # Ice/snow end member for this leg. The broadband gate decides once
+                # whether the SIF=1 value is the fit extrapolation or the high-SIF
+                # mean; every other SIF=1 quantity below reuses that decision.
+                broadband_alb_at_1, broadband_alb_at_1_lower, broadband_alb_at_1_upper, sif1_info = \
+                    _alb_at_sif1(cam_ice_fraction, broadband_alb_cam_time, clip=False)
+                sif1_method = sif1_info['method']
+                sif1_audit.append(dict(leg=f'{date_key}_{case_tag}', **sif1_info))
+
                 # per-wavelength fit + CSV + intercept/SIF=1 spectra figure for this case
                 _fit_wvl_icefraction(alb_wvl, cam_ice_fraction, alb_cam_time,
-                                     f'arcsix_albedo_{date_key}_{case_tag}', f'{date_key} {case_tag}')
+                                     f'arcsix_albedo_{date_key}_{case_tag}', f'{date_key} {case_tag}',
+                                     method=sif1_method)
                 x_sorted, y_pred, lower_bound, upper_bound, res = linear_regression_with_confidence(
                     cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], confidence=0.95)
-                axr.plot(x_sorted, y_pred, color='orange', linestyle='--', label=r'Fit: y=%.2fx+%.2f\n$\mathrm{R^2}$=%.2f' %(res.slope, res.intercept, res.rvalue**2))
+                axr.plot(x_sorted, y_pred, color='orange', linestyle='--',
+                         label='Fit: y=%.2fx+%.2f\n' r'$\mathrm{R^2}$=%.2f'
+                               % (res.slope, res.intercept, res.rvalue**2))
                 intercept = res.intercept
                 slope = res.slope
                 axr.legend(fontsize=10)
 
                 date_conditions.append(f'{date_key}_{case_tag}')
-                broadband_alb_date_cond.append(intercept + slope * 1.0)  # ice fraction = 1.0
-                
-                
+                broadband_alb_date_cond.append(broadband_alb_at_1)  # ice fraction = 1.0
+                # collocated ERA5 albedo over the same camera-matched points, for the
+                # end-member comparison against Di Biagio et al. (2021, their Fig 2b)
+                era5_date_cond.append(np.nanmean(era5_cam_time[valid_mask]))
+
+
                 X_fit = sm.add_constant(cam_ice_fraction[valid_mask])
                 quantiles = [0.05, 0.5, 0.95]
                 models = {}
@@ -539,18 +694,43 @@ def analyze_ice_frac_alb(alb_product='native'):
                     res = mod.fit(q=q)
                     models[q] = res
                     
-                y_fit_05 = models[0.05].predict(X_fit)
-                y_fit_50 = models[0.5].predict(X_fit)
-                y_fit_95 = models[0.95].predict(X_fit)
-                
-                # axr.plot(cam_ice_fraction[valid_mask], y_fit_50, color='orange', linestyle='--', label='Quantile Reg (50th)')
-                axr.fill_between(cam_ice_fraction[valid_mask], y_fit_05, y_fit_95, color='orange', alpha=0.2, label='Quantile Regression (5th-95th)')
+                # sorted in x, otherwise fill_between traces the points in time
+                # order and draws a zigzag instead of the quantile envelope
+                q_order  = np.argsort(cam_ice_fraction[valid_mask])
+                x_q      = cam_ice_fraction[valid_mask][q_order]
+                y_fit_05 = models[0.05].predict(X_fit)[q_order]
+                y_fit_50 = models[0.5].predict(X_fit)[q_order]
+                y_fit_95 = models[0.95].predict(X_fit)[q_order]
+
+                # axr.plot(x_q, y_fit_50, color='orange', linestyle='--', label='Quantile Reg (50th)')
+                axr.fill_between(x_q, y_fit_05, y_fit_95, color='orange', alpha=0.2, label='Quantile Regression (5th-95th)')
                 axr.legend(fontsize=10)
-                    
-                # broadband_alb_at_1       = models[0.5].predict([1.0, 1.0])[0]
-                broadband_alb_at_1       = intercept + slope * 1.0
-                broadband_alb_at_1_upper = models[0.95].predict([1.0, 1.0])[0]
-                broadband_alb_at_1_lower = models[0.05].predict([1.0, 1.0])[0]
+
+                # --- panel-(b)-style standalone fit figure for this leg -------
+                # One per leg of the SIF=1 summary, so every end member there can
+                # be traced back to the fit (and the scatter) it came from.
+                is_high_sif_mean = (sif1_method == 'high_sif_mean')
+                fig_fit, ax_fit = plt.subplots(
+                    figsize=figsize_mm(COLUMN_WIDTH_MM, COLUMN_WIDTH_MM * 0.8))
+                plot_sif_fit_panel(
+                    ax_fit, cam_ice_fraction, broadband_alb_cam_time,
+                    note=(f'SIF=1 end member: mean of SIF > {_SIF1_HIGH_:.2f}'
+                          if is_high_sif_mean else None))
+                ax_fit.set_xlabel('Camera Sea Ice Fraction')
+                ax_fit.set_ylabel('Broadband Albedo')
+                ax_fit.set_title(f'{date_key} {case_tag}')
+                save_grl(fig_fit,
+                         f'{fig_dir}/arcsix_albedo_{date_key}_{case_tag}_broadband_icefraction_fit')
+                plt.close(fig_fit)
+                sif_fit_legs.append((f'{date_key}_{case_tag}',
+                                     np.asarray(cam_ice_fraction, dtype=float).copy(),
+                                     np.asarray(broadband_alb_cam_time, dtype=float).copy(),
+                                     is_high_sif_mean))
+
+
+                # broadband_alb_at_1 and its bounds come from _alb_at_sif1 above:
+                # fit extrapolation + quantile-regression bounds at SIF=1, or the
+                # high-SIF mean + its 5th/95th percentiles where the gate trips.
                 broadband_alb_date_cond_upper.append(broadband_alb_at_1_upper)
                 broadband_alb_date_cond_lower.append(broadband_alb_at_1_lower)
                 broadband_alb_date_cond_unc.append((broadband_alb_at_1_upper - broadband_alb_at_1_lower) / 2)
@@ -596,8 +776,8 @@ def analyze_ice_frac_alb(alb_product='native'):
                     mean_lst.append(mean_)
                     std_lst.append(std_)
                 v_myi = myi_v[np.isfinite(myi_v)]
-                myi_ratio_date_cond_lower.append(np.percentile(v_myi, 10) if len(v_myi) > 0 else np.nan)
-                myi_ratio_date_cond_upper.append(np.percentile(v_myi, 90) if len(v_myi) > 0 else np.nan)
+                myi_ratio_date_cond_lower.append(np.percentile(v_myi,  5) if len(v_myi) > 0 else np.nan)
+                myi_ratio_date_cond_upper.append(np.percentile(v_myi, 95) if len(v_myi) > 0 else np.nan)
 
                 # Percentile stats (median, 10th, 90th) for remaining variables
                 _append_stats(myi_fyi_ratio_date_cond, myi_fyi_ratio_date_cond_lower,
@@ -759,36 +939,13 @@ def analyze_ice_frac_alb(alb_product='native'):
                 # grain_size_date_cond, grain_size_ratio_*, grain_size_1240_date_cond
                 # are computed from albedo at SIF=1 below and appended there
 
-                # --- grain size from regressed spectral albedo at ice fraction = 1 ---
-                # Linear regression at 1700 nm for median; quantile regression for bounds
-                valid_1700 = ~np.isnan(cam_ice_fraction) & ~np.isnan(alb_1700_cam_time)
-                if np.sum(valid_1700) > 2:
-                    _, _, _, _, res_1700 = linear_regression_with_confidence(
-                        cam_ice_fraction[valid_1700], alb_1700_cam_time[valid_1700], confidence=0.95)
-                    alb_1700_at_1 = np.clip(res_1700.intercept + res_1700.slope * 1.0, 1e-6, 1.0)
-                    X_fit_1700 = sm.add_constant(cam_ice_fraction[valid_1700])
-                    models_1700 = {}
-                    for q in [0.05, 0.95]:
-                        models_1700[q] = sm.QuantReg(alb_1700_cam_time[valid_1700], X_fit_1700).fit(q=q)
-                    alb_1700_at_1_lo = np.clip(models_1700[0.05].predict([1.0, 1.0])[0], 1e-6, 1.0)
-                    alb_1700_at_1_hi = np.clip(models_1700[0.95].predict([1.0, 1.0])[0], 1e-6, 1.0)
-                else:
-                    alb_1700_at_1 = alb_1700_at_1_lo = alb_1700_at_1_hi = np.nan
-
-                # Linear regression at 1240 nm for median; quantile regression for bounds
-                valid_1240 = ~np.isnan(cam_ice_fraction) & ~np.isnan(alb_1240_cam_time)
-                if np.sum(valid_1240) > 2:
-                    _, _, _, _, res_1240 = linear_regression_with_confidence(
-                        cam_ice_fraction[valid_1240], alb_1240_cam_time[valid_1240], confidence=0.95)
-                    alb_1240_at_1 = np.clip(res_1240.intercept + res_1240.slope * 1.0, 1e-6, 1.0)
-                    X_fit_1240 = sm.add_constant(cam_ice_fraction[valid_1240])
-                    models_1240 = {}
-                    for q in [0.05, 0.95]:
-                        models_1240[q] = sm.QuantReg(alb_1240_cam_time[valid_1240], X_fit_1240).fit(q=q)
-                    alb_1240_at_1_lo = np.clip(models_1240[0.05].predict([1.0, 1.0])[0], 1e-6, 1.0)
-                    alb_1240_at_1_hi = np.clip(models_1240[0.95].predict([1.0, 1.0])[0], 1e-6, 1.0)
-                else:
-                    alb_1240_at_1 = alb_1240_at_1_lo = alb_1240_at_1_hi = np.nan
+                # --- grain size from spectral albedo at ice fraction = 1 ---
+                # Same end-member gate as the broadband value (see _alb_at_sif1),
+                # so grain size and broadband albedo describe the same surface.
+                alb_1700_at_1, alb_1700_at_1_lo, alb_1700_at_1_hi, _ = _alb_at_sif1(
+                    cam_ice_fraction, alb_1700_cam_time, method=sif1_method)
+                alb_1240_at_1, alb_1240_at_1_lo, alb_1240_at_1_hi, _ = _alb_at_sif1(
+                    cam_ice_fraction, alb_1240_cam_time, method=sif1_method)
 
                 # χ(T) at retrieval wavelength using median KT19 temperature
                 T_K_med = np.clip(np.nanmedian(kt19_v) + 273.15 if np.any(np.isfinite(kt19_v)) else 266.0,
@@ -843,16 +1000,8 @@ def analyze_ice_frac_alb(alb_product='native'):
 
                 # --- ratio-method grain sizes from regressed albedo at SIF=1 ---
                 def _linreg_alb_at_1(ice_frac, alb_arr):
-                    """Return (med, lo, hi) albedo at ice_fraction=1 via lin+quantile reg."""
-                    vmask = ~np.isnan(ice_frac) & ~np.isnan(alb_arr)
-                    if np.sum(vmask) < 3:
-                        return np.nan, np.nan, np.nan
-                    _, _, _, _, r = linear_regression_with_confidence(
-                        ice_frac[vmask], alb_arr[vmask], confidence=0.95)
-                    med = np.clip(r.intercept + r.slope * 1.0, 1e-6, 1.0)
-                    X   = sm.add_constant(ice_frac[vmask])
-                    lo  = np.clip(sm.QuantReg(alb_arr[vmask], X).fit(q=0.05).predict([1.0, 1.0])[0], 1e-6, 1.0)
-                    hi  = np.clip(sm.QuantReg(alb_arr[vmask], X).fit(q=0.95).predict([1.0, 1.0])[0], 1e-6, 1.0)
+                    """Return (med, lo, hi) albedo at ice_fraction=1 under the leg's gate."""
+                    med, lo, hi, _ = _alb_at_sif1(ice_frac, alb_arr, method=sif1_method)
                     return med, lo, hi
 
                 alb1280_med, alb1280_lo, alb1280_hi = _linreg_alb_at_1(cam_ice_fraction, alb_1280_cam_time)
@@ -898,10 +1047,10 @@ def analyze_ice_frac_alb(alb_product='native'):
             axr.set_ylabel('Broadband Albedo', fontsize=14)
             axr.tick_params(labelsize=12)
             axr.set_title('Broadband Albedo vs. Camera Ice Fraction ', fontsize=13)
-            fig.suptitle(f'Date: {date_key}, Case: {case_tag}, Alt < 1.6 km',
+            fig_bb.suptitle(f'Date: {date_key}, Case: {case_tag}, Alt < 1.6 km',
                             fontsize=16)
-            fig.savefig(f'{fig_dir}/arcsix_albedo_{date_key}_{case_tag}_broadband_ice_frac.png', bbox_inches='tight', dpi=150)
-            plt.close(fig)
+            fig_bb.savefig(f'{fig_dir}/arcsix_albedo_{date_key}_{case_tag}_broadband_ice_frac.png', bbox_inches='tight', dpi=150)
+            plt.close(fig_bb)
             
 
     
@@ -914,24 +1063,169 @@ def analyze_ice_frac_alb(alb_product='native'):
         print(f"    ('{dk}', '{ct}'): {sign}{abs(shift_s):.2f}/3600,  # r={r:.3f}")
     print("}")
 
+    # --- ice/snow end-member (SIF=1) gate audit -----------------------------
+    # Which legs report the fit extrapolation and which fall back to the
+    # high-SIF mean, with the numbers the gate acted on.
+    if len(sif1_audit) > 0:
+        print(f'\nSIF=1 ice/snow end member: gate = (p95-p5 SIF < {_SIF1_SPREAD_MIN_:.2f} '
+              f'AND r2 < {_SIF1_R2_MIN_:.2f}) -> mean of SIF > {_SIF1_HIGH_:.2f}')
+        print(f"{'leg':>18} {'n':>6} {'SIF p5-p95':>10} {'SIF min':>8} {'SIF max':>8} "
+              f"{'r2':>6} {'n_high':>7} {'alb_fit':>8} {'alb_high':>8}  method")
+        for a in sif1_audit:
+            print(f"{a['leg']:>18} {a['n']:6d} {a['spread']:10.3f} {a['sif_min']:8.3f} "
+                  f"{a['sif_max']:8.3f} {a['r2']:6.3f} {a['n_high']:7d} {a['alb_fit']:8.3f} "
+                  f"{a['alb_high']:8.3f}  {a['method']}")
+        pd.DataFrame(sif1_audit).to_csv(f'{wvl_fit_dir}/sif1_method_audit.csv', index=False)
+
+    # --- ERA5 vs the ice/snow end member ------------------------------------
+    # The analogue of Di Biagio et al. (2021, Sec. 3.1.2), who compare ERA5
+    # against their N-ICE2015 *point* albedo (up to -0.25 after their day 145)
+    # as well as against the SIC-weighted grid-cell albedo (up to -0.1).
+    if len(era5_date_cond) == len(broadband_alb_date_cond) and len(era5_date_cond) > 0:
+        d_e5 = np.asarray(era5_date_cond, dtype=float) - np.asarray(broadband_alb_date_cond, dtype=float)
+        is_spring = np.array([dc < '20240701' for dc in date_conditions])
+        print('\nERA5 minus SSFR ice/snow end member (SIF=1), per leg:')
+        for dc, e5, sf, dd in zip(date_conditions, era5_date_cond, broadband_alb_date_cond, d_e5):
+            print(f'  {dc:>18}  ERA5={e5:.3f}  SIF=1={sf:.3f}  diff={dd:+.3f}')
+        print(f'  spring mean {np.nanmean(d_e5[is_spring]):+.3f}  '
+              f'summer mean {np.nanmean(d_e5[~is_spring]):+.3f}  '
+              f'all {np.nanmean(d_e5):+.3f}  (most negative {np.nanmin(d_e5):+.3f})')
+
     # --- SI Fig S4.1: per-day broadband albedo at SIF=1 with 5th/95th bounds (GRL style) ---
-    plt.close('all')
-    fig, ax = plt.subplots(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.6))
     colors = ['blue' if 'clear' in dc else 'gray' for dc in date_conditions]
-    ax.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond,
-                yerr=broadband_alb_date_cond_unc,
-                fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
-    ax.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
-    ax.set_xticks(np.arange(len(broadband_alb_date_cond)))
-    ax.set_xticklabels(date_conditions, rotation=45, ha='right')
-    ax.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
-                       mpatches.Patch(color='gray', label='Cloudy')])
-    ax.set_xlabel('Date and Case')
-    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0')
-    # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit')
-    save_grl(fig, f'{fig_dir}/arcsix_albedo_broadband_ice_frac_fit_summary')
-    # plt.show()
-    plt.close(fig)
+    # legs whose end member is the high-SIF mean rather than the fit extrapolation
+    sif1_methods = {a['leg']: a['method'] for a in sif1_audit}
+    is_mean = np.array([sif1_methods.get(dc) == 'high_sif_mean' for dc in date_conditions])
+
+    # Published ice/snow end members, read once and shared by both figure variants.
+    # Sperzel is drawn as a range across their research flights, not a seasonal
+    # track: they caution that inconsistent atmospheric conditions between RFs
+    # make flight-to-flight comparison unreliable.
+    lit = pd.read_csv(f'{_fdir_general_}/SI_data/endmember_lit_values.csv', comment='#')
+    sperzel_rows  = lit.loc[(lit['source'] == 'sperzel2023')
+                            & (lit['class'] == 'white_ice_snow')]
+    dibiagio_rows = lit.loc[lit['source'] == 'dibiagio2021']
+
+    def _lat_col(rows, name):
+        """Numeric latitude column, or an empty series if the CSV predates it."""
+        if name not in rows.columns:
+            return pd.Series(dtype=float)
+        return pd.to_numeric(rows[name], errors='coerce').dropna()
+
+    def _lat_tag(lo_vals, hi_vals):
+        """', 78.6-89.1°N' for the legend; '' where the CSV carries no latitude.
+
+        Sperzel latitudes are per-flight medians (lat_med) so the range is taken
+        over the RFs actually plotted; Di Biagio carries campaign bounds
+        (lat_lo/lat_hi). Both are documented in endmember_lit_values.csv.
+        """
+        if len(lo_vals) == 0 or len(hi_vals) == 0:
+            return ''
+        lo, hi = round(float(lo_vals.min()), 1), round(float(hi_vals.max()), 1)
+        return f', {lo:g}-{hi:g}°N'
+
+    def _plot_sif1_summary(savename, show_lat, show_lit=True):
+        """Per-leg SIF=1 end member vs the published values.
+
+        Three variants are written: the original legend, one that also states
+        the latitude range each published end member came from, since MOSAiC
+        (78.6-89.1N) and N-ICE2015 (80-83N) sample different parts of the Arctic
+        than the ARCSIX legs (78.8-85.7N), and one without the published end
+        members (``show_lit=False``), ARCSIX legs only.
+        """
+        plt.close('all')
+        fig, ax = plt.subplots(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.6))
+        ax.errorbar(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond,
+                    yerr=broadband_alb_date_cond_unc,
+                    fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)#, label='Data Points with Uncertainty')
+        ax.scatter(np.arange(len(broadband_alb_date_cond)), broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
+        handles = [mpatches.Patch(color='blue', label='Clear'),
+                   mpatches.Patch(color='gray', label='Cloudy')]
+        if is_mean.any():
+            idx_mean = np.flatnonzero(is_mean)
+            ax.scatter(idx_mean, np.asarray(broadband_alb_date_cond)[idx_mean],
+                       facecolors='none', edgecolors='k', s=110, linewidths=0.8, zorder=3)
+            handles.append(plt.Line2D([], [], marker='o', color='k', linestyle='none',
+                                      markerfacecolor='none', markersize=8,
+                                      label=f'Mean of SIF > {_SIF1_HIGH_:.2f}'))
+
+        sperzel  = sperzel_rows['albedo']
+        dibiagio = dibiagio_rows['albedo']
+        sperzel_lat  = _lat_col(sperzel_rows, 'lat_med')
+        lat_sp = _lat_tag(sperzel_lat, sperzel_lat) if show_lat else ''
+        lat_db = _lat_tag(_lat_col(dibiagio_rows, 'lat_lo'),
+                          _lat_col(dibiagio_rows, 'lat_hi')) if show_lat else ''
+        if show_lit and len(sperzel) > 0:
+            ax.axhspan(sperzel.min(), sperzel.max(), color=OKABE_ITO[2], alpha=0.15, lw=0, zorder=0)
+            handles.append(mpatches.Patch(color=OKABE_ITO[2], alpha=0.35,
+                                          label=f'MOSAiC white ice/snow, {sperzel.min():.2f}-{sperzel.max():.2f}\n'
+                                                f'(Sperzel et al. 2023, n={len(sperzel)} RFs{lat_sp})'))
+        if show_lit and len(dibiagio) > 0:
+            ax.axhline(float(dibiagio.iloc[0]), color=OKABE_ITO[5], ls='--', lw=1.0, zorder=0)
+            handles.append(plt.Line2D([], [], color=OKABE_ITO[5], ls='--',
+                                      label=f'N-ICE2015 snow-covered ice, {float(dibiagio.iloc[0]):.2f}\n'
+                                            f'(Di Biagio et al. 2021, early spring{lat_db})'))
+        # Collocated ERA5 is deliberately not drawn here: ERA5 'fal' is the grid-box
+        # mean albedo, i.e. the sea-ice tile blended with open water by sea-ice cover
+        # (0801_clear collocates to fal=0.24 at 31% ice ratio). This panel compares
+        # ice/snow end members, so a grid-box mean is not the same quantity. The
+        # like-for-like ERA5 vs SSFR comparison lives in analysis/ssfr_era5_alb_si_fig.py;
+        # the per-leg ERA5 minus SIF=1 differences are still printed above.
+
+        ax.set_xticks(np.arange(len(broadband_alb_date_cond)))
+        ax.set_xticklabels(date_conditions, rotation=45, ha='right')
+        ax.legend(handles=handles, fontsize=6, loc='lower left', ncol=2)
+        ax.set_xlabel('Date and Case')
+        ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0')
+        # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit')
+        save_grl(fig, f'{fig_dir}/{savename}')
+        plt.close(fig)
+
+    _plot_sif1_summary('arcsix_albedo_broadband_ice_frac_fit_summary',     show_lat=False)
+    _plot_sif1_summary('arcsix_albedo_broadband_ice_frac_fit_summary_lat', show_lat=True)
+    _plot_sif1_summary('arcsix_albedo_broadband_ice_frac_fit_summary_noref',
+                       show_lat=False, show_lit=False)
+
+    # --- all-leg overview: one fit panel per leg of the summary above --------
+    # Shared axes so the legs are directly comparable; the equation and R^2 go
+    # in-panel rather than in a legend, which would not survive the panel size.
+    if len(sif_fit_legs) > 0:
+        n_col = 4
+        n_row = int(np.ceil(len(sif_fit_legs) / n_col))
+        plt.close('all')
+        fig, axes = plt.subplots(
+            n_row, n_col, sharex=True, sharey=True,
+            figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.26 * n_row))
+        axes = np.atleast_1d(axes).ravel()
+        for ax_leg, (leg, cam_if, bb_if, is_mean_leg) in zip(axes, sif_fit_legs):
+            res_leg = plot_sif_fit_panel(
+                ax_leg, cam_if, bb_if, scatter_size=1.5, legend_fontsize=None,
+                note=(f'SIF=1: mean of SIF > {_SIF1_HIGH_:.2f}' if is_mean_leg else None))
+            if res_leg is not None:
+                ax_leg.text(0.04, 0.96,
+                            'y=%.2fx%+.2f\n' r'$\mathrm{R^2}$=%.2f'
+                            % (res_leg.slope, res_leg.intercept, res_leg.rvalue ** 2),
+                            transform=ax_leg.transAxes, fontsize=5, va='top', ha='left')
+            ax_leg.set_title(leg, fontsize=6)
+            ax_leg.tick_params(labelsize=5)
+
+        # Shared legend in the first unused slot, from generic proxies: the per-panel
+        # handles carry that leg's own equation in their label. Panels sitting above
+        # an unused slot get their x tick labels back, which sharex otherwise hides.
+        handles = [mpatches.Patch(color='coral', alpha=0.3, label='Quantile Regression (5th-95th)'),
+                   plt.Line2D([], [], color='red', ls='--', label='Linear Fit')]
+        for i, ax_empty in enumerate(axes[len(sif_fit_legs):]):
+            ax_empty.set_axis_off()
+            i_above = len(sif_fit_legs) + i - n_col
+            if i_above >= 0:
+                axes[i_above].tick_params(labelbottom=True)
+            if i == 0:
+                ax_empty.legend(handles=handles, loc='center', fontsize=6, frameon=False)
+        fig.supxlabel('Camera Sea Ice Fraction')
+        fig.supylabel('Broadband Albedo')
+        fig.tight_layout()
+        save_grl(fig, f'{fig_dir}/arcsix_albedo_broadband_icefraction_fit_all_legs')
+        plt.close(fig)
 
     for alb_vals, alb_upper, alb_lower, wvl_label, savename in [
         (alb_1700_date_cond, alb_1700_date_cond_upper, alb_1700_date_cond_lower,
@@ -1018,7 +1312,7 @@ def analyze_ice_frac_alb(alb_product='native'):
     x_fit = np.linspace(0, np.max(myi_ratio_date_cond)*1.05, 100)
     y_fit = intercept + slope * x_fit
     p_values = res_wls.pvalues
-    ax.plot(x_fit, y_fit, color='orange', linestyle='--', label=r'Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
+    ax.plot(x_fit, y_fit, color='orange', linestyle='--', label=r'Fit: y=%.3fx+%.3f, $\mathrm{R^2}$=%.3f, p-value=%.3f'%(slope*100, intercept, r_value, p_values[1]))
 
     ax.legend(fontsize=12)
     ax.set_xlabel('Mean Multi-year Sea Ice Ratio', fontsize=14)
@@ -1028,7 +1322,55 @@ def analyze_ice_frac_alb(alb_product='native'):
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio.png', bbox_inches='tight', dpi=150)
     # plt.show()
     plt.close(fig)
-    
+
+    # Same figure, colored by the per-leg median over-ice KT-19 skin temperature
+    # (nadir HDRF >= 0.4) instead of clear/cloudy: the y variable is an ice end
+    # member, so the all-surface median would mix open-water skin temperatures
+    # into the low-SIF legs (same choice as the Figure-3 panel below). With color
+    # taken by temperature, clear/cloudy moves to the marker shape.
+    myi_arr    = np.array(myi_ratio_date_cond)
+    kt19_ice   = np.array(kt19_high_hdrf_date_cond)
+    is_clear   = np.array(['clear' in dc for dc in date_conditions])
+    has_t      = np.isfinite(kt19_ice)
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.errorbar(myi_ratio_date_cond, broadband_alb_date_cond,
+                xerr=myi_ratio_date_cond_std,
+                yerr=broadband_alb_date_cond_unc,
+                fmt='none', ecolor='lightgray', capsize=5, zorder=1)
+    norm = mcolors.Normalize(vmin=np.nanmin(kt19_ice), vmax=np.nanmax(kt19_ice))
+    sc = None
+    for marker, sel in [('o', is_clear), ('s', ~is_clear)]:
+        if np.any(sel & has_t):
+            sc = ax.scatter(myi_arr[sel & has_t], y[sel & has_t],
+                            c=kt19_ice[sel & has_t], cmap='coolwarm', norm=norm,
+                            marker=marker, alpha=0.8, s=50, zorder=2)
+        # legs with no valid over-ice KT-19 stay visible as open markers
+        if np.any(sel & ~has_t):
+            ax.scatter(myi_arr[sel & ~has_t], y[sel & ~has_t],
+                       facecolor='none', edgecolor='k', marker=marker,
+                       alpha=0.8, s=50, zorder=2)
+    if sc is not None:
+        cbar = fig.colorbar(sc, ax=ax)
+        cbar.set_label('Median KT-19 Surface Skin Temperature over ice ($^o$C)', fontsize=12)
+        cbar.ax.tick_params(labelsize=11)
+    # same WLS fit as the clear/cloudy-colored figure above
+    ax.plot(x_fit, y_fit, color='orange', linestyle='--',
+            label=r'Fit: y=%.3fx+%.3f, $\mathrm{R^2}$=%.3f, p-value=%.3f'
+                  % (slope*100, intercept, r_value, p_values[1]))
+    fit_handles, _ = ax.get_legend_handles_labels()
+    ax.legend(handles=fit_handles + [
+        plt.Line2D([], [], color='k', marker='o', linestyle='none',
+                   markerfacecolor='none', label='Clear'),
+        plt.Line2D([], [], color='k', marker='s', linestyle='none',
+                   markerfacecolor='none', label='Cloudy'),
+    ], fontsize=12)
+    ax.set_xlabel('Mean Multi-year Sea Ice Ratio', fontsize=14)
+    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
+    ax.tick_params(labelsize=12)
+    fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio_kt19.png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+
     print("broadband_alb_date_cond min, max:", np.min(broadband_alb_date_cond), np.max(broadband_alb_date_cond))
     
     date_conditions_simplified = [dc.replace('2024', '').replace('_', '-') for dc in date_conditions]
@@ -1057,7 +1399,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                      fmt='o', ecolor='lightgray', capsize=5, markerfacecolor='none', zorder=1)
         ax2.scatter(x_var, broadband_alb_date_cond, c=colors, alpha=0.8, s=50, zorder=2)
         ax2.plot(x_fit, intercept + slope * x_fit, color='orange', linestyle='--',
-                 label=r'Fit: y=%.3fx+%.3f, $\mathrm{R}$=%.3f, p-value=%.3f'
+                 label=r'Fit: y=%.3fx+%.3f, $\mathrm{R^2}$=%.3f, p-value=%.3f'
                        % (slope * 100, intercept, res_wls.rsquared, res_wls.pvalues[1]))
         ax2.legend(fontsize=12)
         ax2.set_xlabel(x_label, fontsize=14)
@@ -1152,17 +1494,85 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig.savefig(f'{fig_dir}/{savename}', bbox_inches='tight', dpi=150)
         plt.close(fig)
         
+    def _fit_hinge(x, y, t0_grid=None):
+        """Continuous flat-then-linear ('hinge') fit vs temperature.
+
+        y = a               for x <= T0
+        y = a + b*(x - T0)  for x >  T0
+
+        For a fixed T0 the model is linear in (a, b) with the single regressor
+        max(x - T0, 0), so each grid step is one lstsq solve; T0 is taken from
+        the best (lowest-SSE) step. Unweighted, to stay consistent with the
+        panel's WLS(weights=1) linear fit. The default grid (-5 to -0.5 C)
+        brackets the CICE thresholds (-1 C ccsm3 ramp, -1.5 C dEdd dT_mlt).
+        """
+        if t0_grid is None:
+            t0_grid = np.arange(-5.0, -0.5 + 1e-9, 0.05)
+        best = None
+        for t0 in t0_grid:
+            X = np.column_stack([np.ones_like(x), np.maximum(x - t0, 0.0)])
+            coef, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+            sse = float(np.sum((y - X @ coef) ** 2))
+            if best is None or sse < best['sse']:
+                best = {'t0': float(t0), 'a': float(coef[0]),
+                        'b': float(coef[1]), 'sse': sse}
+        sst = float(np.sum((y - y.mean()) ** 2))
+        best['r2'] = 1.0 - best['sse'] / sst if sst > 0 else np.nan
+        return best
+
+    def _hinge_vs_linear_stats(x, y, hinge, n_boot=2000, seed=0):
+        """Support statistics for the hinge fit: F-test/AIC vs the plain linear
+        fit and a leg-resampling bootstrap CI on T0 (and the warm-side slope).
+
+        The F-test treats T0 as one extra parameter (k=3 vs k=2); the breakpoint
+        makes the test approximate, so AIC is reported alongside. Bootstrap
+        resamples whole legs with replacement (the fit unit is the leg median).
+        """
+        n = len(x)
+        X_lin = sm.add_constant(x)
+        res_lin = sm.WLS(y, X_lin).fit()
+        sse_lin = float(np.sum(res_lin.resid ** 2))
+        f_stat = ((sse_lin - hinge['sse']) / 1.0) / (hinge['sse'] / (n - 3))
+        p_f = float(stats.f.sf(f_stat, 1, n - 3)) if f_stat > 0 else 1.0
+        aic_lin   = n * np.log(sse_lin / n)      + 2 * 2
+        aic_hinge = n * np.log(hinge['sse'] / n) + 2 * 3
+        rng = np.random.default_rng(seed)
+        t0_bs, b_bs = [], []
+        for _ in range(n_boot):
+            idx = rng.integers(0, n, n)
+            if np.ptp(x[idx]) < 1.0:      # degenerate resample: nearly one temperature
+                continue
+            bs = _fit_hinge(x[idx], y[idx])
+            t0_bs.append(bs['t0']);  b_bs.append(bs['b'])
+        t0_ci = np.percentile(t0_bs, [2.5, 97.5]) if t0_bs else [np.nan, np.nan]
+        b_ci  = np.percentile(b_bs,  [2.5, 97.5]) if b_bs  else [np.nan, np.nan]
+        return {'sse_lin': sse_lin, 'r2_lin': float(res_lin.rsquared),
+                'f': float(f_stat), 'p_f': p_f,
+                'aic_lin': float(aic_lin), 'aic_hinge': float(aic_hinge),
+                't0_ci': t0_ci, 'b_ci': b_ci, 'n_boot_ok': len(t0_bs)}
+
     def _plot_alb_vs_var1var2(x1_vals, x1_lower, x1_upper,
                               x2_vals, x2_lower, x2_upper,
                               y_vals, y_unc,
                               colors,
                               x1label, x2label,
-                              savename, fig_dir, grl=False):
+                              savename, fig_dir, grl=False, hinge_x1=False,
+                              ring_mask=None,
+                              x2_fill_by_x1=False, x2_fill_label=None):
         """WLS fit + scatter of broadband albedo vs one surface variable.
 
         ``grl=True`` renders the manuscript (GRL) version: full-page width,
         rcParams font sizes, panel labels above the axes, PNG+PDF output.
         Styling only — the fits and plotted values are identical.
+        ``hinge_x1=True`` adds the flat-then-linear fit (and a schematic CICE
+        ramp) to panel (a); meaningful only when x1 is a temperature.
+        ``ring_mask`` rings the legs whose SIF=1 end member is the high-SIF
+        mean rather than the fit extrapolation, like the fit-summary figure;
+        the legend entry goes in panel (b), which has the roomier legend.
+        ``x2_fill_by_x1`` fills panel (b)'s markers with the panel-(a) x values
+        (coolwarm + colorbar, labeled ``x2_fill_label``); clear/cloudy then
+        moves to the marker shape there (circle/square), and legs without a
+        valid x1 render as open black markers so they stay visible.
         """
         x1_arr = np.array(x1_vals)
         x1_lo  = np.array(x1_lower)
@@ -1197,45 +1607,150 @@ def analyze_ice_frac_alb(alb_product='native'):
         intercept2 = res.params[0]
         r_value2   = res.rsquared
         p_value2   = res.pvalues[1]
-        x_line2 = np.linspace(np.nanmin(x2_arr[finite_mask]) * 0.97, 
+        x_line2 = np.linspace(np.nanmin(x2_arr[finite_mask]) * 0.97,
                               np.nanmax(x2_arr[finite_mask]) * 1.03, 100)
         y_line2 = intercept2 + slope2 * x_line2
 
-        # GRL (manuscript) vs diagnostic styling: sizes/fonts/labels only
+        # optional flat-then-linear fit on x1 (temperature), plus support stats
+        hinge = None
+        if hinge_x1:
+            xh = x1_arr[finite_mask]
+            yh = y_arr[finite_mask]
+            hinge  = _fit_hinge(xh, yh)
+            hstats = _hinge_vs_linear_stats(xh, yh, hinge)
+            print(f"\n[hinge fit] {savename} (panel a, n={int(finite_mask.sum())})")
+            print(f"  T0 = {hinge['t0']:.2f} C  "
+                  f"(bootstrap 95% CI {hstats['t0_ci'][0]:.2f} to {hstats['t0_ci'][1]:.2f} C, "
+                  f"{hstats['n_boot_ok']} resamples)")
+            print(f"  plateau a = {hinge['a']:.3f}, warm-side slope b = {hinge['b']:.4f} per C  "
+                  f"(95% CI {hstats['b_ci'][0]:.4f} to {hstats['b_ci'][1]:.4f})")
+            print(f"  R2 hinge = {hinge['r2']:.3f} vs linear = {hstats['r2_lin']:.3f};  "
+                  f"F = {hstats['f']:.2f}, p_F = {hstats['p_f']:.3f} (approximate: T0 is a breakpoint)")
+            print(f"  AIC hinge = {hstats['aic_hinge']:.1f} vs linear = {hstats['aic_lin']:.1f} "
+                  f"(lower is better)")
+
+        # GRL (manuscript) vs diagnostic styling: sizes/fonts/labels only.
+        # The GRL canvas is ~5x smaller than the 15x5 in diagnostic, so the
+        # markers are scaled down with it (same sizes on the small panel look
+        # ~5x heavier and crowd the frame) and the panels get more height.
         label_kw  = {} if grl else {'fontsize': 14}
-        legend_kw = {} if grl else {'fontsize': 11}
+        # 6.5 pt legend in GRL mode: at the rc 8 pt the three-row panel-(a)
+        # legend still reached the low-albedo points
+        legend_kw = {'fontsize': 6.5} if grl else {'fontsize': 11}
         if grl:
-            figsize = figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM / 3.0)   # ~15:5 aspect
+            figsize = figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM / 3.0)
+            pt_kw   = dict(markersize=3.0, capsize=2, elinewidth=0.6)
+            s_pts   = 9
+            ring_s  = 20
+            wspace  = 0.32   # room for panel (b)'s two-line y-label
         else:
             figsize = (15, 5)
+            pt_kw   = dict(markersize=5.0, capsize=3, elinewidth=0.8)
+            s_pts   = 22
+            ring_s  = 48
+            wspace  = 0.2
+
+        # legs whose SIF=1 end member is the high-SIF mean (ringed in black)
+        rm = np.asarray(ring_mask, dtype=bool) if ring_mask is not None else None
+        if rm is not None and not rm.any():
+            rm = None
 
         plt.close('all')
-        fig, (ax, ax2) = plt.subplots(1, 2, figsize=figsize, gridspec_kw={ 'wspace': 0.2})
+        fig, (ax, ax2) = plt.subplots(1, 2, figsize=figsize, gridspec_kw={'wspace': wspace})
         ax.errorbar(x1_arr, y_arr,
                     xerr=asymmetric_error(x1_arr, x1_lo, x1_hi),
                     yerr=y_unc_arr,
-                    fmt='o', ecolor='lightgray', capsize=5,
-                    markerfacecolor='none', zorder=1)
-        ax.scatter(x1_arr, y_arr, c=colors, alpha=0.8, s=60, zorder=2)
+                    fmt='o', ecolor='lightgray', markerfacecolor='none', zorder=1,
+                    **pt_kw)
+        ax.scatter(x1_arr, y_arr, c=colors, alpha=0.8, s=s_pts, zorder=2)
+        if rm is not None:
+            ax.scatter(x1_arr[rm], y_arr[rm], facecolors='none', edgecolors='k',
+                       s=ring_s, linewidths=0.6, zorder=4)
         # ax.plot(x_line, y_line, color='orange', linestyle='--',
         #         label=r'Fit: y=%.4fx+%.3f, $\mathrm{R^2}$=%.3f, p=%.3f'
         #               % (slope, intercept, r_value, p_value))
-        ax.plot(x_line1, y_line1, color='orange', linestyle='--',
-                label=r'$\mathrm{R^2}$=%.3f, p=%.2e'
-                      % (r_value1, p_value1))
-        ax.legend(**legend_kw)
+        # legend text: upright (mathrm) symbols, spaces around '=', and compact
+        # R2/p formats -- at %.3f/%.2e the 3-row legend spanned nearly the full
+        # GRL panel width and covered the warmest leg's point and error bar
+        def _pfmt(p):
+            return 'p < 0.001' if p < 0.0005 else 'p = %.3f' % p
+        lin_label = (r'Linear, $\mathrm{R^2}$ = %.2f, %s' % (r_value1, _pfmt(p_value1))
+                     if hinge is not None else
+                     r'$\mathrm{R^2}$ = %.2f, %s' % (r_value1, _pfmt(p_value1)))
+        ax.plot(x_line1, y_line1, color='orange', linestyle='--', label=lin_label)
+        if hinge is not None:
+            x_h = np.linspace(x_line1.min(), x_line1.max(), 200)
+            y_h = hinge['a'] + hinge['b'] * np.maximum(x_h - hinge['t0'], 0.0)
+            ax.plot(x_h, y_h, color=OKABE_ITO[2], linestyle='-', lw=1.2, zorder=3,
+                    label=r'Flat+ramp, $\mathrm{T_0}$ = %.1f$^o$C, $\mathrm{R^2}$ = %.2f'
+                          % (hinge['t0'], hinge['r2']))
+            # schematic CICE ccsm3 ramp for comparison: flat at the fitted
+            # plateau, 0.1 drop over the final degree (Hunke et al., 2015)
+            ax.plot([x_line1.min(), -1.0, 0.0],
+                    [hinge['a'], hinge['a'], hinge['a'] - 0.1],
+                    color='0.45', linestyle=':', lw=1.0, zorder=2,
+                    label='CICE ramp (schematic)')
+        ax.legend(loc='lower left', handlelength=1.2, handletextpad=0.4,
+                  borderpad=0.25, labelspacing=0.25, borderaxespad=0.15, **legend_kw)
         ax.set_xlabel(x1label, **label_kw)
 
-        ax2.errorbar(x2_arr, y_arr,
-                    xerr=asymmetric_error(x2_arr, x2_lo, x2_hi),
-                    yerr=y_unc_arr,
-                    fmt='o', ecolor='lightgray', capsize=5,
-                    markerfacecolor='none', zorder=1)
-        ax2.scatter(x2_arr, y_arr, c=colors, alpha=0.8, s=60, zorder=2)
+        if x2_fill_by_x1:
+            # bars only: the circle outlines would sit under the square markers
+            ax2.errorbar(x2_arr, y_arr,
+                        xerr=asymmetric_error(x2_arr, x2_lo, x2_hi),
+                        yerr=y_unc_arr,
+                        fmt='none', ecolor='lightgray', zorder=1,
+                        capsize=pt_kw['capsize'], elinewidth=pt_kw['elinewidth'])
+            # clear legs carry 'blue' in the caller's clear/cloudy color list
+            is_clear = np.array([c == 'blue' for c in colors])
+            has_x1   = np.isfinite(x1_arr)
+            norm = mcolors.Normalize(vmin=np.nanmin(x1_arr), vmax=np.nanmax(x1_arr))
+            sc = None
+            for marker, sel in [('o', is_clear), ('s', ~is_clear)]:
+                if np.any(sel & has_x1):
+                    sc = ax2.scatter(x2_arr[sel & has_x1], y_arr[sel & has_x1],
+                                     c=x1_arr[sel & has_x1], cmap='coolwarm',
+                                     norm=norm, marker=marker,
+                                     alpha=0.8, s=s_pts, zorder=2)
+                if np.any(sel & ~has_x1):
+                    ax2.scatter(x2_arr[sel & ~has_x1], y_arr[sel & ~has_x1],
+                                facecolor='none', edgecolor='k', marker=marker,
+                                alpha=0.8, s=s_pts, zorder=2)
+            if sc is not None:
+                cbar = fig.colorbar(sc, ax=ax2, pad=0.02)
+                cbar.set_label(x2_fill_label if x2_fill_label is not None else x1label,
+                               **label_kw)
+        else:
+            ax2.errorbar(x2_arr, y_arr,
+                        xerr=asymmetric_error(x2_arr, x2_lo, x2_hi),
+                        yerr=y_unc_arr,
+                        fmt='o', ecolor='lightgray', markerfacecolor='none', zorder=1,
+                        **pt_kw)
+            ax2.scatter(x2_arr, y_arr, c=colors, alpha=0.8, s=s_pts, zorder=2)
+        if rm is not None:
+            ax2.scatter(x2_arr[rm], y_arr[rm], facecolors='none', edgecolors='k',
+                        s=ring_s, linewidths=0.6, zorder=4)
         ax2.plot(x_line2, y_line2, color='orange', linestyle='--',
-                label=r'$\mathrm{R^2}$=%.3f, p=%.2e'
-                      % (r_value2, p_value2))
-        ax2.legend(**legend_kw)
+                label=r'$\mathrm{R^2}$ = %.2f, %s'
+                      % (r_value2, _pfmt(p_value2)))
+        handles2 = ax2.get_legend_handles_labels()[0]
+        if x2_fill_by_x1:
+            handles2 += [
+                plt.Line2D([], [], color='k', marker=mk, linestyle='none',
+                           markerfacecolor='none',
+                           markersize=float(np.sqrt(s_pts)),
+                           markeredgewidth=0.6, label=lbl)
+                for mk, lbl in [('o', 'Clear'), ('s', 'Cloudy')]
+            ]
+        if rm is not None:
+            handles2.append(plt.Line2D([], [], marker='o', color='k', linestyle='none',
+                                       markerfacecolor='none',
+                                       markersize=float(np.sqrt(ring_s)),
+                                       markeredgewidth=0.6,
+                                       label=f'Mean of SIF > {_SIF1_HIGH_:.2f}'))
+        ax2.legend(handles=handles2, loc='lower right', handlelength=1.2,
+                   handletextpad=0.4, borderpad=0.25, labelspacing=0.25,
+                   borderaxespad=0.15, **legend_kw)
         ax2.set_xlabel(x2label, **label_kw)
 
         for ax_, cap in zip([ax, ax2], ['(a)', '(b)']):
@@ -1244,7 +1759,9 @@ def analyze_ice_frac_alb(alb_product='native'):
             else:
                 ax_.tick_params(labelsize=12)
                 ax_.text(0,  1.07, cap, transform=ax_.transAxes, fontsize=16, va='top', ha='left')
-            ax_.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', **label_kw)
+            # two lines: the single-line label is taller than the GRL panel and
+            # its ends were clipped at the figure edge in the saved raster
+            ax_.set_ylabel('Broadband Albedo\nat Sea Ice Fraction = 1.0', **label_kw)
         fig.tight_layout()
         if grl:
             save_grl(fig, f'{fig_dir}/{savename}')   # strips .png, writes PNG+PDF
@@ -1276,25 +1793,46 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig_dir=fig_dir,
     )
 
-    # Manuscript Figure 3: broadband albedo at SIF=1 vs KT-19 and vs MYI coverage
-    _plot_alb_vs_var1var2(kt19_date_cond, kt19_date_cond_lower, kt19_date_cond_upper,
-                          myi_ratio_date_cond, myi_lower, myi_upper,
-                          broadband_alb_date_cond, broadband_alb_date_cond_unc,
-                          colors,
-                          x1label='Median KT-19 Surface Temperature ($^o$C)',
-                          x2label='Mean MYI Ratio (%)',
-                          savename='arcsix_albedo_broadband_vs_kt19_myi_ratio.png',
-                          fig_dir=fig_dir, grl=True)
+    # Manuscript Figure 3: broadband albedo at SIF=1 vs KT-19 and vs MYI coverage.
+    # Panel (a) uses the over-ice KT-19 median (nadir HDRF >= 0.4, the same
+    # threshold the camera product uses for its ice class): the y variable is an
+    # ice end member, so the all-surface median would mix open-water skin
+    # temperatures into the predictor and warm-bias the low-SIF legs.
     _plot_alb_vs_var1var2(kt19_high_hdrf_date_cond,
                           kt19_high_hdrf_date_cond_lower,
                           kt19_high_hdrf_date_cond_upper,
                           myi_ratio_date_cond, myi_lower, myi_upper,
                           broadband_alb_date_cond, broadband_alb_date_cond_unc,
                           colors,
-                          x1label='Median KT-19 Surface Temperature over ice ($^o$C)',
+                          x1label='Median KT-19 Surface Temperature\nover ice ($^o$C)',
                           x2label='Mean MYI Ratio (%)',
-                          savename='arcsix_albedo_broadband_vs_kt19_over_ice_myi_ratio.png',
-                          fig_dir=fig_dir)
+                          savename='arcsix_albedo_broadband_vs_kt19_myi_ratio.png',
+                          fig_dir=fig_dir, grl=True, hinge_x1=True, ring_mask=is_mean)
+    # Same figure, but panel (b) filled by the panel-(a) over-ice KT-19 median
+    # (clear/cloudy moves to the marker shape there).
+    _plot_alb_vs_var1var2(kt19_high_hdrf_date_cond,
+                          kt19_high_hdrf_date_cond_lower,
+                          kt19_high_hdrf_date_cond_upper,
+                          myi_ratio_date_cond, myi_lower, myi_upper,
+                          broadband_alb_date_cond, broadband_alb_date_cond_unc,
+                          colors,
+                          x1label='Median KT-19 Surface Temperature\nover ice ($^o$C)',
+                          x2label='Mean MYI Ratio (%)',
+                          savename='arcsix_albedo_broadband_vs_kt19_myi_ratio_kt19fill.png',
+                          fig_dir=fig_dir, grl=True, hinge_x1=True, ring_mask=is_mean,
+                          x2_fill_by_x1=True,
+                          # two lines: the single-line label is taller than the
+                          # GRL panel and its top was clipped in the saved raster
+                          x2_fill_label='Median KT-19 Surface Temperature\nover ice ($^o$C)')
+    # Diagnostic counterpart with the all-surface KT-19 median.
+    _plot_alb_vs_var1var2(kt19_date_cond, kt19_date_cond_lower, kt19_date_cond_upper,
+                          myi_ratio_date_cond, myi_lower, myi_upper,
+                          broadband_alb_date_cond, broadband_alb_date_cond_unc,
+                          colors,
+                          x1label='Median KT-19 Surface Temperature ($^o$C)',
+                          x2label='Mean MYI Ratio (%)',
+                          savename='arcsix_albedo_broadband_vs_kt19_allsfc_myi_ratio.png',
+                          fig_dir=fig_dir, hinge_x1=True, ring_mask=is_mean)
     _plot_alb_vs_var(
         brt19h, brt19h_lower, brt19h_upper,
         broadband_alb_date_cond, broadband_alb_date_cond_unc, colors,
@@ -1672,70 +2210,113 @@ def analyze_ice_frac_alb(alb_product='native'):
     cam_t_dt       = [base_date + timedelta(hours=t) for t in cam_t]
 
     # Manuscript Figure 2: 0801 leg time series + fit + camera images (GRL style)
-    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 9.5 / 18.0))
-    gs_fig = GridSpec(3, 16, height_ratios=[1, 1, 1.5], hspace=0.5, wspace=0.6, figure=fig)
-    ax11   = fig.add_subplot(gs_fig[:2, :8])
+    # Taller than 3 rows would otherwise allow, with a 3-column gutter between
+    # (a) and (b) so the red twin-axis label clears (b)'s y-axis.
+    fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 10.2 / 18.0))
+    gs_fig = GridSpec(3, 16, height_ratios=[1, 1, 1.9], hspace=0.65, wspace=0.6, figure=fig)
+    ax11   = fig.add_subplot(gs_fig[:2, :7])
     ax11_2 = ax11.twinx()
-    ax12   = fig.add_subplot(gs_fig[:2, 9:])
+    ax12   = fig.add_subplot(gs_fig[:2, 10:])
     ax21   = fig.add_subplot(gs_fig[2, :4])
     ax22   = fig.add_subplot(gs_fig[2, 4:8])
     ax23   = fig.add_subplot(gs_fig[2, 8:12])
     ax24   = fig.add_subplot(gs_fig[2, 12:])
 
-    l1 = ax11.scatter(time_ssfr_dt, bb_alb, label='Broadband albedo', c='b', s=10)
-    l2 = ax11_2.scatter(cam_t_dt, cam_ice, label='camera SIC', c='r', s=5)
+    # no legend: the blue/red y-axis labels already identify the two series
+    ax11.scatter(time_ssfr_dt, bb_alb, c='b', s=4)
+    ax11_2.scatter(cam_t_dt, cam_ice, c='r', s=3)
     ax11.set_xlabel('Time (UTC)')
     ax11.set_ylabel('Broadband Albedo', color='b')
     ax11_2.set_ylabel('Camera Sea Ice Fraction', color='r')
     ax11_2.set_ylim(-0.05, 1.05)
-    ax11.legend([l1, l2], [l1.get_label(), l2.get_label()],
-                loc='center left', bbox_to_anchor=(0.15, 0.1))
     ax11.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
     ax11.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     image_times = [13+53/60+55/3600, 13+56/60+47/3600, 13+59/60+11/3600, 14+4/60+24/3600]
     img_colors  = ['purple', 'green', 'orange', 'brown']
     directions  = ['down', 'up', 'leftup', 'rightup']
-    for it, direction, color in zip(image_times, directions, img_colors):
-        y_v = bb_alb[np.argmin(np.abs(time_ssfr - it))]
-        ap  = dict(facecolor=color, edgecolor=color, shrink=0.05, width=2, headwidth=8)
-        t_dt = base_date + timedelta(hours=it)
-        if direction == 'down':
-            ax11.annotate('', xy=(t_dt, y_v+0.01), xytext=(t_dt, y_v+0.09), arrowprops=ap)
-        elif direction == 'up':
-            ax11.annotate('', xy=(t_dt, y_v-0.01), xytext=(t_dt, y_v-0.09), arrowprops=ap)
-        elif direction == 'leftup':
-            ax11.annotate('', xy=(t_dt+timedelta(minutes=0.5), y_v-0.01),
-                          xytext=(t_dt+timedelta(minutes=1.5), y_v-0.09), arrowprops=ap)
-        elif direction == 'rightup':
-            ax11.annotate('', xy=(t_dt-timedelta(minutes=0.5), y_v-0.01),
-                          xytext=(t_dt-timedelta(minutes=1.5), y_v-0.09), arrowprops=ap)
+    # Arrow geometry is in points, not data units: panel (a) spans ~0.55 in albedo
+    # over ~1.7 in, so the former 0.08-albedo tail came out shorter than
+    # Matplotlib's default 12-pt arrow head and only the head rendered.
+    # Each length is then clamped to the room between the tip and the frame edge
+    # the arrow points away from, so no tail crosses a spine: save_grl writes with
+    # bbox_inches='tight', so an overhanging tail would also widen the crop.
+    _ARROW_LEN_PT_    = 16      # nominal tip -> tail length
+    _ARROW_MARGIN_PT_ = 3       # keep the tail this far inside the frame
+    _ARROW_MIN_PT_    = 9       # never shorter than the 6-pt head
+    _arrow_dir = {                                  # unit (dx, dy), tip -> tail
+        'down':    ( 0.0,   1.0),
+        'up':      ( 0.0,  -1.0),
+        'leftup':  ( 0.71, -0.71),
+        'rightup': (-0.71, -0.71),
+    }
+    # Freeze the autoscaled frame so the clamp sees the limits the figure is saved
+    # with. Axes positions come from the GridSpec (no tight_layout), so the panel
+    # size in points is fixed here and independent of the save dpi.
+    ax11.set_xlim(ax11.get_xlim());  ax11.set_ylim(ax11.get_ylim())
+    x0_ax, x1_ax = ax11.get_xlim();  y0_ax, y1_ax = ax11.get_ylim()
+    ax_w_pt = ax11.get_position().width  * fig.get_figwidth()  * 72.0
+    ax_h_pt = ax11.get_position().height * fig.get_figheight() * 72.0
 
-    ax12.scatter(cam_ice[mask], bb_cam[mask], s=10, c='k')
-    ax12.plot(sorted_cam_ice, slope_fig*sorted_cam_ice + intercept_fig, color='red', linestyle='--',
-              label=r'Linear Fit: y=%.2fx+%.2f, $\mathrm{R^2}$=%.2f' % (slope_fig, intercept_fig, r_value_fig**2))
+    for it, direction, color in zip(image_times, directions, img_colors):
+        y_v    = bb_alb[np.argmin(np.abs(time_ssfr - it))]
+        t_dt   = base_date + timedelta(hours=it)
+        dy_tip = 0.01 if direction == 'down' else -0.01   # small gap at the data point
+        y_tip  = y_v + dy_tip
+        ux, uy = _arrow_dir[direction]
+        x_tip_pt = (mdates.date2num(t_dt) - x0_ax) / (x1_ax - x0_ax) * ax_w_pt
+        y_tip_pt = (y_tip - y0_ax) / (y1_ax - y0_ax) * ax_h_pt
+        room = []                                   # distance tip -> frame, in points
+        if   ux > 0: room.append((ax_w_pt - x_tip_pt) / ux)
+        elif ux < 0: room.append(x_tip_pt / -ux)
+        if   uy > 0: room.append((ax_h_pt - y_tip_pt) / uy)
+        elif uy < 0: room.append(y_tip_pt / -uy)
+        length = min([_ARROW_LEN_PT_] + [r - _ARROW_MARGIN_PT_ for r in room])
+        length = max(length, _ARROW_MIN_PT_)
+        ax11.annotate('', xy=(t_dt, y_tip),
+                      xytext=(ux*length, uy*length), textcoords='offset points',
+                      arrowprops=dict(facecolor=color, edgecolor=color, shrink=0.0,
+                                      width=1.4, headwidth=6, headlength=6))
+
     ax12.fill_between(sorted_cam_ice,
                       models_fig[0.05].predict(sm.add_constant(sorted_cam_ice)),
                       models_fig[0.95].predict(sm.add_constant(sorted_cam_ice)),
-                      color='coral', alpha=0.3, label='Quantile Regression (5th-95th)')
+                      color='coral', alpha=0.3, lw=0, zorder=1,
+                      label='Quantile Regression (5th-95th)')
+    ax12.scatter(cam_ice[mask], bb_cam[mask], s=4, c='k', alpha=0.6, zorder=2)
+    ax12.plot(sorted_cam_ice, slope_fig*sorted_cam_ice + intercept_fig, color='red', linestyle='--',
+              zorder=3,
+              label=r'Linear Fit: y=%.2fx+%.2f, $\mathrm{R^2}$=%.2f' % (slope_fig, intercept_fig, r_value_fig**2))
     ax12.set_xlabel('Camera Sea Ice Fraction')
     ax12.set_ylabel('Broadband Albedo')
-    ax12.legend()
+    # Small type and tight padding: at the default box width the legend reached
+    # across the panel and covered the high-ice-fraction scatter at upper right.
+    ax12.legend(fontsize=5, loc='upper left', framealpha=0.85,
+                handlelength=1.5, handletextpad=0.5,
+                borderpad=0.35, labelspacing=0.3, borderaxespad=0.3)
 
+    # Timestamp and panel letter go inside each image: an axes title here would
+    # collide with the x-labels of (a)/(b) directly above.
     img_crop = (slice(0, 1980), slice(500, 2500))
-    for ax_img, fn, title, col in [
-        (ax21, f'{_fdir_general_}/camera/20240801/Capture_02436_13_53_54Z.jpg', '13:53:54 UTC', img_colors[0]),
-        (ax22, f'{_fdir_general_}/camera/20240801/Capture_02584_13_56_47Z.jpg', '13:56:47 UTC', img_colors[1]),
-        (ax23, f'{_fdir_general_}/camera/20240801/Capture_02712_13_59_11Z.jpg', '13:59:11 UTC', img_colors[2]),
-        (ax24, f'{_fdir_general_}/camera/20240801/Capture_02991_14_04_24Z.jpg', '14:04:24 UTC', img_colors[3]),
+    # Display-only brightening: gamma < 1 lifts the shadows without clipping the
+    # sun-glint spot on the dome, which a linear gain would blow out. The camera
+    # ice-fraction retrieval runs on the original imagery, not on this rendering.
+    _IMG_GAMMA_ = 0.85
+    for ax_img, fn, cap, title, col in [
+        (ax21, f'{_fdir_general_}/camera/20240801/Capture_02436_13_53_54Z.jpg', '(c)', '13:53:54 UTC', img_colors[0]),
+        (ax22, f'{_fdir_general_}/camera/20240801/Capture_02584_13_56_47Z.jpg', '(d)', '13:56:47 UTC', img_colors[1]),
+        (ax23, f'{_fdir_general_}/camera/20240801/Capture_02712_13_59_11Z.jpg', '(e)', '13:59:11 UTC', img_colors[2]),
+        (ax24, f'{_fdir_general_}/camera/20240801/Capture_02991_14_04_24Z.jpg', '(f)', '14:04:24 UTC', img_colors[3]),
     ]:
-        img = plt.imread(fn)
+        img = np.clip(plt.imread(fn) / 255.0, 0.0, 1.0) ** _IMG_GAMMA_
         ax_img.imshow(img[img_crop[0], img_crop[1], :])
-        ax_img.set_title(title, color=col)
+        ax_img.text(0.03, 0.97, f'{cap} {title}', transform=ax_img.transAxes,
+                    color=col, fontsize=7, va='top', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                              edgecolor='none', alpha=0.75))
         ax_img.axis('off')
 
-    for ax_cap, cap in zip([ax11, ax12, ax21, ax22, ax23, ax24],
-                            ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)']):
+    for ax_cap, cap in zip([ax11, ax12], ['(a)', '(b)']):
         add_panel_label(ax_cap, cap)
     save_grl(fig, f'{fig_dir}/arcsix_albedo_0801_clear_broadband_icefraction_combined')
     plt.close(fig)
