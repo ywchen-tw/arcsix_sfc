@@ -47,7 +47,7 @@ CLOUDY_CASE_ID_LIST = [
     'case_023', 'case_024',
     'case_039', 'case_040', 'case_041', 'case_042', 'case_043', 'case_044', 'case_045',
     'case_046', 'case_047',
-    'case_048', 'case_049', 'case_050', 'case_054', 'case_055', 'case_056'
+    'case_048', 'case_049', 'case_050', 'case_054', 'case_055', 'case_056',
     'case_057', 'case_058',
 ]
 
