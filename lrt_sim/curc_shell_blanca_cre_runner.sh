@@ -22,18 +22,35 @@ PROJECT_ROOT="/projects/yuch8913/arcsix_sfc/lrt_sim"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 cd "$PROJECT_ROOT"
 
-# Usage: sbatch curc_shell_blanca_cre_runner.sh ALB_INDEX [CASE_ID] [MODE]
-#   ALB_INDEX : 0-based index into cre_cases.MANUAL_ALB_SWEEP (one albedo per job)
-#   CASE_ID   : catalog case id (default case_004)
-#   MODE      : sw | lw | both (default both)
-# Submit one job per albedo, e.g.:  for i in $(seq 0 9); do sbatch THIS.sh $i; done
+# Usage: sbatch curc_shell_blanca_cre_runner.sh ALB_INDEX [CHUNK_INDEX] [CASE_ID] [MODE]
+#   ALB_INDEX   : 0-based index into cre_cases.MANUAL_ALB_SWEEP (one albedo per job)
+#   CHUNK_INDEX : 0-based index into cre_cases.CRE_SZA_CHUNKS -- run only that
+#                 slice of the SZA grid, so one (case, albedo) is split across
+#                 several shorter jobs. Omit to run the whole grid in one job.
+#   CASE_ID     : catalog case id (default case_004)
+#   MODE        : sw | lw | both (default both)
+#
+# One job per albedo (whole SZA grid each):
+#   for i in $(seq 0 14); do sbatch THIS.sh $i; done
+# One job per (albedo, SZA chunk) -- shorter jobs, better for preemptable QOS:
+#   for i in $(seq 0 14); do for c in $(seq 0 3); do sbatch THIS.sh $i $c; done; done
+#
+# The chunks together cover the full grid PLUS the case-mean SZA, so a complete
+# set is required before cre_plot can build its axis -- run every chunk.
 ALB_INDEX="$1"
-CASE_ID="${2:-case_004}"
-MODE="${3:-both}"
+CHUNK_INDEX="$2"
+CASE_ID="${3:-case_004}"
+MODE="${4:-both}"
 
 if [ -z "$ALB_INDEX" ]; then
     echo "ERROR: ALB_INDEX (first arg) required, e.g. 'sbatch $0 0'." >&2
     exit 1
+fi
+
+# Empty CHUNK_INDEX -> no flag -> cre_runner uses the full SZA grid.
+SZA_CHUNK_FLAG=()
+if [ -n "$CHUNK_INDEX" ]; then
+    SZA_CHUNK_FLAG=(--sza-chunk "$CHUNK_INDEX")
 fi
 
 # Reuse the prebuilt atmospheric profile (skips the MODIS-based rebuild); the
@@ -94,5 +111,6 @@ python -m cre.cre_runner \
     --mode "$MODE" \
     --atm-file "$ATM_FILE" \
     --manual-alb "$MANUAL_ALB" \
+    "${SZA_CHUNK_FLAG[@]}" \
     --workers "$WORKERS" \
     $OVERWRITE_FLAG

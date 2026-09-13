@@ -103,6 +103,15 @@ except ImportError:
         _fdir_data_, _fdir_general_, _fdir_tmp_, _fdir_tmp_graph_, _title_extra_,
     )
 
+# The SZA sweep is defined once in cre_cases so cre_sim and cre_plot can never
+# drift apart on which angles exist.
+try:
+    from cre.cre_cases import cre_sza_array
+except ImportError:
+    try:
+        from .cre_cases import cre_sza_array
+    except ImportError:
+        from cre_cases import cre_sza_array
 
 
 o2a_1_start, o2a_1_end = 748, 780
@@ -376,6 +385,63 @@ def load_case_from_combined(date_s, case_tag, combined_file=None):
     return select_combined_rows(date_s, case_tag=case_tag, combined_file=combined_file)
 
 
+def case_meta_cache_file(date_s, case_tag):
+    """Path of the small per-case extract cached from the combined product."""
+    return f'{_fdir_general_}/sfc_alb_cre/case_meta_{date_s}_{case_tag}.pkl'
+
+
+def load_case_from_combined_cached(date_s, case_tag, combined_file=None):
+    """:func:`load_case_from_combined` with a small on-disk cache.
+
+    The combined product is a multi-GB pickle, and a cluster sweep runs one task
+    per (albedo, SZA-chunk) -- dozens of tasks that would each re-read all of it
+    just to slice out the same few hundred rows. The selection is a few MB, so
+    cache it next to the CRE albedo files and reuse it; this cuts both the
+    per-task memory peak and a lot of traffic on the shared filesystem.
+
+    The cache is invalidated by mtime whenever the combined product is rebuilt
+    (same rule as ``combined.cache_is_fresh``). Writes go through a
+    process-unique temp file plus :func:`os.replace`, so concurrent array tasks
+    can never read a half-written cache -- whichever finishes first wins and the
+    others overwrite it with identical content. Any cache failure falls back to
+    reading the combined product directly, so a full disk or a read-only data
+    tree degrades to the old behaviour instead of failing the run.
+    """
+    cache_file = case_meta_cache_file(date_s, case_tag)
+    source_file = combined_file if combined_file is not None else combined_product_file()
+
+    if os.path.exists(cache_file):
+        try:
+            fresh = (not os.path.exists(source_file)
+                     or os.path.getmtime(cache_file) >= os.path.getmtime(source_file))
+            if fresh:
+                with open(cache_file, 'rb') as f:
+                    return pickle.load(f)
+            print(f"Case cache {os.path.basename(cache_file)} is older than the combined "
+                  f"product; rebuilding it.")
+        except Exception as err:
+            print(f"Could not read case cache {cache_file} ({err}); rebuilding it.")
+
+    case = load_case_from_combined(date_s, case_tag, combined_file=combined_file)
+    if case is None:
+        return None
+
+    tmp_file = f'{cache_file}.tmp.{os.getpid()}'
+    try:
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(tmp_file, 'wb') as f:
+            pickle.dump(case, f, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp_file, cache_file)
+        print(f"Cached case metadata for {date_s} {case_tag} -> {cache_file}")
+    except Exception as err:
+        print(f"Could not write case cache {cache_file} ({err}); continuing without it.")
+        try:
+            os.remove(tmp_file)
+        except OSError:
+            pass
+    return case
+
+
 def mean_extended_albedo(date_s, time_range=None, case_tag=None, combined_file=None,
                          combined_data=None, alt_range=None):
     """Mean atmospheric-corrected **extended** albedo over a selected range.
@@ -445,6 +511,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
                      lw=False,
                      manual_alb=None,
                      sza_list=None,
+                     include_sza_avg=False,  # append the case-mean SZA to an explicit sza_list
                      manual_atm_file=None,
                      manual_ch4_file=None,
                      cwp_list_g=None,  # explicit CWP list [g/m^2] for a quick test; None = built-in platform sweep
@@ -603,7 +670,7 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # vapor profile is not in the combined product, so it is still read from the
     # per-leg cloud-observation pickles in the loop below (only needed when
     # building the atmospheric profile from scratch).
-    combined_case = load_case_from_combined(date_s, case_tag)
+    combined_case = load_case_from_combined_cached(date_s, case_tag)
 
     init = True
     alb_iter2_all = None
@@ -733,10 +800,17 @@ def cre_sim(date=datetime.datetime(2024, 5, 31),
     # sza_arr = np.array([70, 71.5,], dtype=np.float32)
     # sza_arr = np.array([72.5, 73], dtype=np.float32)
     # sza_arr = np.array([73.5, 75, sza_avg], dtype=np.float32)
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, 80, 82.5, 85, 87, sza_avg], dtype=np.float32)
+    # CRE_SZA_GRID + the case-mean SZA -- the same axis cre_plot rebuilds.
+    sza_arr = cre_sza_array(sza_avg)
     if sza_list is not None:
-        # explicit solar-zenith-angle list (e.g. a single angle for a quick test)
+        # explicit solar-zenith-angle list (a quick test, or one cluster chunk)
         sza_arr = np.atleast_1d(np.array(sza_list, dtype=np.float32))
+        if include_sza_avg:
+            # An explicit list REPLACES the grid, so the run-time case-mean would
+            # otherwise be lost -- and cre_plot needs it. Exactly one SZA chunk
+            # sets this so the mean is simulated once across a chunked run.
+            sza_arr = np.unique(np.concatenate(
+                (sza_arr, np.array([np.round(sza_avg, 2)], dtype=np.float32))))
     # sza_arr = np.array([55, 57.5,], dtype=np.float32)
     # sza_arr = np.array([60, 62.5], dtype=np.float32)
     # sza_arr = np.array([65, 67.5], dtype=np.float32)
@@ -1029,6 +1103,7 @@ def process_cre_case(
     manual_alb=None,
     overwrite_lrt=False,
     sza_list=None,
+    include_sza_avg=False,
     manual_atm_file=None,
     manual_ch4_file=None,
     workers=None,
@@ -1062,6 +1137,7 @@ def process_cre_case(
         lw=lw,
         manual_alb=manual_alb,
         sza_list=sza_list,
+        include_sza_avg=include_sza_avg,
         manual_atm_file=manual_atm_file,
         manual_ch4_file=manual_ch4_file,
         workers=workers,

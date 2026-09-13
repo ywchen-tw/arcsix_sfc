@@ -18,9 +18,9 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
         sys.path.insert(0, _path)
 
 if __package__:
-    from .cre_cases import CRE_CASE_IDS, DEFAULT_CRE_CASE_ID, MANUAL_ALB_SWEEP
+    from .cre_cases import CRE_CASE_IDS, CRE_SZA_CHUNKS, DEFAULT_CRE_CASE_ID, MANUAL_ALB_SWEEP, sza_chunk
 else:
-    from cre_cases import CRE_CASE_IDS, DEFAULT_CRE_CASE_ID, MANUAL_ALB_SWEEP
+    from cre_cases import CRE_CASE_IDS, CRE_SZA_CHUNKS, DEFAULT_CRE_CASE_ID, MANUAL_ALB_SWEEP, sza_chunk
 
 
 def _lw_modes(mode):
@@ -35,6 +35,7 @@ def run_cre_cases(
     overwrite_lrt=False,
     manual_alb=None,
     sza_list=None,
+    include_sza_avg=False,
     manual_atm_file=None,
     manual_ch4_file=None,
     workers=None,
@@ -60,6 +61,7 @@ def run_cre_cases(
                 manual_alb=manual_alb,
                 overwrite_lrt=overwrite_lrt,
                 sza_list=sza_list,
+                include_sza_avg=include_sza_avg,
                 manual_atm_file=manual_atm_file,
                 manual_ch4_file=manual_ch4_file,
                 workers=workers,
@@ -104,6 +106,19 @@ def main():
              'replacing "atm_profiles" with "ch4_profiles".',
     )
     parser.add_argument(
+        '--sza-chunk', type=int, default=None, metavar='INDEX',
+        help='Run one SZA chunk from cre_cases.CRE_SZA_CHUNKS instead of the full '
+             f'grid ({len(CRE_SZA_CHUNKS)} chunks, 0-{len(CRE_SZA_CHUNKS) - 1}). Splits a '
+             'case into several smaller cluster jobs; the chunks together cover the '
+             'full grid plus the case-mean SZA. Overrides --sza/--sza-avg.',
+    )
+    parser.add_argument(
+        '--sza-avg', action='store_true',
+        help='Also run the case-mean SZA alongside an explicit --sza list. An explicit '
+             'list otherwise replaces the grid entirely and drops the case mean, which '
+             'cre_plot requires. Implied by the relevant --sza-chunk.',
+    )
+    parser.add_argument(
         '--manual-alb-sweep', action='store_true',
         help='Use the cross-case manual albedo spectra sweep from cre_cases.',
     )
@@ -126,13 +141,21 @@ def main():
 
     manual_alb = MANUAL_ALB_SWEEP if args.manual_alb_sweep else args.manual_alb
 
+    sza_list = args.sza
+    include_sza_avg = args.sza_avg
+    if args.sza_chunk is not None:
+        sza_list, include_sza_avg = sza_chunk(args.sza_chunk)
+        print(f"SZA chunk {args.sza_chunk}/{len(CRE_SZA_CHUNKS) - 1}: {sza_list}"
+              f"{' + case-mean' if include_sza_avg else ''}")
+
     run_cre_cases(
         case_id=args.case_id,
         case_ids=case_ids,
         mode=args.mode,
         overwrite_lrt=args.overwrite_lrt,
         manual_alb=manual_alb,
-        sza_list=args.sza,
+        sza_list=sza_list,
+        include_sza_avg=include_sza_avg,
         manual_atm_file=args.atm_file,
         manual_ch4_file=args.ch4_file,
         workers=args.workers,

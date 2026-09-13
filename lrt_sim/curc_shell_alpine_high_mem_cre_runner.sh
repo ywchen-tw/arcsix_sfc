@@ -10,10 +10,10 @@
 #SBATCH --job-name=arcsix-cre_simulation
 #SBATCH --partition=amem
 #SBATCH --qos=mem-normal
-# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (13 entries:
-# indices 0-12). Keep this range in sync with len(MANUAL_ALB_SWEEP). %2 caps the
+# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (15 entries:
+# indices 0-14). Keep this range in sync with len(MANUAL_ALB_SWEEP). %2 caps the
 # job to 2 full amem nodes running concurrently.
-#SBATCH --array=0-12%2
+#SBATCH --array=0-14%2
 
 module load anaconda intel/2022.1.2 hdf5/1.10.1 zlib/1.2.11 netcdf/4.8.1 swig/4.1.1 gsl/2.7
 conda activate er3t

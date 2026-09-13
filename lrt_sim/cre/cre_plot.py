@@ -93,6 +93,15 @@ from plot_style import apply_grl_style, figsize_mm, save_grl, add_panel_label, F
 # from util.arcsix_atm import prepare_atmospheric_profile
 from util import *
 
+# Shared SZA sweep: identical axis to the one cre_sim runs.
+try:
+    from cre.cre_cases import cre_sza_array
+except ImportError:
+    try:
+        from .cre_cases import cre_sza_array
+    except ImportError:
+        from cre_cases import cre_sza_array
+
 # Reuse the atmospheric-correction settings (single source of truth for paths
 # and mission constants) instead of redefining them here.
 try:
@@ -487,7 +496,10 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
     # sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75, 77.5, ], dtype=np.float32)
     # sza_arr = np.array([50, 55, 60, np.round(sza_avg, 2), 65, 70, 75, 77.5, 80, 82.5, 85, 87], dtype=np.float32)
     
-    sza_arr = np.array([50, 52.5, 55, 57.5, 60, np.round(sza_avg, 2), 62.5, 65, 67.5, 70, 71.5, 72.5, 73, 73.5, 75,], dtype=np.float32)
+    # Same axis cre_sim simulates: CRE_SZA_GRID + the case-mean SZA, ascending.
+    # (The old hand-written list wedged sza_avg after 60, which is only monotonic
+    # when the case mean happens to fall in 60-62.5.)
+    sza_arr = cre_sza_array(sza_avg)
 
         
         
