@@ -23,16 +23,26 @@ export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 cd "$PROJECT_ROOT"
 
 # Usage: sbatch curc_shell_alpine_high_mem_cre_runner.sh [CASE_ID] [MODE]
-#   CASE_ID : catalog case id (default case_004)
+#   CASE_ID : catalog case id (default case_014)
 #   MODE    : sw | lw | both (default both)
-CASE_ID="${1:-case_019}"
+#
+# CASE_ID and ATM_FILE below must name the SAME case. They are two independent
+# settings -- passing a different CASE_ID does NOT move ATM_FILE -- and a
+# mismatch resolves to zpt/<CASE_ID's date>/<ATM_FILE's name>, a path that only
+# fails loudly while the two cases have different dates.
+CASE_ID="${1:-case_014}"
 MODE="${2:-both}"
 
 # Reuse the prebuilt full-window atmospheric profile for the active case (skips the
 # MODIS-based rebuild); the matching ch4_profiles_* is derived automatically.
 # Resolved under data/zpt/<date>/. Uncomment the line matching CASE_ID above.
-ATM_FILE="atm_profiles_20240613_cloudy_atm_corr_1_14.109_14.140_0.11km.dat"      # case_019 (2024-06-13)
-# ATM_FILE="atm_profiles_20240607_cloudy_atm_corr_15.336_15.761_0.12km.dat"      # case_014 (2024-06-07)
+ATM_FILE="atm_profiles_20240607_cloudy_atm_corr_15.319_15.761_0.12km.dat"        # case_014 (2024-06-07)
+# NOTE: the time window in this name is rebuilt from the combined product on every
+# run (cre_sim writes atm_profiles_<date>_<tag>_<t0>_<t1>_<alt>km.dat from the case
+# rows), so a combined-product rebuild can shift it. This was 15.336 before the
+# 2026-09-12 rebuild; case_014 has no skip-flagged legs, so its window is the full
+# 15.319-15.761 span of the 53 legs on disk.
+# ATM_FILE="atm_profiles_20240613_cloudy_atm_corr_1_14.109_14.140_0.11km.dat"    # case_019 (2024-06-13)
 
 # Each uvspec CRE run peaks near ~64 GB; amem gives ~15.5 GB/core. Size the pool
 # by available RAM (not core count) so the flattened SZA x CWP sweep never OOMs.

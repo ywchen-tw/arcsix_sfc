@@ -390,6 +390,19 @@ def case_meta_cache_file(date_s, case_tag):
     return f'{_fdir_general_}/sfc_alb_cre/case_meta_{date_s}_{case_tag}.pkl'
 
 
+# Key recorded inside a cache file to decide whether it still matches its source.
+_CACHE_SOURCE_KEY = '_source_stat'
+
+
+def _source_stat(path):
+    """Return ``(size, mtime)`` of the combined product, or ``None`` if unreadable."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_size, st.st_mtime)
+
+
 def load_case_from_combined_cached(date_s, case_tag, combined_file=None):
     """:func:`load_case_from_combined` with a small on-disk cache.
 
@@ -399,38 +412,76 @@ def load_case_from_combined_cached(date_s, case_tag, combined_file=None):
     cache it next to the CRE albedo files and reuse it; this cuts both the
     per-task memory peak and a lot of traffic on the shared filesystem.
 
-    The cache is invalidated by mtime whenever the combined product is rebuilt
-    (same rule as ``combined.cache_is_fresh``). Writes go through a
-    process-unique temp file plus :func:`os.replace`, so concurrent array tasks
-    can never read a half-written cache -- whichever finishes first wins and the
-    others overwrite it with identical content. Any cache failure falls back to
-    reading the combined product directly, so a full disk or a read-only data
-    tree degrades to the old behaviour instead of failing the run.
+    Freshness is decided by the source's ``(size, mtime)`` **recorded inside the
+    cache when it was written**, not by comparing the two files' timestamps. That
+    survives copying the data tree between machines with ``rsync -a`` (which
+    preserves mtime) and cannot be defeated by touching either file, while a real
+    rebuild of the combined product still invalidates it.
+
+    A cache whose source has gone missing or become unreadable -- a truncated
+    file from an interrupted transfer, most likely -- is USED with a loud
+    warning rather than discarded: on a cluster the big file may well be
+    mid-sync, and failing dozens of array tasks over it helps nobody. When there
+    is no usable cache either, the error names the file and its size instead of
+    surfacing a bare ``UnpicklingError``.
+
+    Writes go through a process-unique temp file plus :func:`os.replace`, so
+    concurrent array tasks can never read a half-written cache. Any cache write
+    failure is non-fatal -- a read-only or full data tree degrades to the old
+    read-it-every-time behaviour.
     """
     cache_file = case_meta_cache_file(date_s, case_tag)
     source_file = combined_file if combined_file is not None else combined_product_file()
+    source_stat = _source_stat(source_file)
 
+    cached = None
     if os.path.exists(cache_file):
         try:
-            fresh = (not os.path.exists(source_file)
-                     or os.path.getmtime(cache_file) >= os.path.getmtime(source_file))
-            if fresh:
-                with open(cache_file, 'rb') as f:
-                    return pickle.load(f)
-            print(f"Case cache {os.path.basename(cache_file)} is older than the combined "
-                  f"product; rebuilding it.")
+            with open(cache_file, 'rb') as f:
+                cached = pickle.load(f)
         except Exception as err:
             print(f"Could not read case cache {cache_file} ({err}); rebuilding it.")
+            cached = None
 
-    case = load_case_from_combined(date_s, case_tag, combined_file=combined_file)
+    if cached is not None:
+        recorded = cached.get(_CACHE_SOURCE_KEY)
+        if recorded is not None and source_stat is not None and tuple(recorded) == source_stat:
+            return {k: v for k, v in cached.items() if k != _CACHE_SOURCE_KEY}
+        if recorded is None:
+            print(f"Case cache {os.path.basename(cache_file)} predates source-stat tracking; "
+                  f"rebuilding it once.")
+        else:
+            print(f"Case cache {os.path.basename(cache_file)} does not match the combined "
+                  f"product (cached {tuple(recorded)}, source {source_stat}); rebuilding it.")
+
+    try:
+        case = load_case_from_combined(date_s, case_tag, combined_file=combined_file)
+    except Exception as err:
+        # Truncated/corrupt source. Prefer a cache we already have over failing.
+        if cached is not None:
+            print(f"WARNING: could not read {source_file} ({err}).")
+            print(f"WARNING: falling back to the existing case cache {cache_file}, which may "
+                  f"predate the current combined product. Re-copy the combined product and "
+                  f"delete this cache if the results look stale.")
+            return {k: v for k, v in cached.items() if k != _CACHE_SOURCE_KEY}
+        size = source_stat[0] if source_stat is not None else 'missing'
+        raise RuntimeError(
+            f"Could not read the combined product {source_file} (size: {size} bytes): {err}. "
+            f"A truncated pickle usually means the file transfer to this machine did not "
+            f"finish -- re-copy it (rsync -aP) and compare the byte count with the source."
+        ) from err
+
     if case is None:
         return None
 
+    payload = dict(case)
+    if source_stat is not None:
+        payload[_CACHE_SOURCE_KEY] = source_stat
     tmp_file = f'{cache_file}.tmp.{os.getpid()}'
     try:
         os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         with open(tmp_file, 'wb') as f:
-            pickle.dump(case, f, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
         os.replace(tmp_file, cache_file)
         print(f"Cached case metadata for {date_s} {case_tag} -> {cache_file}")
     except Exception as err:
