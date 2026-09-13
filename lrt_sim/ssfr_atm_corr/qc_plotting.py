@@ -4,12 +4,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 try:
-    from .helpers import ssfr_flags
+    from .helpers import resolve_ssfr_mask_flags
 except ImportError:
-    from helpers import ssfr_flags
+    from helpers import resolve_ssfr_mask_flags
 
 
-def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, date_s, case_tag, pitch_roll_thres=3.0):
+def ssfr_time_series_plot(
+    data_hsk,
+    data_ssfr,
+    data_hsr1,
+    tmhr_ranges_select,
+    date_s,
+    case_tag,
+    pitch_roll_thres=3.0,
+    mask_flags=None,
+):
     t_hsk = np.array(data_hsk["tmhr"])
     t_ssfr = data_ssfr['time'] / 3600.0
     t_hsr1 = data_hsr1['time'] / 3600.0
@@ -70,10 +79,14 @@ def ssfr_time_series_plot(data_hsk, data_ssfr, data_hsr1, tmhr_ranges_select, da
     hsr_dif_ratio = hsr_dif_ratio[t_hsr1_tmhr_mask]
     hsr1_diff_ratio_530_570_mean = hsr1_diff_ratio_530_570_mean[t_hsr1_tmhr_mask]
 
-    alp_ang_pit_rol_issue = (data_ssfr['flag'] & ssfr_flags.alp_ang_pit_rol_issue) != 0
-    alp_ang_pit_rol_issue_tmhr = alp_ang_pit_rol_issue[t_ssfr_tmhr_mask]
-    ssfr_fup_tmhr[alp_ang_pit_rol_issue_tmhr] = np.nan
-    ssfr_fdn_tmhr[alp_ang_pit_rol_issue_tmhr] = np.nan
+    # Blank the highlighted SSFR series on the same R1 flag bits preprocess masks on.
+    ssfr_flag = np.asarray(data_ssfr['flag']).astype(np.int64)
+    flag_excluded = np.zeros(ssfr_flag.shape, dtype=bool)
+    for member in resolve_ssfr_mask_flags(mask_flags):
+        flag_excluded |= (ssfr_flag & int(member.value)) != 0
+    flag_excluded_tmhr = flag_excluded[t_ssfr_tmhr_mask]
+    ssfr_fup_tmhr[flag_excluded_tmhr] = np.nan
+    ssfr_fdn_tmhr[flag_excluded_tmhr] = np.nan
 
     ssfr_zen_550_ind = np.argmin(np.abs(ssfr_zen_wvl - 550))
     ssfr_nad_550_ind = np.argmin(np.abs(ssfr_nad_wvl - 550))

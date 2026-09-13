@@ -1,10 +1,12 @@
 """Small helpers for SSFR atmospheric correction."""
 
 import os
+import re
 import uuid
 from contextlib import contextmanager
 from enum import IntFlag, auto
 
+import h5py
 import numpy as np
 import pandas as pd
 
@@ -56,12 +58,96 @@ except ImportError:
     )
 
 
+# SSFR R1 data-quality flag. Bit index = declaration order, mirroring `ssfr_flags`
+# in ssfr/projects/2024-arcsix/_arcsix_archive.py (layout of 2026-09-11). The R1
+# file documents its own layout in the `flag` long_name; call
+# `verify_ssfr_flag_layout` before decoding so a re-ordered product can never be
+# read with a stale enum.
 class ssfr_flags(IntFlag):
-    pitcth_roll_exceed_threshold = auto()
-    camera_icing = auto()
-    camera_icing_pre = auto()
-    zen_toa_over_threshold = auto()
-    alp_ang_pit_rol_issue = auto()
+    tec_temp_controller_issue = auto()        # bit 0: thermoelectric cooler (TEC) temperature controller issue
+    hsk_pitch_roll_exceed_threshold = auto()  # bit 1: aircraft (HSK INS) pitch/roll exceeded threshold (nadir collector)
+    camera_icing = auto()                     # bit 2: camera icing at measurement time
+    camera_icing_pre = auto()                 # bit 3: camera icing within 30 minutes prior to measurement time
+    zen_toa_over_threshold = auto()           # bit 4: zenith flux exceeded the TOA irradiance threshold
+    alp_hsk_ang_issue = auto()                # bit 5: leveling-platform pitch/roll rate-of-change issue
+    alp_pitch_roll_exceed_threshold = auto()  # bit 6: zenith collector tilt after platform compensation exceeded threshold
+
+
+# Bits that preprocess masks on by default (zenith, nadir and TOA together).
+# Bits 2, 3, 5 and 6 are recorded in the leg pickle but not masked.
+ssfr_default_mask_flags = (
+    ssfr_flags.tec_temp_controller_issue,
+    ssfr_flags.hsk_pitch_roll_exceed_threshold,
+    ssfr_flags.zen_toa_over_threshold,
+)
+
+# Keyword that must appear in the R1 long_name description of each bit.
+_SSFR_FLAG_KEYWORDS = {
+    ssfr_flags.tec_temp_controller_issue: 'thermoelectric cooler',
+    ssfr_flags.hsk_pitch_roll_exceed_threshold: 'aircraft pitch/roll',
+    ssfr_flags.camera_icing: 'camera icing at measurement time',
+    ssfr_flags.camera_icing_pre: 'camera icing within',
+    ssfr_flags.zen_toa_over_threshold: 'exceeding the toa',
+    ssfr_flags.alp_hsk_ang_issue: 'rate-of-change',
+    ssfr_flags.alp_pitch_roll_exceed_threshold: 'light-collector tilt',
+}
+
+
+def ssfr_flag_bit(flag_member):
+    """Return the 0-based bit index of an ``ssfr_flags`` member."""
+    return int(flag_member.value).bit_length() - 1
+
+
+def resolve_ssfr_mask_flags(mask_flags=None):
+    """Normalise ``mask_flags`` (members, names, or None) to a tuple of members."""
+    if mask_flags is None:
+        return ssfr_default_mask_flags
+    resolved = []
+    for item in mask_flags:
+        if isinstance(item, ssfr_flags):
+            resolved.append(item)
+        elif isinstance(item, str):
+            resolved.append(ssfr_flags[item])
+        else:
+            raise TypeError(f'mask_flags entries must be ssfr_flags members or names, got {item!r}')
+    return tuple(resolved)
+
+
+def verify_ssfr_flag_layout(fname_ssfr):
+    """Check that the ``flag`` long_name in an SSFR R1 file matches ``ssfr_flags``.
+
+    The archive script composes the long_name as ``bit N: description`` entries in
+    enum order, so a re-ordered or extended product is caught here instead of
+    silently decoding the wrong bits. Returns the long_name on success.
+    """
+    with h5py.File(fname_ssfr, 'r') as f:
+        long_name = f['flag'].attrs.get('long_name', '')
+    if isinstance(long_name, bytes):
+        long_name = long_name.decode()
+    long_name = str(long_name)
+
+    described = {
+        int(m.group(1)): m.group(2).strip()
+        for m in re.finditer(r'bit\s+(\d+):\s*([^;]+)', long_name)
+    }
+
+    problems = []
+    for member, keyword in _SSFR_FLAG_KEYWORDS.items():
+        bit = ssfr_flag_bit(member)
+        text = described.get(bit)
+        if text is None:
+            problems.append(f'bit {bit} ({member.name}) is not documented in the file')
+        elif keyword not in text.lower():
+            problems.append(f'bit {bit} ({member.name}) reads "{text}" in the file')
+    extra = sorted(set(described) - {ssfr_flag_bit(m) for m in _SSFR_FLAG_KEYWORDS})
+    if extra:
+        problems.append(f'file documents bits {extra} unknown to ssfr_flags')
+    if problems:
+        raise RuntimeError(
+            f'SSFR flag layout mismatch in {fname_ssfr}: ' + '; '.join(problems)
+            + f'. File long_name: "{long_name}"'
+        )
+    return long_name
 
 
 @contextmanager

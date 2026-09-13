@@ -12,6 +12,8 @@ import glob
 import math
 import os
 import re
+from collections import Counter
+
 import numpy as np
 
 if __package__:
@@ -769,7 +771,7 @@ ALL_CASE_CATALOG = [
  {'id': 'case_039',
   'date': '2024-08-07',
   'case_tag': 'cloudy_atm_corr_1',
-  'tmhr_ranges_select': [[13.344, 13.763], # 100m, cloudy
+  'tmhr_ranges_select': [[13.344, 13.518], # 100m, cloudy
                                             ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -786,8 +788,46 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cot': 1.59,},
  
  {'id': 'case_040',
+   'date': '2024-08-07',
+   'case_tag': 'cloudy_atm_corr_2',
+   'tmhr_ranges_select': [[13.518, 13.682], # 100m, cloudy
+                                             ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.6, 0.65, 0.69, 0.78, 1.0,]),
+                             np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                             np.arange(5.0, 10.1, 2.5),
+                             np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 10.7,
+   'manual_cloud_cwp': 0.01128,
+   'manual_cloud_cwp_expr': '11.28 / 1000',
+   'manual_cloud_cth': 0.78,
+   'manual_cloud_cbh': 0.69,
+   'manual_cloud_cot': 1.59,},
+ 
+ {'id': 'case_041',
+    'date': '2024-08-07',
+    'case_tag': 'cloudy_atm_corr_3',
+    'tmhr_ranges_select': [[13.682, 13.763], # 100m, cloudy
+                                              ],
+    'simulation_interval': 0.5,
+    'clear_sky': False,
+    'manual_cloud': True,
+    'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.4, 0.6, 0.65, 0.69, 0.78, 1.0,]),
+                              np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                              np.arange(5.0, 10.1, 2.5),
+                              np.array([15, 20, 30., 40., 45.]))),
+    'manual_cloud_cer': 10.7,
+    'manual_cloud_cwp': 0.01128,
+    'manual_cloud_cwp_expr': '11.28 / 1000',
+    'manual_cloud_cth': 0.78,
+    'manual_cloud_cbh': 0.69,
+    'manual_cloud_cot': 1.59,},
+ 
+ {'id': 'case_042',
   'date': '2024-08-07',
-  'case_tag': 'cloudy_atm_corr_2',
+  'case_tag': 'cloudy_atm_corr_4',
   'tmhr_ranges_select': [
                         [15.472, 15.567], # 180m, cloudy
                         ],
@@ -805,11 +845,11 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 0.62,
   'manual_cloud_cot': 16.21,},
  
- {'id': 'case_041',
+ {'id': 'case_043',
   'date': '2024-08-07',
-  'case_tag': 'cloudy_atm_corr_3',
+  'case_tag': 'cloudy_atm_corr_5',
   'tmhr_ranges_select': [
-                        [15.580, 15.921], # 100m, cloudy
+                        [15.580, 15.684], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -825,7 +865,47 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 0.62,
   'manual_cloud_cot': 16.21,},
  
- {'id': 'case_042',
+ {'id': 'case_044',
+   'date': '2024-08-07',
+   'case_tag': 'cloudy_atm_corr_6',
+   'tmhr_ranges_select': [
+                         [15.684, 15.851], # 100m, cloudy
+                         ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
+                             np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                             np.arange(5.0, 10.1, 2.5),
+                             np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 7.2,
+   'manual_cloud_cwp': 0.0775,
+   'manual_cloud_cwp_expr': '77.5 / 1000',
+   'manual_cloud_cth': 0.96,
+   'manual_cloud_cbh': 0.62,
+   'manual_cloud_cot': 16.21,},
+ 
+ {'id': 'case_045',
+    'date': '2024-08-07',
+    'case_tag': 'cloudy_atm_corr_7',
+    'tmhr_ranges_select': [
+                          [15.851, 15.921], # 100m, cloudy
+                          ],
+    'simulation_interval': 0.5,
+    'clear_sky': False,
+    'manual_cloud': True,
+    'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
+                              np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                              np.arange(5.0, 10.1, 2.5),
+                              np.array([15, 20, 30., 40., 45.]))),
+    'manual_cloud_cer': 7.2,
+    'manual_cloud_cwp': 0.0775,
+    'manual_cloud_cwp_expr': '77.5 / 1000',
+    'manual_cloud_cth': 0.96,
+    'manual_cloud_cbh': 0.62,
+    'manual_cloud_cot': 16.21,},
+ 
+ {'id': 'case_046',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
@@ -845,7 +925,7 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 0.67,
   'manual_cloud_cot': 14.12,},
  
- {'id': 'case_043',
+ {'id': 'case_047',
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -865,11 +945,11 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 1.81,
   'manual_cloud_cot': 12.41,},
  
- {'id': 'case_044',
+ {'id': 'case_048',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
-                        [13.376, 13.600], # 100m, cloudy
+                        [13.376, 13.561], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -885,7 +965,27 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 0.34,
   'manual_cloud_cot': 13.93,},
  
- {'id': 'case_045',
+ {'id': 'case_049',
+   'date': '2024-08-09',
+   'case_tag': 'cloudy_atm_corr_3',
+   'tmhr_ranges_select': [
+                         [13.561, 13.600], # 100m, cloudy
+                         ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.34, 0.4, 0.6, 0.77, 1.0,]),
+                                                np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                                np.arange(5.0, 10.1, 2.5),
+                                                np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 9.0,
+   'manual_cloud_cwp': 0.08349,
+   'manual_cloud_cwp_expr': '83.49 / 1000',
+   'manual_cloud_cth': 0.77,
+   'manual_cloud_cbh': 0.34,
+   'manual_cloud_cot': 13.93,},
+ 
+ {'id': 'case_050',
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
@@ -905,7 +1005,7 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cbh': 0.29,
   'manual_cloud_cot': 8.93,},
  
- {'id': 'case_046',
+ {'id': 'case_051',
   'date': '2024-08-15',
   'case_tag': 'clear_atm_corr_1',
   'tmhr_ranges_select': [
@@ -916,7 +1016,7 @@ ALL_CASE_CATALOG = [
   'levels': None,
   },
  
- {'id': 'case_047',
+ {'id': 'case_052',
   'date': '2024-08-15',
   'case_tag': 'clear_atm_corr_2',
   'tmhr_ranges_select': [
@@ -927,7 +1027,7 @@ ALL_CASE_CATALOG = [
   'levels': None,
   },
  
- {'id': 'case_048',
+ {'id': 'case_053',
   'date': '2024-08-15',
   'case_tag': 'clear_atm_corr_3',
   'tmhr_ranges_select': [
@@ -1041,6 +1141,18 @@ BAD_CASE_CATALOG = [
 
 # Active cases recovered from legacy/ssfr_atm_corr_ori.py after line 2100.
 CASE_CATALOG = ALL_CASE_CATALOG
+
+
+def _check_unique_case_ids(catalog, name):
+    """Raise if an id repeats; ``get_case`` would otherwise silently return the first match."""
+    counts = Counter(case['id'] for case in catalog)
+    duplicates = sorted(case_id for case_id, count in counts.items() if count > 1)
+    if duplicates:
+        raise ValueError(f"{name} has duplicate case ids: {', '.join(duplicates)}")
+
+
+_check_unique_case_ids(ALL_CASE_CATALOG, 'ALL_CASE_CATALOG')
+_check_unique_case_ids(BAD_CASE_CATALOG, 'BAD_CASE_CATALOG')
 
 
 def cases_for_date(date_s):

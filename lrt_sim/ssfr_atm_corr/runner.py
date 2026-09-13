@@ -17,10 +17,10 @@ for _path in (_REPO_ROOT, _LRT_SIM_ROOT):
         sys.path.insert(0, _path)
 
 if __package__:
-    from .case_catalog import run_catalog_case
+    from .case_catalog import CASE_CATALOG, run_catalog_case
     from .settings import _fdir_data_, _fdir_general_
 else:
-    from case_catalog import run_catalog_case
+    from case_catalog import CASE_CATALOG, run_catalog_case
     from settings import _fdir_data_, _fdir_general_
 
 
@@ -36,7 +36,7 @@ CLEAR_SKY_CASE_ID_LIST = [
     'case_030', 'case_031',
     'case_032', 'case_033',
     'case_034', 'case_035', 'case_036', 'case_037', 'case_038',
-    'case_046', 'case_047', 'case_048',
+    'case_051', 'case_052', 'case_053',
 ]
 
 CLOUDY_CASE_ID_LIST = [
@@ -45,9 +45,9 @@ CLOUDY_CASE_ID_LIST = [
     'case_014',
     'case_019', 'case_020', 'case_021',
     'case_023', 'case_024',
-    'case_039', 'case_040', 'case_041',
-    'case_042', 'case_043',
-    'case_044', 'case_045',
+    'case_039', 'case_040', 'case_041', 'case_042', 'case_043', 'case_044', 'case_045',
+    'case_046', 'case_047',
+    'case_048', 'case_049', 'case_050',
 ]
 
 SPIRAL_CASE_ID_LIST = [
@@ -55,6 +55,27 @@ SPIRAL_CASE_ID_LIST = [
 ]
 
 CASE_ID_LIST = sorted(CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST + SPIRAL_CASE_ID_LIST)
+
+
+def _check_case_id_lists(case_catalog):
+    """Raise if the three id lists above and the active catalog disagree."""
+    catalog_ids = {case['id'] for case in case_catalog}
+    listed = CLEAR_SKY_CASE_ID_LIST + CLOUDY_CASE_ID_LIST + SPIRAL_CASE_ID_LIST
+    duplicates = sorted({case_id for case_id in listed if listed.count(case_id) > 1})
+    missing = sorted(catalog_ids - set(listed))
+    unknown = sorted(set(listed) - catalog_ids)
+    problems = []
+    if duplicates:
+        problems.append(f"listed more than once: {', '.join(duplicates)}")
+    if missing:
+        problems.append(f"in CASE_CATALOG but in no runner list: {', '.join(missing)}")
+    if unknown:
+        problems.append(f"in runner lists but not in CASE_CATALOG: {', '.join(unknown)}")
+    if problems:
+        raise ValueError('runner case id lists are out of sync with CASE_CATALOG; ' + '; '.join(problems))
+
+
+_check_case_id_lists(CASE_CATALOG)
 
 
 def make_default_config():

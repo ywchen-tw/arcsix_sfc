@@ -2,6 +2,10 @@
 
 This module creates the ``flt_cld_obs_info`` pickle files consumed by
 ``ssfr_atm_corr.workflow``.
+
+SSFR samples are screened with the R1 data-quality flag (see ``ssfr_flags`` in
+``helpers``). Zenith, nadir and TOA are masked together wherever any bit in
+``mask_flags`` is set; every bit is also saved to the leg pickle for QC.
 """
 
 import datetime
@@ -29,13 +33,13 @@ from util import FlightConfig, load_h5, nearest_indices, read_ict_kt19, solar_in
 
 try:
     from .case_catalog import cloud_observation_file, get_case
-    from .helpers import ssfr_flags
+    from .helpers import resolve_ssfr_mask_flags, ssfr_flags, verify_ssfr_flag_layout
     from .qc_plotting import ssfr_time_series_plot
     from .settings import _fdir_data_, _fdir_general_, _mission_, _platform_
     from .setup import split_tmhr_ranges, write_ssfr_support_files
 except ImportError:
     from case_catalog import cloud_observation_file, get_case
-    from helpers import ssfr_flags
+    from helpers import resolve_ssfr_mask_flags, ssfr_flags, verify_ssfr_flag_layout
     from qc_plotting import ssfr_time_series_plot
     from settings import _fdir_data_, _fdir_general_, _mission_, _platform_
     from setup import split_tmhr_ranges, write_ssfr_support_files
@@ -91,12 +95,20 @@ def collect_cloud_observation_legs(
     manual_cloud_cth=0.945,
     manual_cloud_cbh=0.344,
     manual_cloud_cot=6.26,
+    mask_flags=None,
 ):
-    """Create cloud-observation pickle files for one atmospheric-correction case."""
+    """Create cloud-observation pickle files for one atmospheric-correction case.
+
+    ``mask_flags`` lists the ``ssfr_flags`` members (or their names) whose samples
+    are set to NaN in the zenith, nadir and TOA arrays. ``None`` selects
+    ``helpers.ssfr_default_mask_flags`` (TEC issue, aircraft pitch/roll, zenith
+    over TOA).
+    """
     if tmhr_ranges_select is None:
         tmhr_ranges_select = [[14.10, 14.27]]
     if config is None:
         config = make_default_config()
+    mask_flags = resolve_ssfr_mask_flags(mask_flags)
 
     log = logging.getLogger("ssfr_atm_corr.preprocess")
     date_s = date.strftime("%Y%m%d")
@@ -111,6 +123,21 @@ def collect_cloud_observation_legs(
     data_marli = load_marli(config, date_s)
     data_kt19 = load_kt19(config, date_s)
 
+    # Decode the R1 data-quality flag once for the whole flight. The layout check
+    # raises if the file's documented bit order differs from ``ssfr_flags``.
+    flag_long_name = verify_ssfr_flag_layout(config.ssfr(date_s))
+    log.info("SSFR flag layout verified: %s", flag_long_name)
+    ssfr_flag = np.asarray(data_ssfr['flag']).astype(np.int64)
+    ssfr_flag_bits = {member: (ssfr_flag & int(member.value)) != 0 for member in ssfr_flags}
+    ssfr_excluded = np.zeros(ssfr_flag.shape, dtype=bool)
+    for member in mask_flags:
+        ssfr_excluded |= ssfr_flag_bits[member]
+    ssfr_f_dn_scale_factor = float(np.asarray(data_ssfr.get('f_dn_scale_factor', np.nan)).squeeze())
+    print(
+        f"SSFR flag mask bits: {[member.name for member in mask_flags]}; "
+        f"f_dn scale factor in file: {ssfr_f_dn_scale_factor:.4f}"
+    )
+
     if plot_qc:
         ssfr_time_series_plot(
             data_hsk,
@@ -120,6 +147,7 @@ def collect_cloud_observation_legs(
             date_s,
             case_tag,
             pitch_roll_thres=3.0,
+            mask_flags=mask_flags,
         )
 
     # Ensure the slit-convolved solar spectrum used for SSFR TOA is available.
@@ -238,17 +266,24 @@ def collect_cloud_observation_legs(
             )
             ssfr_nad_flux_interp[j, :] = f_nad_flux_interp(ssfr_zen_wvl)
 
-        pitch_roll_mask = np.sqrt(data_hsk["ang_pit"][mask]**2 + data_hsk["ang_rol"][mask]**2) < 3.0
-        ssfr_zen_flux[~pitch_roll_mask, :] = np.nan
-        ssfr_nad_flux_interp[~pitch_roll_mask, :] = np.nan
-        ssfr_zen_toa[~pitch_roll_mask, :] = np.nan
+        # Data-quality screening from the R1 flag. Zenith, nadir and TOA are masked
+        # together so the leg-mean spectra draw on the same samples. The aircraft
+        # pitch/roll test that used to be recomputed from HSK here is bit 1 of the
+        # flag (same 3 degree threshold) and is covered by the default mask set.
+        flag_bits_leg = {member: bits[sel_ssfr] for member, bits in ssfr_flag_bits.items()}
+        flag_leg = ssfr_flag[sel_ssfr]
+        excluded_leg = ssfr_excluded[sel_ssfr]
+        ssfr_zen_flux[excluded_leg, :] = np.nan
+        ssfr_nad_flux_interp[excluded_leg, :] = np.nan
+        ssfr_zen_toa[excluded_leg, :] = np.nan
 
-        icing = (data_ssfr['flag'] & ssfr_flags.camera_icing) != 0
-        icing_pre = (data_ssfr['flag'] & ssfr_flags.camera_icing_pre) != 0
-        alp_ang_pit_rol_issue = (data_ssfr['flag'] & ssfr_flags.alp_ang_pit_rol_issue) != 0
-        alp_ang_pit_rol_issue_leg = alp_ang_pit_rol_issue[sel_ssfr]
-        ssfr_zen_flux[alp_ang_pit_rol_issue_leg, :] = np.nan
-        ssfr_nad_flux_interp[alp_ang_pit_rol_issue_leg, :] = np.nan
+        flag_counts = ', '.join(
+            f'{member.name}={int(np.sum(bits))}' for member, bits in flag_bits_leg.items()
+        )
+        print(
+            f"Leg {ileg + 1} flag counts ({len(times_leg)} samples): {flag_counts}; "
+            f"excluded: {int(np.sum(excluded_leg))}"
+        )
 
         # Skip legs where too many wavelength channels are all-NaN after masking.
         # A channel is NaN in nanmean only when every time step at that wavelength is
@@ -272,6 +307,9 @@ def collect_cloud_observation_legs(
                 'skip_reason': skip_reason,
                 'time': times_leg,
                 'alt': data_hsk["alt"][mask] / 1000.0,
+                'ssfr_flag': flag_leg,
+                'ssfr_excluded': excluded_leg,
+                'ssfr_mask_flags': [member.name for member in mask_flags],
             }
             with open(fname_pkl, 'wb') as f:
                 pickle.dump(sentinel, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -285,8 +323,19 @@ def collect_cloud_observation_legs(
         leg['ssfr_zen_wvl'] = ssfr_zen_wvl
         leg['ssfr_nad_wvl'] = ssfr_zen_wvl
         leg['ssfr_toa'] = ssfr_zen_toa
-        leg['ssfr_icing'] = icing[sel_ssfr]
-        leg['ssfr_icing_pre'] = icing_pre[sel_ssfr]
+        # Raw flag plus one boolean array per bit, for downstream QC.
+        leg['ssfr_flag'] = flag_leg
+        leg['ssfr_flag_long_name'] = flag_long_name
+        leg['ssfr_mask_flags'] = [member.name for member in mask_flags]
+        leg['ssfr_excluded'] = excluded_leg
+        leg['ssfr_f_dn_scale_factor'] = ssfr_f_dn_scale_factor
+        leg['ssfr_tec_issue'] = flag_bits_leg[ssfr_flags.tec_temp_controller_issue]
+        leg['ssfr_hsk_pitch_roll_exceed'] = flag_bits_leg[ssfr_flags.hsk_pitch_roll_exceed_threshold]
+        leg['ssfr_icing'] = flag_bits_leg[ssfr_flags.camera_icing]
+        leg['ssfr_icing_pre'] = flag_bits_leg[ssfr_flags.camera_icing_pre]
+        leg['ssfr_zen_toa_over'] = flag_bits_leg[ssfr_flags.zen_toa_over_threshold]
+        leg['ssfr_alp_hsk_ang_issue'] = flag_bits_leg[ssfr_flags.alp_hsk_ang_issue]
+        leg['ssfr_alp_tilt_exceed'] = flag_bits_leg[ssfr_flags.alp_pitch_roll_exceed_threshold]
 
         with open(fname_pkl, 'wb') as f:
             pickle.dump(leg, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -298,7 +347,7 @@ def collect_cloud_observation_legs(
     return output_files
 
 
-def preprocess_catalog_case(config, case_id, overwrite=False, plot_qc=True):
+def preprocess_catalog_case(config, case_id, overwrite=False, plot_qc=True, mask_flags=None):
     """Preprocess one active catalog case by id."""
     case = get_case(case_id)
     year, month, day = [int(part) for part in case['date'].split('-')]
@@ -317,4 +366,5 @@ def preprocess_catalog_case(config, case_id, overwrite=False, plot_qc=True):
         manual_cloud_cth=case.get('manual_cloud_cth', 0.0) or 0.0,
         manual_cloud_cbh=case.get('manual_cloud_cbh', 0.0) or 0.0,
         manual_cloud_cot=case.get('manual_cloud_cot', 0.0) or 0.0,
+        mask_flags=mask_flags,
     )
