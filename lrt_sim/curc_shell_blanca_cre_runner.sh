@@ -14,6 +14,12 @@
 # preemptable jobs can be killed mid-run; --requeue + the resumable run logic
 # below let a requeued job pick up where it left off instead of restarting.
 #SBATCH --requeue
+# One array task per (albedo, SZA chunk) pair, flattened onto SLURM_ARRAY_TASK_ID:
+# 15 albedos in cre_cases.MANUAL_ALB_SWEEP x 4 chunks in cre_cases.CRE_SZA_CHUNKS
+# = 60 tasks (indices 0-59). Keep this range in sync with those two lists -- the
+# guard below aborts a task whose index no longer maps onto a real pair. %2 caps
+# the sweep to 2 concurrent nodes.
+#SBATCH --array=0-59%2
 
 module load anaconda intel/2022.1.2 hdf5/1.10.1 zlib/1.2.11 netcdf/4.8.1 swig/4.1.1 gsl/2.7
 conda activate er3t
@@ -22,29 +28,59 @@ PROJECT_ROOT="/projects/yuch8913/arcsix_sfc/lrt_sim"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 cd "$PROJECT_ROOT"
 
-# Usage: sbatch curc_shell_blanca_cre_runner.sh ALB_INDEX [CHUNK_INDEX] [CASE_ID] [MODE]
-#   ALB_INDEX   : 0-based index into cre_cases.MANUAL_ALB_SWEEP (one albedo per job)
-#   CHUNK_INDEX : 0-based index into cre_cases.CRE_SZA_CHUNKS -- run only that
-#                 slice of the SZA grid, so one (case, albedo) is split across
-#                 several shorter jobs. Omit to run the whole grid in one job.
-#   CASE_ID     : catalog case id (default case_004)
-#   MODE        : sw | lw | both (default both)
+# Usage: sbatch curc_shell_blanca_cre_runner.sh [CASE_ID] [MODE]
+# The albedo and SZA-chunk indices are derived from SLURM_ARRAY_TASK_ID, not passed in.
+#   CASE_ID : catalog case id (default case_004)
+#   MODE    : sw | lw | both (default both)
 #
-# One job per albedo (whole SZA grid each):
-#   for i in $(seq 0 14); do sbatch THIS.sh $i; done
-# One job per (albedo, SZA chunk) -- shorter jobs, better for preemptable QOS:
-#   for i in $(seq 0 14); do for c in $(seq 0 3); do sbatch THIS.sh $i $c; done; done
+# The whole (albedo x SZA chunk) matrix goes in with ONE submit:
+#   sbatch curc_shell_blanca_cre_runner.sh                 # case_004, both modes
+#   sbatch curc_shell_blanca_cre_runner.sh case_004 lw     # longwave only
 #
-# The chunks together cover the full grid PLUS the case-mean SZA, so a complete
-# set is required before cre_plot can build its axis -- run every chunk.
-ALB_INDEX="$1"
-CHUNK_INDEX="$2"
-CASE_ID="${3:-case_004}"
-MODE="${4:-both}"
+# Re-run a subset by overriding the range on the command line, e.g. after a few
+# tasks were preempted and did not requeue:
+#   sbatch --array=12,17,40-43 curc_shell_blanca_cre_runner.sh
+#
+# Outside a job array (a quick interactive test) set the indices by hand:
+#   ALB_INDEX=0 CHUNK_INDEX=0 bash curc_shell_blanca_cre_runner.sh
+#
+# The chunks together cover the full SZA grid PLUS the case-mean SZA, so a
+# complete set is required before cre_plot can build its axis -- run every task.
+CASE_ID="${1:-case_004}"
+MODE="${2:-both}"
 
-if [ -z "$ALB_INDEX" ]; then
-    echo "ERROR: ALB_INDEX (first arg) required, e.g. 'sbatch $0 0'." >&2
-    exit 1
+# Albedo and SZA-chunk counts come from Python so the bash side never drifts
+# from the lists it is indexing.
+N_ALB="$(python -c 'from cre.cre_cases import MANUAL_ALB_SWEEP as a; print(len(a))')" || exit 1
+N_CHUNK="$(python -c 'from cre.cre_cases import CRE_SZA_CHUNKS as c; print(len(c))')" || exit 1
+N_TASKS=$(( N_ALB * N_CHUNK ))
+
+if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
+    # Flatten (albedo, chunk) onto the array index: chunk varies fastest, so the
+    # four chunks of one albedo are adjacent and finish at about the same time.
+    ALB_INDEX=$((  SLURM_ARRAY_TASK_ID / N_CHUNK ))
+    CHUNK_INDEX=$(( SLURM_ARRAY_TASK_ID % N_CHUNK ))
+
+    if [ "$SLURM_ARRAY_TASK_ID" -ge "$N_TASKS" ]; then
+        echo "ERROR: array task ${SLURM_ARRAY_TASK_ID} has no (albedo, chunk) pair:" >&2
+        echo "       ${N_ALB} albedos x ${N_CHUNK} chunks = ${N_TASKS} tasks (0-$(( N_TASKS - 1 )))." >&2
+        echo "       Update the '#SBATCH --array' range in $0." >&2
+        exit 1
+    fi
+    # A deliberate subset (a re-run) is fine; a full submit that no longer spans
+    # the matrix would silently skip pairs, so say so loudly.
+    if [ -n "${SLURM_ARRAY_TASK_COUNT:-}" ] && [ "$SLURM_ARRAY_TASK_COUNT" -gt "$N_TASKS" ]; then
+        echo "WARNING: array covers ${SLURM_ARRAY_TASK_COUNT} tasks but only ${N_TASKS} pairs exist." >&2
+    fi
+else
+    # Not an array job: fall back to env overrides for a single manual run.
+    ALB_INDEX="${ALB_INDEX:-}"
+    CHUNK_INDEX="${CHUNK_INDEX:-}"
+    if [ -z "$ALB_INDEX" ]; then
+        echo "ERROR: not a job array and ALB_INDEX unset." >&2
+        echo "       Submit with sbatch, or set ALB_INDEX (and optionally CHUNK_INDEX)." >&2
+        exit 1
+    fi
 fi
 
 # Empty CHUNK_INDEX -> no flag -> cre_runner uses the full SZA grid.
@@ -52,6 +88,7 @@ SZA_CHUNK_FLAG=()
 if [ -n "$CHUNK_INDEX" ]; then
     SZA_CHUNK_FLAG=(--sza-chunk "$CHUNK_INDEX")
 fi
+echo "Task ${SLURM_ARRAY_TASK_ID:-manual}: albedo index ${ALB_INDEX}/$(( N_ALB - 1 )), SZA chunk ${CHUNK_INDEX:-<full grid>}"
 
 # Reuse the prebuilt atmospheric profile (skips the MODIS-based rebuild); the
 # matching ch4_profiles_* is derived automatically. Resolved under data/zpt/<date>/.
