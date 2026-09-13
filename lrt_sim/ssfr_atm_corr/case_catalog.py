@@ -281,7 +281,7 @@ ALL_CASE_CATALOG = [
   'date': '2024-06-03',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
-                        [14.711, 14.868],  # 300m, cloudy, camera icing
+                        [14.711, 14.786],  # 300m, cloudy, camera icing
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -296,6 +296,26 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cth': 1.91,
   'manual_cloud_cbh': 0.5,
   'manual_cloud_cot': 24.31,},
+ 
+ {'id': 'case_056',
+   'date': '2024-06-03',
+   'case_tag': 'cloudy_atm_corr_2',
+   'tmhr_ranges_select': [
+                         [14.786, 14.868],  # 300m, cloudy, camera icing
+                         ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0,]),
+                             np.array([1.5, 1.91, 2.0, 2.5, 3.0, 4.0]), 
+                             np.arange(5.0, 10.1, 2.5),
+                             np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 7.0,
+   'manual_cloud_cwp': 0.11365,
+   'manual_cloud_cwp_expr': '113.65 / 1000',
+   'manual_cloud_cth': 1.91,
+   'manual_cloud_cbh': 0.5,
+   'manual_cloud_cot': 24.31,},
  
  {'id': 'case_005',
   'date': '2024-06-05',
