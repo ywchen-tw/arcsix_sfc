@@ -1051,7 +1051,7 @@ ALL_CASE_CATALOG = [
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
-                        [16.029, 16.224], # 100m, cloudy
+                        [16.029, 16.096], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -1066,6 +1066,46 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cth': 0.62,
   'manual_cloud_cbh': 0.29,
   'manual_cloud_cot': 8.93,},
+ 
+ {'id': 'case_057',
+   'date': '2024-08-09',
+   'case_tag': 'cloudy_atm_corr_2',
+   'tmhr_ranges_select': [
+                         [16.096, 16.162], # 100m, cloudy
+                         ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
+                                                np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                                np.arange(5.0, 10.1, 2.5),
+                                                np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 8.3,
+   'manual_cloud_cwp': 0.0491,
+   'manual_cloud_cwp_expr': '49.1 / 1000',
+   'manual_cloud_cth': 0.62,
+   'manual_cloud_cbh': 0.29,
+   'manual_cloud_cot': 8.93,},
+ 
+ {'id': 'case_058',
+    'date': '2024-08-09',
+    'case_tag': 'cloudy_atm_corr_2',
+    'tmhr_ranges_select': [
+                          [16.162, 16.224], # 100m, cloudy
+                          ],
+    'simulation_interval': 0.5,
+    'clear_sky': False,
+    'manual_cloud': True,
+    'levels': np.concatenate((np.array([0.0, 0.1, 0.2, 0.29, 0.4, 0.62, 0.8, 1.0,]),
+                                                 np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                                                 np.arange(5.0, 10.1, 2.5),
+                                                 np.array([15, 20, 30., 40., 45.]))),
+    'manual_cloud_cer': 8.3,
+    'manual_cloud_cwp': 0.0491,
+    'manual_cloud_cwp_expr': '49.1 / 1000',
+    'manual_cloud_cth': 0.62,
+    'manual_cloud_cbh': 0.29,
+    'manual_cloud_cot': 8.93,},
  
  {'id': 'case_051',
   'date': '2024-08-15',
