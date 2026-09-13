@@ -1051,7 +1051,7 @@ ALL_CASE_CATALOG = [
   'date': '2024-08-09',
   'case_tag': 'cloudy_atm_corr_2',
   'tmhr_ranges_select': [
-                        [16.029, 16.096], # 100m, cloudy
+                        [16.029, 16.0958], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -1071,7 +1071,7 @@ ALL_CASE_CATALOG = [
    'date': '2024-08-09',
    'case_tag': 'cloudy_atm_corr_2',
    'tmhr_ranges_select': [
-                         [16.096, 16.1623], # 100m, cloudy
+                         [16.0958, 16.1623], # 100m, cloudy
                          ],
    'simulation_interval': 0.5,
    'clear_sky': False,
