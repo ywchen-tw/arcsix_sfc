@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m cre.cre_runner --help)",
+      "Bash(/bin/ls -1 data/zpt)",
+      "Bash(/bin/ls -la data/)",
+      "Bash(git commit -m ' *)",
+      "Bash(conda activate *)",
+      "Bash(python -)",
+      "Read(//Users/yuch8913/miniforge3/envs/**)",
+      "Read(//Users/yuch8913/miniforge3/envs/er3t_env/bin/**)",
+      "Bash(/Users/yuch8913/miniforge3/envs/er3t_env/bin/python -c 'import er3t, os; print\\(os.path.dirname\\(er3t.__file__\\)\\)')",
+      "Bash(/Users/yuch8913/miniforge3/envs/er3t_env/bin/python -c 'import er3t.dev, os; print\\(sorted\\(os.listdir\\(os.path.dirname\\(er3t.dev.__file__\\)\\)\\)\\)')",
+      "Bash(/Users/yuch8913/miniforge3/envs/er3t_env/bin/python -m py_compile cre/cre_sim.py)",
+      "WebFetch(domain:codes.ecmwf.int)",
+      "Bash(python3 -m py_compile analysis/ssfr_era5_alb_si_fig.py)",
+      "Bash(ls -la /Users/yuch8913/Downloads/GRL-arcsix-albedo_draft_test_0713.docx /Users/yuch8913/Downloads/GRL-arcsix-albedo-SI_test_0713.docx)",
+      "Read(//Users/yuch8913/Downloads/**)",
+      "Bash(/Users/yuch8913/miniforge3/envs/er3t_env/bin/python -c ' *)",
+      "Bash(python -m py_compile arcsix_cld_insitu.py)",
+      "Bash(cp /Users/yuch8913/programming/arcsix_sfc/data/lrt/20240603_cloudy_atm_corr_2_sat_cloud/*20240613_14.109*.csv /Users/yuch8913/programming/arcsix_sfc/data/lrt/20240603_cloudy_atm_corr_2_sat_cloud_cre/ && ls /Users/yuch8913/programming/arcsix_sfc/data/lrt/20240603_cloudy_atm_corr_2_sat_cloud_cre/ | grep -c \"20240613_14.109\")",
+      "WebFetch(domain:cds.climate.copernicus.eu)",
+      "Bash(mkdir -p si_media)",
+      "Read(//Volumes/**)",
+      "Read(//Volumes/argus/field/arcsix/processed-by-MacL4850_20260528/**)",
+      "Bash(grep -vE \"RuntimeWarning|UserWarning|Warning \\\\[|Warning:|rescale=|^-+$|tight_layout|cannot be safely|valid_m|Mean of empty|while try_time|_lev_mean|_vmr|co2_pressure|^  fig|Standard atmosphere|pressure smoothing\")",
+      "Bash(grep -vE \"RuntimeWarning|UserWarning|Warning \\\\[|rescale=|^-+$|tight_layout|cannot be safely|valid_m|Mean of empty|while try_time|_lev_mean|_vmr|co2_pressure|^  fig|Standard atmosphere|pressure smoothing|Dload|Total|% Received|^ *[0-9]\")",
+      "Bash(grep -iv \"\\\\.dat$\")",
+      "Bash(git commit -q -m 'atm_profiles: standalone atm/ch4 profile generation for obs targets *)",
+      "WebFetch(domain:agupubs.onlinelibrary.wiley.com)",
+      "WebFetch(domain:online.ucpress.edu)",
+      "WebFetch(domain:api.semanticscholar.org)",
+      "WebFetch(domain:epic.awi.de)",
+      "WebFetch(domain:onlinelibrary.wiley.com)",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/126.0 Safari/537.36\" -o light2022_mosaic.pdf \"https://epic.awi.de/id/eprint/56767/1/Light_etal_2022_Arctic_sea_ice_albedo_Spectral_composition_spatial_heterogeneity_temporal_evolution_observed_MOSAiC_drift.pdf\")",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/126.0 Safari/537.36\" -o perovich2002_sheba.pdf \"https://onlinelibrary.wiley.com/doi/pdfdirect/10.1029/2000JC000438\")",
+      "WebFetch(domain:psl.noaa.gov)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -sL \"https://arcticdata.io/metacat/d1/mn/v2/object/doi%3A10.18739%2FA2FT8DK8Z\" -o mosaic_spectral_eml.xml)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3)"
+    ],
+    "additionalDirectories": [
+      "/Users/yuch8913/programming/arcsix_sfc/data/lrt/20240603_cloudy_atm_corr_2_sat_cloud",
+      "/Users/yuch8913/programming/er3t/er3t/er3t/util"
+    ]
+  }
+}

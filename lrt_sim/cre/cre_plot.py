@@ -918,13 +918,13 @@ def cre_sim_plot(date=datetime.datetime(2024, 5, 31),
         """Snap a target broadband albedo to the nearest actually-simulated one."""
         return float(_alb_unique_arr[np.argmin(np.abs(_alb_unique_arr - target))])
     broadband_alb_curve = [
-        _nearest_curve_alb(0.70),                      # context (~0.704)
+        _nearest_curve_alb(0.70),                      # context (~0.706)
         # The 2024-08-08 spectrum (now 0.553) replaces 2024-07-25 (0.530): the
         # 0.530 spectrum's extension is ~0 beyond 1.5 um, which reads as an
         # artifact in the albedo-spectra panel.
         _nearest_curve_alb(0.564),
         _nearest_curve_alb(ssfr_ext_broadband_alb),   # observation (~0.742)
-        _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.655)
+        _nearest_curve_alb(era5_broadband_alb),        # closest to ERA5 (~0.651)
         _nearest_curve_alb(0.797),                     # brightest (~0.778)
     ]
     print("broadband_alb_curve (5 plotted):", broadband_alb_curve)

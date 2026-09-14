@@ -10,10 +10,11 @@
 #SBATCH --job-name=arcsix-cre_simulation
 #SBATCH --partition=amem
 #SBATCH --qos=mem-normal
-# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (15 entries:
-# indices 0-14). Keep this range in sync with len(MANUAL_ALB_SWEEP). %2 caps the
-# job to 2 full amem nodes running concurrently.
-#SBATCH --array=0-14%2
+# One array task per surface albedo in cre_cases.MANUAL_ALB_SWEEP (16 entries:
+# indices 0-15). Keep this range in sync with len(MANUAL_ALB_SWEEP) -- a range
+# that is too short skips the tail of the sweep silently. %2 caps the job to 2
+# full amem nodes running concurrently.
+#SBATCH --array=0-15%2
 
 module load anaconda intel/2022.1.2 hdf5/1.10.1 zlib/1.2.11 netcdf/4.8.1 swig/4.1.1 gsl/2.7
 conda activate er3t
@@ -123,7 +124,7 @@ python -m cre.cre_runner \
 #     --manual-alb sfc_alb_20240603_14.711_14.761_0.34km_cre_alb.dat # peak 3-min broadband ~0.751
 
 # case_019 is now the array case above, so its own albedo (index 6 of
-# MANUAL_ALB_SWEEP) is already covered by the 0-12 sweep. Single-albedo reference:
+# MANUAL_ALB_SWEEP) is already covered by the 0-15 sweep. Single-albedo reference:
 # python -m cre.cre_runner --case-id case_019 --mode 'both' \
 #     --atm-file "$ATM_FILE" \
 #     --manual-alb sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat

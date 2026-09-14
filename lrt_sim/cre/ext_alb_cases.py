@@ -131,6 +131,10 @@ EXT_ALB_CASES = [
     {'date': '20240809', 'time_range': (13.376, 13.600)},
     {'date': '20240809', 'time_range': (16.029, 16.224)},
     # scaled variants (sensitivity tests)
+    # case_004's own spectrum scaled to the ERA5 fal case mean (0.7320 -> 0.651),
+    # so the ERA5 curve in cre_plot differs from the observation only in albedo
+    # magnitude, not spectral shape. See analysis/ssfr_era5_alb_si_fig.py panel (a).
+    {'date': '20240603', 'time_range': (14.711, 14.868), 'scale': 0.889},
     {'date': '20240528', 'time_range': (15.610, 17.404), 'scale': 0.99},
     {'date': '20240808', 'time_range': (15.314, 15.497), 'scale': 0.97},
     {'date': '20240808', 'time_range': (15.314, 15.497), 'scale': 1.012},

@@ -15,11 +15,12 @@
 # below let a requeued job pick up where it left off instead of restarting.
 #SBATCH --requeue
 # One array task per (albedo, SZA chunk) pair, flattened onto SLURM_ARRAY_TASK_ID:
-# 15 albedos in cre_cases.MANUAL_ALB_SWEEP x 4 chunks in cre_cases.CRE_SZA_CHUNKS
-# = 60 tasks (indices 0-59). Keep this range in sync with those two lists -- the
-# guard below aborts a task whose index no longer maps onto a real pair. %2 caps
-# the sweep to 2 concurrent nodes.
-#SBATCH --array=0-59%2
+# 16 albedos in cre_cases.MANUAL_ALB_SWEEP x 4 chunks in cre_cases.CRE_SZA_CHUNKS
+# = 64 tasks (indices 0-63). Keep this range in sync with those two lists -- the
+# guard below aborts a task whose index no longer maps onto a real pair, but a
+# range that is too SHORT is silent, so shrink/grow it whenever the sweep changes.
+# %2 caps the sweep to 2 concurrent nodes.
+#SBATCH --array=0-63%2
 
 module load anaconda intel/2022.1.2 hdf5/1.10.1 zlib/1.2.11 netcdf/4.8.1 swig/4.1.1 gsl/2.7
 conda activate er3t

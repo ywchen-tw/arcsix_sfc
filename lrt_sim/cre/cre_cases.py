@@ -123,7 +123,8 @@ CRE_CWP_LIST_LINUX = [
 # Values refreshed 2026-09-12 from ext_alb_broadband.csv after the combined
 # product was rebuilt; most moved by <0.02 but 20240611_..._0.12km fell 0.704 ->
 # 0.666. The solar weight is the 250-4050 nm slit file (adopted 2026-07-17; the
-# old 2500 nm file gave values ~0.013-0.019 higher).
+# old 2500 nm file gave values ~0.013-0.019 higher). Re-verified 2026-09-13
+# against a fresh regeneration of ext_alb_broadband.csv: every value unchanged.
 #
 # NOTE: several entries sit under the ~0.02 spacing rule above. The 2026-09-12
 # refresh pushed two pairs back under it -- 0.610/0.611 (20240809_16.029 vs
@@ -131,6 +132,13 @@ CRE_CWP_LIST_LINUX = [
 # -- and the case_004 family is deliberately dense at 0.732/0.735/0.742 so the
 # observation is bracketed by its own full-window and 3-min means. The 0.752
 # entry likewise splits the 0.742-0.762 gap at its midpoint (0.010 either side).
+# The 0.727 entry sits 0.005 below the case_004 full-window mean; it is
+# kept because it is the only 2024-06-07 albedo and so the only representation of
+# case_014's date in the sweep. The 0.651 entry sits 0.010 from both neighbours
+# (0.641 / 0.661) by construction: it is case_004's own spectrum scaled 0.889X to
+# the ERA5 fal case mean (0.6511), so cre_plot's ERA5 curve lands on a simulated
+# albedo instead of snapping ~0.010 to an arbitrary side. Its target is the ERA5
+# value, not an even spacing -- do not thin it to restore the ~0.02 rule.
 # All are kept for now; thin them if the tight spacing kinks the critical-LWP
 # contour.
 # ---------------------------------------------------------------------------
@@ -139,13 +147,18 @@ MANUAL_ALB_SWEEP = [
     'sfc_alb_20240725_15.881_15.903_0.33km_cre_alb.dat',             # 0.531
     'sfc_alb_20240808_13.212_13.345_0.12km_cre_alb.dat',             # 0.568
     'sfc_alb_20240809_16.029_16.224_0.11km_cre_alb.dat',             # 0.610
-    'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',  # 0.611
+    # 'sfc_alb_20240808_15.314_15.497_0.12km_cre_alb_scale_1.012X.dat',  # 0.611
     'sfc_alb_20240611_14.968_15.347_0.41km_cre_alb.dat',             # 0.641
+    'sfc_alb_20240603_14.711_14.868_0.34km_cre_alb_scale_0.889X.dat',  # 0.651  (case_004 ERA5 fal mean)
     'sfc_alb_20240613_14.109_14.140_0.11km_cre_alb.dat',             # 0.661  (case_019 own albedo)
-    'sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat',             # 0.666
+    # 'sfc_alb_20240611_14.968_15.347_0.12km_cre_alb.dat',             # 0.666
     'sfc_alb_20240528_15.610_17.404_0.18km_cre_alb.dat',             # 0.686
-    # 0.694 (sfc_alb_20240613_15.834_..._scale_0.987X) dropped: thinned the tight
-    # cluster near 0.7 that kinked the critical-LWP contour.
+    # 0.694 (sfc_alb_20240613_15.834_..._scale_0.987X) and 0.704 (the same file
+    # unscaled) stay dropped: the 0.706 entry below is that cluster's single
+    # representative, chosen because it splits the old 0.686-0.732 gap most
+    # evenly (0.020 below, 0.021 above).
+    'sfc_alb_20240613_16.043_16.067_0.14km_cre_alb.dat',             # 0.706
+    'sfc_alb_20240607_15.336_15.761_0.12km_cre_alb.dat',             # 0.727  (only 2024-06-07 albedo; case_014's date)
     # The case_004 family below spans 0.732-0.742. The peak 1-min albedo (0.742)
     # stays commented out: it collides with the 2-min broadband bin and corrupts
     # that albedo's critical-LWP column.
