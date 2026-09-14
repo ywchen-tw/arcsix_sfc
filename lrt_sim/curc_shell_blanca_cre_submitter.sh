@@ -36,6 +36,7 @@
 #                    (default: the whole sweep) -- how to resume a partial run
 #   SUBMIT_DELAY=S   seconds between submissions (default 1), to be gentle on slurmctld
 #   EXTRA_SBATCH     extra flags passed to every sbatch, e.g. "--qos=normal"
+#   FORCE=1          submit even if a job for that albedo is already queued/running
 #   N_ALB/N_CHUNK    skip the Python lookup (only if the conda env is unavailable)
 #
 # Anything else in the environment is inherited by the submitted jobs (sbatch
@@ -81,6 +82,8 @@ CONCURRENCY="${CONCURRENCY:-2}"
 SUBMIT_DELAY="${SUBMIT_DELAY:-1}"
 DRY_RUN="${DRY_RUN:-0}"
 EXTRA_SBATCH="${EXTRA_SBATCH:-}"
+FORCE="${FORCE:-0}"
+ME="${USER:-$(whoami)}"
 
 if [ "$ALB_START" -lt 0 ] || [ "$ALB_END" -ge "$N_ALB" ] || [ "$ALB_START" -gt "$ALB_END" ]; then
     echo "ERROR: albedo range ${ALB_START}-${ALB_END} is not inside 0-$(( N_ALB - 1 ))." >&2
@@ -109,12 +112,33 @@ echo
 
 N_OK=0
 N_FAIL=0
+N_SKIP=0
 for (( ALB=ALB_START; ALB<=ALB_END; ALB++ )); do
     # Chunk varies fastest in the runner's flattening, so one albedo is the
     # contiguous block [ALB*N_CHUNK, ALB*N_CHUNK + N_CHUNK - 1].
     LO=$(( ALB * N_CHUNK ))
     HI=$(( LO + N_CHUNK - 1 ))
     JOB_NAME="arcsix-cre_${CASE_ID}_alb${ALB}"
+
+    # Duplicate guard. Two jobs on the SAME (albedo, SZA) are only safe when the
+    # first has finished: cre_sim skips an SZA whose CSV already exists, but that
+    # CSV is written at the very END of the run, so an overlapping duplicate sees
+    # it missing, runs the whole sweep again, and both write the same uvspec
+    # input/output files under tmp -- which can be read back as finished while
+    # half-written. So never submit an albedo that is already pending or running.
+    # squeue filters by name server-side, so no truncation to worry about; a
+    # finished job leaves no entry, and that case IS handled by the CSV skip.
+    if [ "$FORCE" != "1" ]; then
+        EXISTING="$( squeue -h -u "$ME" -n "$JOB_NAME" -o '%i' 2>/dev/null )"
+        SQ_RC=$?
+        if [ $SQ_RC -ne 0 ]; then
+            echo "alb ${ALB}: WARNING -- squeue failed, cannot check for a duplicate; submitting anyway." >&2
+        elif [ -n "$EXISTING" ]; then
+            echo "alb ${ALB} (tasks ${LO}-${HI}): SKIPPED -- already queued/running as $(echo $EXISTING | tr '\n' ' ')"
+            N_SKIP=$(( N_SKIP + 1 ))
+            continue
+        fi
+    fi
 
     SBATCH_CMD=( sbatch
         --array="${LO}-${HI}%${CONCURRENCY}"
@@ -154,10 +178,11 @@ done
 
 echo
 if [ "$DRY_RUN" = "1" ]; then
-    echo "DRY_RUN: $(( ALB_END - ALB_START + 1 )) submissions printed, none sent."
+    echo "DRY_RUN: $(( ALB_END - ALB_START + 1 - N_SKIP )) submission(s) printed, ${N_SKIP} skipped as already queued; none sent."
     exit 0
 fi
-echo "Submitted ${N_OK} job(s); ${N_FAIL} failed."
+echo "Submitted ${N_OK} job(s); ${N_SKIP} skipped (already in queue); ${N_FAIL} failed."
+[ "$N_SKIP" -gt 0 ] && echo "  (re-submit a skipped albedo with FORCE=1 only if you are sure it is not running)"
 if [ "$N_OK" -gt 0 ]; then
     echo "Job ids -> ${JOBID_LOG}"
     echo "Cancel the whole sweep with: scancel \$(cat ${JOBID_LOG})"

@@ -290,10 +290,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -437,10 +441,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -586,10 +594,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -744,10 +756,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=1.0, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=1.0, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -902,10 +918,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -1068,10 +1088,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -1234,10 +1258,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)
@@ -1400,10 +1428,14 @@ def combined_atm_corr():
     eff_alb_ = gas_abs_masking(alb_wvl, np.ones_like(alb_wvl), alt=np.nanmean(alt_selected_all))
     
     fig = plt.figure(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM*10.0/16.0))
-    gs1 = GridSpec(2, 7, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
-    ax1 = fig.add_subplot(gs1[:, :3], projection=cartopy_proj)
-    ax2 = fig.add_subplot(gs1[0, 3:])
-    ax3 = fig.add_subplot(gs1[1, 3:])
+    # 13 cols not 7: column 5 is an empty spacer so the (b)/(c) y-axis labels
+    # clear panel (a)'s frame (~18 px). tight_layout cannot do this itself --
+    # the cartopy GeoAxes has a fixed aspect and is not tight_layout-compatible,
+    # so w_pad is ignored. 5/13 for the map keeps (b)/(c) near their old width.
+    gs1 = GridSpec(2, 13, left=0.05, right=0.95, wspace=0.8, hspace=0.3)
+    ax1 = fig.add_subplot(gs1[:, :5], projection=cartopy_proj)
+    ax2 = fig.add_subplot(gs1[0, 6:])
+    ax3 = fig.add_subplot(gs1[1, 6:])
     
     # Set the extent for the main axes
     lon_min = np.min(lon_selected_all)

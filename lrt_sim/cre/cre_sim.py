@@ -103,6 +103,12 @@ except ImportError:
         _fdir_data_, _fdir_general_, _fdir_tmp_, _fdir_tmp_graph_, _title_extra_,
     )
 
+# Reuse the atomic writer rather than keeping a third copy of the pattern.
+try:
+    from ssfr_atm_corr.helpers import atomic_write
+except ImportError:
+    from lrt_sim.ssfr_atm_corr.helpers import atomic_write
+
 # The SZA sweep is defined once in cre_cases so cre_sim and cre_plot can never
 # drift apart on which angles exist.
 try:
@@ -280,8 +286,16 @@ def solar_interpolation_func(solar_flux_file, date):
     return interp1d(wvl_solar, flux_solar, bounds_error=False, fill_value=0.0)
 
 def write_2col_file(filename, wvl, val, header):
-    """Write two-column data to a file with a header"""
-    with open(filename, 'w') as f:
+    """Write two-column data to a file with a header.
+
+    Written atomically (temp file + os.replace), matching
+    ``ssfr_atm_corr.helpers.write_2col_file``. Every array task sharing a surface
+    albedo rewrites the same ``*_ext4100.dat`` at startup, so a plain
+    truncate-and-write lets a concurrent uvspec read a half-written albedo --
+    either ``Error -7 ... setup_albedo`` or, worse, a silently wrong spectrum.
+    With os.replace a racing writer can only ever swap in another COMPLETE file.
+    """
+    with atomic_write(filename) as f:
         f.write(header)
         for i in range(len(val)):
             f.write(f'{wvl[i]:11.3f} {val[i]:12.3e}\n')

@@ -74,9 +74,28 @@ Notes:
   `figS20`←`native/arcsix_albedo_broadband_ice_frac_fit_summary_noref.png`,
   `figS21`←`SI/sfc_alb_ssfr_vs_era5_5panel.png`,
   `fig01`←`sfc_alb_corr_lonlat/arcsix_broadband_albedo_vs_longitude_polar_projection_spring_summer_combined.png`
-  (all four panels in one file). Still outstanding: **figS17/figS18**, whose sources are from
-  2026-06-12 and have never been re-run against the R1 combined product. `figS02, S03, S06, S07, S09–S14` come from
+  (all four panels in one file), `figS17`←`sfc_alb_corr_analysis/arcsix_albedo_0729_clear_1_summary.png`,
+  `figS18`←`sfc_alb_corr_analysis/arcsix_albedo_0605_clear_spiral_summary.png` (both re-run
+  against the R1 combined product for the first time — the figS17 caption numbers changed,
+  see below). All 11 manuscript figures sourced from this repo are now current. `figS02, S03, S06, S07, S09–S14` come from
   the external SSFR calibration workflow and cannot be checked from this repo.
+- **Panel (a) layout of the eight `*_summary` figures.** They set `g1.top_labels = False`
+  but not `right_labels`, so cartopy drew latitude labels on the map's right edge, on top of
+  the (b)/(c) y-axis labels; and `ax1.legend()` put an oversized legend inside the map (14
+  altitude entries on the spiral figures). Fixed 2026-09-14 in `ssfr_atm_corr/analysis.py`:
+  `g1.right_labels = False` at all 8 sites; the panel-(a) legend moved below the map frame
+  (`bbox_to_anchor=(0.5, -0.10)`, 3 columns on the spirals, 2 on the two-entry ones);
+  and `GridSpec(2, 7)` -> `GridSpec(2, 13)` (map `[:, :5]`, (b)/(c) `[_, 6:]`, column 5 an
+  empty spacer). That last one matters: the (b)/(c) y-axis labels were *overlapping* panel
+  (a)'s frame by ~10 px, and `tight_layout` cannot fix it — a cartopy GeoAxes has a fixed
+  aspect and matplotlib warns it is not tight_layout-compatible, so `w_pad` is silently
+  ignored (verified: byte-identical output). Only a spacer column works. Measured gaps:
+  7 cols -10 px (overlap), 8 cols (map 3/8) +64 px (too wide, and it squeezed (b)/(c) to
+  283 px), **13 cols (map 5/13) +18 px** with (b)/(c) back to 314 px vs 327 px originally.
+  `save_grl` uses `bbox_inches='tight'`, so the outside-axes legend is captured.
+- **figS17 caption numbers (R1 re-run, 2026-09-14).** Broadband albedo at 3.6 km
+  0.577 ± 0.020 and at 0.1 km 0.570 ± 0.063; the means differ by 0.008 (1.3%).
+  The SI still says 0.574 ± 0.020 / 0.570 ± 0.063 and "0.004, or 0.7%".
 - **Ice/snow end member (SIF=1).** Normally the OLS extrapolation of albedo vs camera
   sea-ice fraction. Where a leg's SIF spread (p95−p5) is below 0.10 *and* the broadband
   fit has r² < 0.50, the extrapolated slope is a leverage artifact (2024-05-28 spans
