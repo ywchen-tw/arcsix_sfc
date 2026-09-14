@@ -49,6 +49,7 @@ CLOUDY_CASE_ID_LIST = [
     'case_046', 'case_047',
     'case_048', 'case_049', 'case_050', 'case_054', 'case_055', 'case_056',
     'case_057', 'case_058', 'case_059', 'case_060', 'case_061', 'case_062', 'case_063',
+    'case_064', 'case_065'
 ]
 
 SPIRAL_CASE_ID_LIST = [

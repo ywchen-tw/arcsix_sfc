@@ -1029,7 +1029,7 @@ ALL_CASE_CATALOG = [
    'date': '2024-08-07',
    'case_tag': 'cloudy_atm_corr_6',
    'tmhr_ranges_select': [
-                         [15.684, 15.851], # 100m, cloudy
+                         [15.684, 15.767], # 100m, cloudy
                          ],
    'simulation_interval': 0.5,
    'clear_sky': False,
@@ -1044,6 +1044,26 @@ ALL_CASE_CATALOG = [
    'manual_cloud_cth': 0.96,
    'manual_cloud_cbh': 0.62,
    'manual_cloud_cot': 16.21,},
+ 
+ {'id': 'case_064',
+    'date': '2024-08-07',
+    'case_tag': 'cloudy_atm_corr_6',
+    'tmhr_ranges_select': [
+                          [15.767, 15.851], # 100m, cloudy
+                          ],
+    'simulation_interval': 0.5,
+    'clear_sky': False,
+    'manual_cloud': True,
+    'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.62, 0.8, 0.96,]),
+                              np.array([1.5, 2.0, 2.5, 3.0, 4.0]), 
+                              np.arange(5.0, 10.1, 2.5),
+                              np.array([15, 20, 30., 40., 45.]))),
+    'manual_cloud_cer': 7.2,
+    'manual_cloud_cwp': 0.0775,
+    'manual_cloud_cwp_expr': '77.5 / 1000',
+    'manual_cloud_cth': 0.96,
+    'manual_cloud_cbh': 0.62,
+    'manual_cloud_cot': 16.21,},
  
  {'id': 'case_045',
     'date': '2024-08-07',
@@ -1069,7 +1089,7 @@ ALL_CASE_CATALOG = [
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
-                        [13.212, 13.347], # 100m, cloudy
+                        [13.212, 13.279], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -1084,6 +1104,26 @@ ALL_CASE_CATALOG = [
   'manual_cloud_cth': 1.98,
   'manual_cloud_cbh': 0.67,
   'manual_cloud_cot': 14.12,},
+ 
+ {'id': 'case_065',
+   'date': '2024-08-08',
+   'case_tag': 'cloudy_atm_corr_1',
+   'tmhr_ranges_select': [
+                         [13.279, 13.347], # 100m, cloudy
+                         ],
+   'simulation_interval': 0.5,
+   'clear_sky': False,
+   'manual_cloud': True,
+   'levels': np.concatenate((np.array([0.0, 0.1, 0.15, 0.2, 0.3, 0.4, 0.67, 0.8, 1.0,]),
+                             np.array([1.5, 1.98, 2.5, 3.0, 4.0]), 
+                             np.arange(5.0, 10.1, 2.5),
+                             np.array([15, 20, 30., 40., 45.]))),
+   'manual_cloud_cer': 15.3,
+   'manual_cloud_cwp': 0.14394,
+   'manual_cloud_cwp_expr': '143.94 / 1000',
+   'manual_cloud_cth': 1.98,
+   'manual_cloud_cbh': 0.67,
+   'manual_cloud_cot': 14.12,},
  
  {'id': 'case_047',
   'date': '2024-08-08',
