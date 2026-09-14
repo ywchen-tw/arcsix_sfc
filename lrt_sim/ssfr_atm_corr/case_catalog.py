@@ -1029,7 +1029,7 @@ ALL_CASE_CATALOG = [
    'date': '2024-08-07',
    'case_tag': 'cloudy_atm_corr_6',
    'tmhr_ranges_select': [
-                         [15.684, 15.767], # 100m, cloudy
+                         [15.684, 15.7673], # 100m, cloudy
                          ],
    'simulation_interval': 0.5,
    'clear_sky': False,
@@ -1049,7 +1049,7 @@ ALL_CASE_CATALOG = [
     'date': '2024-08-07',
     'case_tag': 'cloudy_atm_corr_6',
     'tmhr_ranges_select': [
-                          [15.767, 15.851], # 100m, cloudy
+                          [15.7673, 15.851], # 100m, cloudy
                           ],
     'simulation_interval': 0.5,
     'clear_sky': False,
@@ -1089,7 +1089,7 @@ ALL_CASE_CATALOG = [
   'date': '2024-08-08',
   'case_tag': 'cloudy_atm_corr_1',
   'tmhr_ranges_select': [
-                        [13.212, 13.279], # 100m, cloudy
+                        [13.212, 13.2788], # 100m, cloudy
                         ],
   'simulation_interval': 0.5,
   'clear_sky': False,
@@ -1109,7 +1109,7 @@ ALL_CASE_CATALOG = [
    'date': '2024-08-08',
    'case_tag': 'cloudy_atm_corr_1',
    'tmhr_ranges_select': [
-                         [13.279, 13.347], # 100m, cloudy
+                         [13.2788, 13.347], # 100m, cloudy
                          ],
    'simulation_interval': 0.5,
    'clear_sky': False,
