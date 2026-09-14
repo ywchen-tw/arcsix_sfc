@@ -102,14 +102,17 @@ if [ ! -f "$PROFILE_PATH" ]; then
     fi
 fi
 
-python -m cre.cre_runner \
-    --case-id "$CASE_ID" \
-    --mode "$MODE" \
-    "${ATM_FLAG[@]}" \
-    --manual-alb "$MANUAL_ALB" \
-    --workers "$WORKERS" \
-    $OVERWRITE_FLAG
+# python -m cre.cre_runner \
+#     --case-id "$CASE_ID" \
+#     --mode "$MODE" \
+#     "${ATM_FLAG[@]}" \
+#     --manual-alb "$MANUAL_ALB" \
+#     --workers "$WORKERS" \
+#     $OVERWRITE_FLAG
 
+
+python -m cre.cre_runner --case-id case_004 --mode 'both' \
+    --manual-alb atm_profiles_20240603_cloudy_atm_corr_2_14.711_14.868_0.34km.dat
 
 # python -m cre.cre_runner --case-id case_004 --mode 'lw' \
 #     --manual-alb sfc_alb_20240603_14.735_14.752_0.34km_cre_alb.dat

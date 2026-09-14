@@ -328,6 +328,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 5.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 1.0))
     g1.top_labels = False
+    g1.right_labels = False
 
 
     ax1.scatter(lon_selected_high_alt, lat_selected_high_alt, transform=ccrs.PlateCarree(),
@@ -336,8 +337,9 @@ def combined_atm_corr():
     ax1.scatter(lon_selected_low_alt, lat_selected_low_alt, transform=ccrs.PlateCarree(),
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=2,
+                     markerscale=1.5, handletextpad=0.4, columnspacing=1.2,
+                     borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -473,6 +475,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 15.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 5.0))
     g1.top_labels = False
+    g1.right_labels = False
 
 
     ax1.scatter(lon_selected_high_alt, lat_selected_high_alt, transform=ccrs.PlateCarree(),
@@ -481,8 +484,9 @@ def combined_atm_corr():
     ax1.scatter(lon_selected_low_alt, lat_selected_low_alt, transform=ccrs.PlateCarree(),
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=2,
+                     markerscale=1.5, handletextpad=0.4, columnspacing=1.2,
+                     borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -620,6 +624,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 15.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 5.0))
     g1.top_labels = False
+    g1.right_labels = False
 
 
     ax1.scatter(lon_selected_high_alt, lat_selected_high_alt, transform=ccrs.PlateCarree(),
@@ -628,8 +633,9 @@ def combined_atm_corr():
     ax1.scatter(lon_selected_low_alt, lat_selected_low_alt, transform=ccrs.PlateCarree(),
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=2,
+                     markerscale=1.5, handletextpad=0.4, columnspacing=1.2,
+                     borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -776,6 +782,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 15.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 5.0))
     g1.top_labels = False
+    g1.right_labels = False
 
 
     ax1.scatter(lon_selected_high_alt, lat_selected_high_alt, transform=ccrs.PlateCarree(),
@@ -784,8 +791,9 @@ def combined_atm_corr():
     ax1.scatter(lon_selected_low_alt, lat_selected_low_alt, transform=ccrs.PlateCarree(),
                label=f'{alt_selected_low_alt_avg:.1f} km', c='r', s=7.5, zorder=2)
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=2,
+                     markerscale=1.5, handletextpad=0.4, columnspacing=1.2,
+                     borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -932,6 +940,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 5.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 1.0))
     g1.top_labels = False
+    g1.right_labels = False
     
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
@@ -948,8 +957,12 @@ def combined_atm_corr():
                  label=f'{alt_avg:.1f} km', c=color_series[i], linewidth=2, zorder=2)
 
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    # Legend below the panel (a) frame: 14 altitude entries did not fit inside
+    # the map. 3 columns keeps it to 5 rows; bbox_inches='tight' in save_grl
+    # captures it even though it sits outside the axes.
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=3,
+                     handlelength=1.4, handletextpad=0.4, columnspacing=1.0,
+                     labelspacing=0.3, borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -1093,6 +1106,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 5.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 1.0))
     g1.top_labels = False
+    g1.right_labels = False
     
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
@@ -1109,8 +1123,12 @@ def combined_atm_corr():
                  label=f'{alt_avg:.1f} km', c=color_series[i], linewidth=2, zorder=2)
 
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    # Legend below the panel (a) frame: 14 altitude entries did not fit inside
+    # the map. 3 columns keeps it to 5 rows; bbox_inches='tight' in save_grl
+    # captures it even though it sits outside the axes.
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=3,
+                     handlelength=1.4, handletextpad=0.4, columnspacing=1.0,
+                     labelspacing=0.3, borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -1254,6 +1272,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 5.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 1.0))
     g1.top_labels = False
+    g1.right_labels = False
     
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
@@ -1270,8 +1289,12 @@ def combined_atm_corr():
                  label=f'{alt_avg:.1f} km', c=color_series[i], linewidth=2, zorder=2)
 
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    # Legend below the panel (a) frame: 14 altitude entries did not fit inside
+    # the map. 3 columns keeps it to 5 rows; bbox_inches='tight' in save_grl
+    # captures it even though it sits outside the axes.
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=3,
+                     handlelength=1.4, handletextpad=0.4, columnspacing=1.0,
+                     labelspacing=0.3, borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
@@ -1415,6 +1438,7 @@ def combined_atm_corr():
     g1.xlocator = FixedLocator(np.arange(-180, 180.1, 5.0))
     g1.ylocator = FixedLocator(np.arange(50, 90.1, 1.0))
     g1.top_labels = False
+    g1.right_labels = False
     
     # Create a ScalarMappable
     data_min, data_max = np.arange(len(alt_select_avg)).min(), np.arange(len(alt_select_avg)).max()
@@ -1431,8 +1455,12 @@ def combined_atm_corr():
                  label=f'{alt_avg:.1f} km', c=color_series[i], linewidth=2, zorder=2)
 
     
-    # leg = ax.legend(loc='center left', fontsize=9, bbox_to_anchor=(1.07, 0.5))
-    leg = ax1.legend()
+    # Legend below the panel (a) frame: 14 altitude entries did not fit inside
+    # the map. 3 columns keeps it to 5 rows; bbox_inches='tight' in save_grl
+    # captures it even though it sits outside the axes.
+    leg = ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=3,
+                     handlelength=1.4, handletextpad=0.4, columnspacing=1.0,
+                     labelspacing=0.3, borderpad=0.35)
     leg.get_frame().set_alpha(0.925)
     leg.get_frame().set_facecolor('white')
     ax1.set_xlabel('Longitude')
