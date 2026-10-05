@@ -462,11 +462,11 @@ def analyze_ice_frac_alb(alb_product='native'):
         mean_p  = np.nanmean(wvl_pval[avg_mask]) if np.any(avg_mask) else np.nan
 
         # intercept (SIF=0) and ice/snow end-member (SIF=1) albedo spectra in one figure
-        sif1_label = ('Extrapolated (sea ice fraction = 1)' if method == 'fit' else
-                      f'Mean of sea ice fraction > {_SIF1_HIGH_:.2f} (n={int(high.sum())})')
+        sif1_label = ('Extrapolated (sea ice concentration = 1)' if method == 'fit' else
+                      f'Mean of sea ice concentration > {_SIF1_HIGH_:.2f} (n={int(high.sum())})')
         plt.close('all')
         fig, ax = plt.subplots(figsize=(9, 5))
-        ax.plot(alb_wvl, wvl_intercept, color='b', label='Intercept (sea ice fraction = 0)')
+        ax.plot(alb_wvl, wvl_intercept, color='b', label='Intercept (sea ice concentration = 0)')
         ax.plot(alb_wvl, wvl_alb_sif1,  color='r', label=sif1_label)
         for band in gas_bands:
             ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
@@ -480,7 +480,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                 'mean $\\mathrm{R^2}$ = %.3f\nmean p = %.2e\n(excl. gas bands)' % (mean_r2, mean_p),
                 transform=ax.transAxes, fontsize=11, va='bottom', ha='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-        ax.set_title(f'Intercept & Sea-Ice-Fraction=1 Albedo Spectra, {date_label}', fontsize=13)
+        ax.set_title(f'Intercept & Sea-Ice-Concentration=1 Albedo Spectra, {date_label}', fontsize=13)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{prefix}_intercept_sif1_spectra.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
@@ -638,10 +638,10 @@ def analyze_ice_frac_alb(alb_product='native'):
             fig_bb, (ax, axr) = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.3})
             ax2 = ax.twinx()
             l1 = ax.plot(time_selected_all, broadband_alb_selected_all, c='skyblue', label='Broadband Albedo', alpha=0.75, linewidth=2)
-            l2 = ax2.plot(cam_time, cam_ice_fraction, c='coral', label='Camera Ice Fraction', alpha=0.75, linewidth=1.5)
+            l2 = ax2.plot(cam_time, cam_ice_fraction, c='coral', label='Camera Sea Ice Concentration', alpha=0.75, linewidth=1.5)
             ax.set_xlabel('Time (UTC)', fontsize=14)
             ax.set_ylabel('Broadband Albedo', fontsize=14)
-            ax2.set_ylabel('Camera Ice Fraction', fontsize=14)
+            ax2.set_ylabel('Camera Sea Ice Concentration', fontsize=14)
             lns = [l1[0], l2[0]]
             labs = [l.get_label() for l in lns]
             ax.legend(lns, labs, fontsize=10,)# loc='center left', bbox_to_anchor=(1.02, 0.5))
@@ -716,7 +716,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                     ax_fit, cam_ice_fraction, broadband_alb_cam_time,
                     note=(f'SIF=1 end member: mean of SIF > {_SIF1_HIGH_:.2f}'
                           if is_high_sif_mean else None))
-                ax_fit.set_xlabel('Camera Sea Ice Fraction')
+                ax_fit.set_xlabel('Camera Sea Ice Concentration')
                 ax_fit.set_ylabel('Broadband Albedo')
                 ax_fit.set_title(f'{date_key} {case_tag}')
                 save_grl(fig_fit,
@@ -801,9 +801,9 @@ def analyze_ice_frac_alb(alb_product='native'):
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(6, 4))
                 sc = ax.scatter(cam_ice_fraction, kt19_cam_time, c='steelblue', alpha=0.6)
-                ax.set_xlabel('Camera Ice Fraction', fontsize=12)
+                ax.set_xlabel('Camera Sea Ice Concentration', fontsize=12)
                 ax.set_ylabel('KT19 Surface Temperature (°C)', fontsize=12)
-                ax.set_title(f'KT19 Surface Temperature vs Camera Ice Fraction\nDate: {date_key}, Case: {case_tag}', fontsize=13)
+                ax.set_title(f'KT19 Surface Temperature vs Camera Sea Ice Concentration\nDate: {date_key}, Case: {case_tag}', fontsize=13)
                 plt.tight_layout()
                 plt.savefig(f'{fig_dir}/kt19_cam_time_vs_ice_fraction_scatter_{date_key}_{case_tag}.png', dpi=300)
 
@@ -1043,10 +1043,10 @@ def analyze_ice_frac_alb(alb_product='native'):
                 print(f"    Mean YI Ratio: {yi_ratio_date_cond[-1]:.2f} +/- {yi_ratio_date_cond_std[-1]:.2f} %")
                 print(f"    Mean FYI+YI Ratio: {fyi_yi_ratio_date_cond[-1]:.2f} +/- {fyi_yi_ratio_date_cond_std[-1]:.2f} %")
                       
-            axr.set_xlabel('Camera Ice Fraction', fontsize=14)
+            axr.set_xlabel('Camera Sea Ice Concentration', fontsize=14)
             axr.set_ylabel('Broadband Albedo', fontsize=14)
             axr.tick_params(labelsize=12)
-            axr.set_title('Broadband Albedo vs. Camera Ice Fraction ', fontsize=13)
+            axr.set_title('Broadband Albedo vs. Camera Sea Ice Concentration ', fontsize=13)
             fig_bb.suptitle(f'Date: {date_key}, Case: {case_tag}, Alt < 1.6 km',
                             fontsize=16)
             fig_bb.savefig(f'{fig_dir}/arcsix_albedo_{date_key}_{case_tag}_broadband_ice_frac.png', bbox_inches='tight', dpi=150)
@@ -1176,7 +1176,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax.set_xticklabels(date_conditions, rotation=45, ha='right')
         ax.legend(handles=handles, fontsize=6, loc='lower left', ncol=2)
         ax.set_xlabel('Date and Case')
-        ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0')
+        ax.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0')
         # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 from Linear Fit')
         save_grl(fig, f'{fig_dir}/{savename}')
         plt.close(fig)
@@ -1221,7 +1221,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                 axes[i_above].tick_params(labelbottom=True)
             if i == 0:
                 ax_empty.legend(handles=handles, loc='center', fontsize=6, frameon=False)
-        fig.supxlabel('Camera Sea Ice Fraction')
+        fig.supxlabel('Camera Sea Ice Concentration')
         fig.supylabel('Broadband Albedo')
         fig.tight_layout()
         save_grl(fig, f'{fig_dir}/arcsix_albedo_broadband_icefraction_fit_all_legs')
@@ -1248,7 +1248,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
                            mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
         ax.set_xlabel('Date and Case', fontsize=14)
-        ax.set_ylabel(f'{wvl_label} Albedo at Ice Fraction = 1.0', fontsize=14)
+        ax.set_ylabel(f'{wvl_label} Albedo at Sea Ice Concentration = 1.0', fontsize=14)
         ax.tick_params(labelsize=12)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{savename}', bbox_inches='tight', dpi=150)
@@ -1286,8 +1286,8 @@ def analyze_ice_frac_alb(alb_product='native'):
                                 color='orange', linestyle='--',
                                 label=r'$\mathrm{R^2}$=%.3f, p=%.2e' % (res.rsquared, res.pvalues[1]))
             legend_handles.append(fit_line)
-        ax.set_xlabel(f'{wvl_label} Albedo at Sea Ice Fraction = 1.0', fontsize=14)
-        ax.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+        ax.set_xlabel(f'{wvl_label} Albedo at Sea Ice Concentration = 1.0', fontsize=14)
+        ax.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
         ax.tick_params(labelsize=12)
         ax.legend(handles=legend_handles, fontsize=10)
         fig.tight_layout()
@@ -1316,7 +1316,7 @@ def analyze_ice_frac_alb(alb_product='native'):
 
     ax.legend(fontsize=12)
     ax.set_xlabel('Mean Multi-year Sea Ice Ratio', fontsize=14)
-    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
+    ax.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
     ax.tick_params(labelsize=12)
     # ax.set_title('Broadband Albedo at Ice Fraction = 1.0 vs. Mean MYI Ratio', fontsize=13)
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio.png', bbox_inches='tight', dpi=150)
@@ -1366,7 +1366,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                    markerfacecolor='none', label='Cloudy'),
     ], fontsize=12)
     ax.set_xlabel('Mean Multi-year Sea Ice Ratio', fontsize=14)
-    ax.set_ylabel('Broadband Albedo at Ice Fraction = 1.0', fontsize=14)
+    ax.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
     ax.tick_params(labelsize=12)
     fig.savefig(f'{fig_dir}/arcsix_albedo_broadband_ice_frac_vs_myi_ratio_kt19.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
@@ -1390,7 +1390,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax1.legend(handles=[mpatches.Patch(color='blue', label='Clear'),
                              mpatches.Patch(color='gray', label='Cloudy')], fontsize=10)
         ax1.set_xlabel('Date and condition', fontsize=14)
-        ax1.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+        ax1.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
         # (b) scatter + WLS fit
         res_wls = sm.WLS(np.array(broadband_alb_date_cond), sm.add_constant(x_var)).fit()
         slope, intercept = res_wls.params[1], res_wls.params[0]
@@ -1403,7 +1403,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                        % (slope * 100, intercept, res_wls.rsquared, res_wls.pvalues[1]))
         ax2.legend(fontsize=12)
         ax2.set_xlabel(x_label, fontsize=14)
-        ax2.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+        ax2.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
         for ax, cap in zip([ax1, ax2], ['(a)', '(b)']):
             ax.tick_params(labelsize=12)
             ax.text(0, 1.07, cap, transform=ax.transAxes, fontsize=16, va='top', ha='left')
@@ -1488,7 +1488,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                       % (r_value, p_value))
         ax.legend(fontsize=11)
         ax.set_xlabel(xlabel, fontsize=14)
-        ax.set_ylabel('Broadband Albedo at Sea Ice Fraction = 1.0', fontsize=14)
+        ax.set_ylabel('Broadband Albedo at Sea Ice Concentration = 1.0', fontsize=14)
         ax.tick_params(labelsize=12)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{savename}', bbox_inches='tight', dpi=150)
@@ -1761,7 +1761,7 @@ def analyze_ice_frac_alb(alb_product='native'):
                 ax_.text(0,  1.07, cap, transform=ax_.transAxes, fontsize=16, va='top', ha='left')
             # two lines: the single-line label is taller than the GRL panel and
             # its ends were clipped at the figure edge in the saved raster
-            ax_.set_ylabel('Broadband Albedo\nat Sea Ice Fraction = 1.0', **label_kw)
+            ax_.set_ylabel('Broadband Albedo\nat Sea Ice Concentration = 1.0', **label_kw)
         fig.tight_layout()
         if grl:
             save_grl(fig, f'{fig_dir}/{savename}')   # strips .png, writes PNG+PDF
@@ -2067,10 +2067,10 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig, ax = plt.subplots(figsize=(9, 5))
         ax2 = ax.twinx()
         l1 = ax.scatter(time_ssfr, broadband_alb, label=f'Alt: {alt_avg:.1f}km', c='b', s=10)
-        l2 = ax2.scatter(cam_time, cam_ice_frac, label='Camera Ice Fraction', c='r', s=5)
+        l2 = ax2.scatter(cam_time, cam_ice_frac, label='Camera Sea Ice Concentration', c='r', s=5)
         ax.set_xlabel('Time (UTC)', fontsize=14)
         ax.set_ylabel('Broadband Albedo', fontsize=14)
-        ax2.set_ylabel('Camera Ice Fraction', fontsize=14)
+        ax2.set_ylabel('Camera Sea Ice Concentration', fontsize=14)
         ax.legend([l1, l2], [l1.get_label(), l2.get_label()], fontsize=10)
         ax.tick_params(labelsize=12)
         ax.set_title(f'Surface Albedo (atm corr + fit), {date_label}', fontsize=13)
@@ -2082,10 +2082,10 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig, ax = plt.subplots(figsize=(9, 5))
         ax2 = ax.twinx()
         l1 = ax.plot(time_ssfr, broadband_alb, c='skyblue', label='Broadband Albedo', alpha=0.75, linewidth=2)
-        l2 = ax2.plot(cam_time, cam_ice_frac, c='coral', label='Camera Ice Fraction', alpha=0.75, linewidth=1.5)
+        l2 = ax2.plot(cam_time, cam_ice_frac, c='coral', label='Camera Sea Ice Concentration', alpha=0.75, linewidth=1.5)
         ax.set_xlabel('Time (UTC)', fontsize=14)
         ax.set_ylabel('Broadband Albedo', fontsize=14)
-        ax2.set_ylabel('Camera Ice Fraction', fontsize=14)
+        ax2.set_ylabel('Camera Sea Ice Concentration', fontsize=14)
         ax.legend([l1[0], l2[0]], [l1[0].get_label(), l2[0].get_label()], fontsize=10)
         ax.tick_params(labelsize=12)
         ax.set_title(f'Surface Albedo (atm corr + fit), {date_label}', fontsize=13)
@@ -2096,10 +2096,10 @@ def analyze_ice_frac_alb(alb_product='native'):
         # 6. Camera ice fraction vs broadband albedo scatter
         fig, ax = plt.subplots(figsize=(8, 6))
         ax.scatter(cam_ice_frac, broadband_alb_cam, s=10, c='k')
-        ax.set_xlabel('Camera Ice Fraction', fontsize=14)
+        ax.set_xlabel('Camera Sea Ice Concentration', fontsize=14)
         ax.set_ylabel('Broadband Albedo', fontsize=14)
         ax.tick_params(labelsize=12)
-        ax.set_title(f'Surface Albedo vs Camera Ice Fraction, {date_label}', fontsize=13)
+        ax.set_title(f'Surface Albedo vs Camera Sea Ice Concentration, {date_label}', fontsize=13)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{prefix}_broadband_icefraction.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
@@ -2111,11 +2111,11 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig, ax = plt.subplots(figsize=(8, 6))
         for idx, wvl, col in zip(wvl_idxs, wvl_targets, wvl_colors):
             ax.scatter(cam_ice_frac, alb_cam[:, idx], s=10, c=col, label=f'{wvl}nm')
-        ax.set_xlabel('Camera Ice Fraction', fontsize=14)
+        ax.set_xlabel('Camera Sea Ice Concentration', fontsize=14)
         ax.set_ylabel('Surface Albedo', fontsize=14)
         ax.legend(fontsize=10)
         ax.tick_params(labelsize=12)
-        ax.set_title(f'Surface Albedo at Different Wavelengths vs Camera Ice Fraction, {date_label}', fontsize=13)
+        ax.set_title(f'Surface Albedo at Different Wavelengths vs Camera Sea Ice Concentration, {date_label}', fontsize=13)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{prefix}_wvl_icefraction.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
@@ -2137,7 +2137,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         ax.tick_params(labelsize=12)
         for band in gas_bands:
             ax.axvspan(band[0], band[1], color='gray', alpha=0.3)
-        ax.set_title(f'Correlation between Surface Albedo and Camera Ice Fraction vs Wavelength, {date_label}', fontsize=13)
+        ax.set_title(f'Correlation between Surface Albedo and Camera Sea Ice Concentration vs Wavelength, {date_label}', fontsize=13)
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{prefix}_wvl_icefraction_correlation.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
@@ -2227,7 +2227,7 @@ def analyze_ice_frac_alb(alb_product='native'):
     ax11_2.scatter(cam_t_dt, cam_ice, c='r', s=3)
     ax11.set_xlabel('Time (UTC)')
     ax11.set_ylabel('Broadband Albedo', color='b')
-    ax11_2.set_ylabel('Camera Sea Ice Fraction', color='r')
+    ax11_2.set_ylabel('Camera Sea Ice Concentration', color='r')
     ax11_2.set_ylim(-0.05, 1.05)
     ax11.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
     ax11.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
@@ -2287,7 +2287,7 @@ def analyze_ice_frac_alb(alb_product='native'):
     ax12.plot(sorted_cam_ice, slope_fig*sorted_cam_ice + intercept_fig, color='red', linestyle='--',
               zorder=3,
               label=r'Linear Fit: y=%.2fx+%.2f, $\mathrm{R^2}$=%.2f' % (slope_fig, intercept_fig, r_value_fig**2))
-    ax12.set_xlabel('Camera Sea Ice Fraction')
+    ax12.set_xlabel('Camera Sea Ice Concentration')
     ax12.set_ylabel('Broadband Albedo')
     # Small type and tight padding: at the default box width the legend reached
     # across the panel and covered the high-ice-fraction scatter at upper right.
@@ -2334,11 +2334,11 @@ def analyze_ice_frac_alb(alb_product='native'):
     ]:
         cam_t_leg, cam_ice_leg, bb_leg = leg_results[prefix]
         ax.scatter(cam_ice_leg, bb_leg, s=10, c=color, label=label, alpha=alpha, zorder=zorder)
-    ax.set_xlabel('Camera Ice Fraction', fontsize=14)
+    ax.set_xlabel('Camera Sea Ice Concentration', fontsize=14)
     ax.set_ylabel('Broadband Albedo', fontsize=14)
     ax.tick_params(labelsize=12)
     ax.legend(fontsize=10)
-    ax.set_title('Surface Albedo vs Camera Ice Fraction', fontsize=13)
+    ax.set_title('Surface Albedo vs Camera Sea Ice Concentration', fontsize=13)
     fig.tight_layout()
     fig.savefig(f'{fig_dir}/arcsix_albedo_0801_0802_broadband_icefraction.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
