@@ -199,3 +199,6 @@ cython_debug/
 
 # GRL manuscript (drafts, figures, LaTeX build artifacts) -- kept local
 lrt_sim/GRL-manuscript/
+
+# local manuscript notes
+lrt_sim/GRL_SI_REVISION_TODO.md
