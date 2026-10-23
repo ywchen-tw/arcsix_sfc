@@ -194,6 +194,174 @@ def plot_sif_fit_panel(ax, cam_ice, bb_alb, scatter_size=4, legend_fontsize=6,
     return res
 
 
+def _merge_bands(bands):
+    """Union of overlapping/touching (lo, hi) intervals.
+
+    ``settings.gas_bands`` overlaps itself (650-706, 705-760, 748-780 nm); one
+    translucent span per entry draws the overlaps darker, which reads as extra
+    spectral features. Merging first shades every wavelength exactly once.
+    """
+    merged = []
+    for lo, hi in sorted(bands):
+        if merged and lo <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], hi))
+        else:
+            merged.append((lo, hi))
+    return merged
+
+
+def plot_sif1_spectra_evolution(legs, fig_dir, csv_path, sif1_high=0.98,
+                                base='arcsix_albedo_sif1_spectra_evolution'):
+    """Ice/snow end-member (SIF=1) albedo spectra of every leg, over the campaign.
+
+    ``legs`` is a list of ``(leg, wvl, alb_sif1, method)``: the leg tag
+    ('YYYYMMDD_clear'), its wavelength grid (nm), the SIF=1 spectrum and the
+    gate method ('fit' or 'high_sif_mean'). Legs are drawn in list order.
+
+    Panel (a) overlays the spectra; panel (b) shows each leg minus the all-leg
+    median, which is where the legs separate. Color encodes
+    season and date (blues = spring, oranges = summer, darker = later; shades
+    are spaced by date rank so legs one day apart stay distinct), line style the
+    sky condition (solid clear, dashed cloudy), and a trailing '*' in the legend
+    marks legs whose end member is the mean of SIF > ``sif1_high`` rather than
+    the fit extrapolation. Gas-absorption bands are shaded; the spectra are
+    drawn through them.
+
+    Spring and summer SSFR grids differ by one channel, so the median and the
+    anomalies are evaluated on the first leg's grid; panel (a) uses each leg's
+    own grid.
+
+    Writes under ``fig_dir`` (PNG + PDF via save_grl):
+      {base}             two-panel GRL figure
+      {base}_a, _b       each panel alone, GRL style
+      {base}_slide_a, _b each panel alone, slide font sizes, MMDD dates (PNG only)
+    and the stacked spectra (wavelength + one column per leg) to ``csv_path``.
+    """
+    names  = [l[0] for l in legs]
+    dates  = [datetime.strptime(n.split('_')[0], '%Y%m%d') for n in names]
+    season = ['summer' if n[:8] > '20240630' else 'spring' for n in names]   # same split as sfx
+    sky    = ['clear' if 'clear' in n else 'cloudy' for n in names]
+    wvl    = np.asarray(legs[0][1], dtype=float)
+    spec   = np.array([np.interp(wvl, np.asarray(w, float), np.asarray(a, float))
+                       for _, w, a, _ in legs])
+    with warnings.catch_warnings():            # all-NaN wavelengths are expected
+        warnings.simplefilter('ignore', category=RuntimeWarning)
+        med = np.nanmedian(spec, axis=0)
+    anom = spec - med
+
+    def _labels(date_fmt):
+        """Legend entry per leg; GRL figures use '%d %b', slides the terser '%m%d'."""
+        return [f"{d:{date_fmt}} {k}" + (' *' if m == 'high_sif_mean' else '')
+                for d, k, (_, _, _, m) in zip(dates, sky, legs)]
+
+    # stacked spectra, one column per leg, with the gate method in the header
+    mean_legs = [n for n, (_, _, _, m) in zip(names, legs) if m == 'high_sif_mean']
+    df = pd.DataFrame({'wvl_nm': wvl})
+    for n, sp in zip(names, spec):
+        df[n] = sp
+    with open(csv_path, 'w') as f:
+        f.write("# Ice/snow end-member (SIF=1) albedo spectra per leg, on the first leg's wavelength grid.\n"
+                f"# End member = mean of SIF > {sif1_high:.2f} (not the fit extrapolation) for: "
+                f"{', '.join(mean_legs) if mean_legs else 'none'}\n")
+        df.to_csv(f, index=False)
+
+    # one sequential ramp per season; shades by date rank, not day count
+    def _season_colors(sea, cmap_name, lo=0.45, hi=0.9):
+        idx  = [i for i, s_ in enumerate(season) if s_ == sea]
+        cmap = plt.get_cmap(cmap_name)
+        return {i: cmap(lo + (hi - lo) * k / max(len(idx) - 1, 1)) for k, i in enumerate(idx)}
+    colors = {**_season_colors('spring', 'Blues'), **_season_colors('summer', 'Oranges')}
+    ls = {'clear': '-', 'cloudy': (0, (4, 1.5))}
+
+    def _shade(ax):
+        for lo, hi in _merge_bands(gas_bands):
+            ax.axvspan(lo, hi, facecolor='0.90', lw=0, zorder=0)
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(50))
+        ax.set_xlim(np.nanmin(wvl), np.nanmax(wvl))
+
+    def _draw_spectra(ax, lw, date_fmt='%d %b'):
+        """Panel (a). Returns {season: [leg handles]}."""
+        labels = _labels(date_fmt)
+        handles = {'spring': [], 'summer': []}
+        for i, (_, w, a, _) in enumerate(legs):
+            h, = ax.plot(w, a, color=colors[i], ls=ls[sky[i]], lw=lw, label=labels[i])
+            handles[season[i]].append(h)
+        _shade(ax)
+        ax.set_ylabel('Ice/snow end-member albedo')
+        ax.set_ylim(0, 1.05)
+        return handles
+
+    def _draw_anomaly(ax, lw, date_fmt='%d %b'):
+        """Panel (b). Returns {season: [leg handles]}."""
+        labels = _labels(date_fmt)
+        handles = {'spring': [], 'summer': []}
+        for i in range(len(legs)):
+            h, = ax.plot(wvl, anom[i], color=colors[i], ls=ls[sky[i]], lw=lw, label=labels[i])
+            handles[season[i]].append(h)
+        ax.axhline(0, color='0.3', lw=0.5)
+        _shade(ax)
+        ax.set_ylabel('Albedo $-$ all-leg median')
+        lim = 1.05 * np.nanmax(np.abs(anom))
+        ax.set_ylim(-lim, lim)
+        return handles
+
+    def _legend(fig, handles, lw, anchor_x, date_fmt='%d %b'):
+        def hdr(t): return plt.Line2D([], [], color='none', label=t)
+        sp = [d for d, s_ in zip(dates, season) if s_ == 'spring']
+        su = [d for d, s_ in zip(dates, season) if s_ == 'summer']
+        hs = [plt.Line2D([], [], color='0.4', ls=ls['clear'],  lw=lw, label='clear'),
+              plt.Line2D([], [], color='0.4', ls=ls['cloudy'], lw=lw, label='cloudy')]
+        if sp:
+            hs += [hdr(''), hdr(f'Spring ({min(sp):{date_fmt}} \u2013 {max(sp):{date_fmt}})')] + handles['spring']
+        if su:
+            hs += [hdr(''), hdr(f'Summer ({min(su):{date_fmt}} \u2013 {max(su):{date_fmt}})')] + handles['summer']
+        lg = fig.legend(handles=hs, loc='center left', bbox_to_anchor=(anchor_x, 0.5),
+                        frameon=False, handlelength=2.2, handletextpad=0.6, labelspacing=0.35)
+        for t in lg.get_texts():
+            if t.get_text().startswith(('Spring', 'Summer')):
+                t.set_fontweight('bold')
+
+    # --- two-panel GRL figure -------------------------------------------------
+    plt.close('all')
+    fig, (ax_a, ax_b) = plt.subplots(
+        2, 1, figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.95),
+        sharex=True, gridspec_kw={'height_ratios': [1, 1.3]})
+    handles = _draw_spectra(ax_a, lw=1.1)
+    _draw_anomaly(ax_b, lw=1.1)
+    ax_a.tick_params(labelbottom=False)
+    ax_b.set_xlabel('Wavelength (nm)')
+    add_panel_label(ax_a, '(a)')
+    add_panel_label(ax_b, '(b)')
+    _legend(fig, handles, 1.1, anchor_x=0.765)
+    fig.subplots_adjust(left=0.08, right=0.75, top=0.95, bottom=0.08, hspace=0.08)
+    save_grl(fig, f'{fig_dir}/{base}')
+    plt.close(fig)
+
+    # --- each panel alone: GRL style, then slide font sizes -------------------
+    slide_rc = {'font.size': 14, 'axes.labelsize': 16, 'xtick.labelsize': 13,
+                'ytick.labelsize': 13, 'legend.fontsize': 12, 'axes.linewidth': 1.0,
+                'xtick.major.width': 1.0, 'ytick.major.width': 1.0,
+                'xtick.minor.width': 0.7, 'ytick.minor.width': 0.7}
+    for tag, draw in (('a', _draw_spectra), ('b', _draw_anomaly)):
+        # GRL
+        fig, ax = plt.subplots(figsize=figsize_mm(FULL_WIDTH_MM, FULL_WIDTH_MM * 0.55))
+        handles = draw(ax, lw=1.1)
+        ax.set_xlabel('Wavelength (nm)')
+        _legend(fig, handles, 1.1, anchor_x=0.765)
+        fig.subplots_adjust(left=0.08, right=0.75, top=0.95, bottom=0.12)
+        save_grl(fig, f'{fig_dir}/{base}_{tag}')
+        plt.close(fig)
+        # slide: larger type, heavier lines, MMDD dates for quick reading, PNG only
+        with mpl.rc_context(slide_rc):
+            fig, ax = plt.subplots(figsize=(12, 6.5))
+            handles = draw(ax, lw=2.0, date_fmt='%m%d')
+            ax.set_xlabel('Wavelength (nm)')
+            _legend(fig, handles, 2.0, anchor_x=0.775, date_fmt='%m%d')
+            fig.subplots_adjust(left=0.08, right=0.76, top=0.95, bottom=0.12)
+            save_grl(fig, f'{fig_dir}/{base}_slide_{tag}', dpi=200, formats=('png',))
+            plt.close(fig)
+
+
 def analyze_ice_frac_alb(alb_product='native'):
     log = logging.getLogger("atm corr combined")
 
@@ -251,6 +419,7 @@ def analyze_ice_frac_alb(alb_product='native'):
     date_conditions = []
     sif1_audit = []               # per-leg ice/snow end-member gate diagnostics
     sif_fit_legs = []             # (leg, cam SIF, broadband alb, is_high_sif_mean) for the all-leg overview
+    sif1_spectra_legs = []        # (leg, wvl, SIF=1 spectrum, method) for the spectral-evolution figure
     era5_date_cond = []           # per-leg collocated ERA5 broadband albedo
     broadband_alb_date_cond = []
     broadband_alb_date_cond_upper = []
@@ -413,8 +582,9 @@ def analyze_ice_frac_alb(alb_product='native'):
 
         Writes ``{prefix}_wvl_icefraction_fit.csv`` (wvl, slope, intercept=SIF=0,
         r2, alb_sif1=ice/snow end member at SIF=1) and the companion
-        intercept/SIF=1 spectra figure. Returns (slope, intercept, r2, alb_sif1)
-        arrays for reuse.
+        intercept/SIF=1 spectra figure. Returns (slope, intercept, r2, alb_sif1,
+        method) for reuse; *method* is the one actually applied, which falls
+        back to 'fit' when too few high-SIF spectra exist for the mean.
 
         *method* comes from the leg's broadband gate (see ``_alb_at_sif1``):
         ``'fit'`` extrapolates the per-wavelength regression to SIF=1,
@@ -484,7 +654,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         fig.tight_layout()
         fig.savefig(f'{fig_dir}/{prefix}_intercept_sif1_spectra.png', bbox_inches='tight', dpi=150)
         plt.close(fig)
-        return wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1
+        return wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1, method
 
     # best time-shift results: {(date_key, case_tag): {'shift_s': int, 'r': float}}
     kt19_hdrf_best_shift = {}
@@ -664,10 +834,16 @@ def analyze_ice_frac_alb(alb_product='native'):
                 sif1_method = sif1_info['method']
                 sif1_audit.append(dict(leg=f'{date_key}_{case_tag}', **sif1_info))
 
-                # per-wavelength fit + CSV + intercept/SIF=1 spectra figure for this case
-                _fit_wvl_icefraction(alb_wvl, cam_ice_fraction, alb_cam_time,
-                                     f'arcsix_albedo_{date_key}_{case_tag}', f'{date_key} {case_tag}',
-                                     method=sif1_method)
+                # per-wavelength fit + CSV + intercept/SIF=1 spectra figure for this case;
+                # the SIF=1 spectrum is kept for the all-leg spectral-evolution figure
+                _, _, _, wvl_alb_sif1_leg, wvl_sif1_method = _fit_wvl_icefraction(
+                    alb_wvl, cam_ice_fraction, alb_cam_time,
+                    f'arcsix_albedo_{date_key}_{case_tag}', f'{date_key} {case_tag}',
+                    method=sif1_method)
+                sif1_spectra_legs.append((f'{date_key}_{case_tag}',
+                                          np.asarray(alb_wvl, dtype=float).copy(),
+                                          np.asarray(wvl_alb_sif1_leg, dtype=float).copy(),
+                                          wvl_sif1_method))
                 x_sorted, y_pred, lower_bound, upper_bound, res = linear_regression_with_confidence(
                     cam_ice_fraction[valid_mask], broadband_alb_cam_time[valid_mask], confidence=0.95)
                 axr.plot(x_sorted, y_pred, color='orange', linestyle='--',
@@ -1185,6 +1361,16 @@ def analyze_ice_frac_alb(alb_product='native'):
     _plot_sif1_summary('arcsix_albedo_broadband_ice_frac_fit_summary_lat', show_lat=True)
     _plot_sif1_summary('arcsix_albedo_broadband_ice_frac_fit_summary_noref',
                        show_lat=False, show_lit=False)
+
+    # --- ice/snow end-member (SIF=1) spectra across legs --------------------
+    # Spectral companion to the broadband summary above: every leg's SIF=1
+    # spectrum overlaid, and its departure from the all-leg median, to show how
+    # the end member evolves over the campaign (see plot_sif1_spectra_evolution).
+    if len(sif1_spectra_legs) > 0:
+        plot_sif1_spectra_evolution(
+            sif1_spectra_legs, fig_dir,
+            csv_path=f'{wvl_fit_dir}/arcsix_albedo_sif1_spectra_all_legs.csv',
+            sif1_high=_SIF1_HIGH_)
 
     # --- all-leg overview: one fit panel per leg of the summary above --------
     # Shared axes so the legs are directly comparable; the equation and R^2 go
@@ -2121,7 +2307,7 @@ def analyze_ice_frac_alb(alb_product='native'):
         plt.close(fig)
 
         # 8. Per-wavelength fit -> CSV + intercept/SIF=1 spectra figure (shared helper)
-        wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1 = _fit_wvl_icefraction(
+        wvl_slope, wvl_intercept, wvl_r2, wvl_alb_sif1, _ = _fit_wvl_icefraction(
             alb_wvl, cam_ice_frac, alb_cam, prefix, date_label)
 
         # Slope and R² vs wavelength
